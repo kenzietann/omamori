@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+    <img src="docs/assets/logo.png" alt="Omamori logo" width="320">
+  </picture>
+</p>
+
 # Omamori (お守り)
 
 [日本語](README.jp.md)
