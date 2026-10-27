@@ -1,0 +1,18 @@
+# Private planning docs (PRD and old versions)
+docs/omamori-prd-*.md
+docs/archive/
+
+# Secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# macOS
+.DS_Store
+
+# Private workspace files
+AGENTS.md
+CLAUDE.md
+DECISIONS.md
