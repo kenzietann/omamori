@@ -97,6 +97,9 @@ SIEM ではありません。ホスト型のサービスでもありません。
 Go を使います。テストは `go test` で行い、ファズテストも使います。ターミナル画面は
 Bubble Tea を使う予定です(まだ決まっていません)。
 
+コードのスタイル: 名前は分かりやすい単語で書きます(`x` ではなく `expectedCheckDigit` の
+ように)。コミットメッセージは Conventional Commits に従います。
+
 ## ライセンス
 
 MIT。[LICENSE](LICENSE) を見てください。

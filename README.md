@@ -94,6 +94,9 @@ January (all must-have parts are done).
 Go. Tests with `go test`, including fuzz tests. Terminal screen with Bubble Tea
 (not final yet).
 
+Code style: I use clear, full-word names (like `expectedCheckDigit`, not `x`). Commit
+messages follow Conventional Commits.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
