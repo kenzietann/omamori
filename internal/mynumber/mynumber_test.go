@@ -73,3 +73,45 @@ func TestBadInputs(t *testing.T) {
 		})
 	}
 }
+
+func TestValidate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		inputDigits string
+		wantValid   bool
+	}{
+		{"V01", "123456789018", true},
+		{"V02", "999999999996", true},
+		{"V03", "000000000000", true},
+		{"V04", "200000000000", true},
+		{"V05", "000000000051", true},
+		{"V06", "100000000005", true},
+		{"V07", "000000000060", true},
+		{"I01", "123456789019", false},
+		{"I02", "223456789018", false},
+		{"I03", "213456789018", false},
+		{"I04", "000000000050", false},
+		{"L01", "12345678901", false},
+		{"L02", "1234567890180", false},
+		{"L03", "", false},
+		{"L04", "123456789018\n", false},
+		{"N01", "12345678901A", false},
+		{"N02", "1234 5678 9018", false},
+		{"N03", "1234-5678-9018", false},
+		{"N04", "１２３４５６７８９０１８", false},
+		{"N05", "١٢٣٤٥٦٧٨٩٠١٨", false},
+		{"N06", "12345678901８", false},
+		{"12 bytes, Arabic-Indic digit", "1234567890١", false},
+		{"12 bytes, full-width digit", "123456789０", false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			gotValid := Validate(testCase.inputDigits)
+
+			if gotValid != testCase.wantValid {
+				t.Errorf("Validate(%q) = %v, want %v", testCase.inputDigits, gotValid, testCase.wantValid)
+			}
+		})
+	}
+}
