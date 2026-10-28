@@ -115,3 +115,11 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func FuzzValidate(f *testing.F) {
+	f.Add("123456789018")
+
+	f.Fuzz(func(t *testing.T, inputDigits string) {
+		Validate(inputDigits)
+	})
+}
