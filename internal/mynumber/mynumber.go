@@ -32,3 +32,20 @@ func CheckDigit(myNumber string) (int, error) {
 		return 11 - remainder, nil
 	}
 }
+
+func Validate(inputDigits string) bool {
+	if len(inputDigits) != 12 {
+		return false
+	}
+
+	checkDigit, err := CheckDigit(inputDigits[:11])
+
+	if err != nil {
+		return false
+	}
+
+	if checkDigit == int(inputDigits[11]-'0') {
+		return true
+	}
+	return false
+}
