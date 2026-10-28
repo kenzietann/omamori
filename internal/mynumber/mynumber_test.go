@@ -52,6 +52,15 @@ func TestBadInputs(t *testing.T) {
 		{"letter", "1234567890a", true},
 		{"valid control", "12345678901", false},
 		{"punctuation", "18'2332?.@,", true},
+		{"empty", "", true},
+		{"too long", "123456789012", true},
+		{"space", "1234 678901", true},
+		{"hyphen", "1234-678901", true},
+		{"trailing newline", "1234567890\n", true},
+		{"full-width digits", "１２３４５６７８９０１", true},
+		{"Arabic-Indic digits", "١٢٣٤٥٦٧٨٩٠١", true},
+		{"full-width digit, 11 bytes", "12345678９", true},
+		{"Arabic-Indic digit, 11 bytes", "123456789١", true},
 	}
 
 	for _, testCase := range testCases {
