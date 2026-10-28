@@ -1,9 +1,18 @@
 package mynumber
 
+import "errors"
+
 func CheckDigit(myNumber string) (int, error) {
+	if len(myNumber) != 11 {
+		return 0, errors.New("The inputted number digits is not 11")
+	}
+
 	digitsInArray := make([]int, len(myNumber))
 
 	for k, char := range myNumber {
+		if char < '0' || char > '9' {
+			return 0, errors.New("Unsupported digits detected")
+		}
 		digitsInArray[k] = int(char - '0')
 	}
 

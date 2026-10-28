@@ -15,6 +15,17 @@ func TestCheckDigit(t *testing.T) {
 		{"Z01", "00000000000", 0},
 		{"R1", "20000000000", 0},
 		{"R10", "00000000005", 1},
+		{"W01", "10000000000", 5},
+		{"W02", "01000000000", 6},
+		{"W03", "00100000000", 7},
+		{"W04", "00010000000", 8},
+		{"W05", "00001000000", 9},
+		{"W06", "00000100000", 4},
+		{"W07", "00000010000", 5},
+		{"W08", "00000001000", 6},
+		{"W09", "00000000100", 7},
+		{"W10", "00000000010", 8},
+		{"W11", "00000000001", 9},
 	}
 
 	for _, testCase := range testData {
@@ -26,6 +37,29 @@ func TestCheckDigit(t *testing.T) {
 			}
 			if gotCheckDigit != testCase.wantCheckDigit {
 				t.Errorf("CheckDigit(%q) = %d, want %d", testCase.inputDigits, gotCheckDigit, testCase.wantCheckDigit)
+			}
+		})
+	}
+}
+
+func TestBadInputs(t *testing.T) {
+	testCases := []struct {
+		name        string
+		inputDigits string
+		wantError   bool
+	}{
+		{"too short", "123", true},
+		{"letter", "1234567890a", true},
+		{"valid control", "12345678901", false},
+		{"punctuation", "18'2332?.@,", true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := CheckDigit(testCase.inputDigits)
+			gotError := err != nil
+			if gotError != testCase.wantError {
+				t.Errorf("CheckDigit(%q): got error = %v, want error = %v", testCase.inputDigits, gotError, testCase.wantError)
 			}
 		})
 	}
