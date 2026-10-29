@@ -1,6 +1,9 @@
 package mynumber
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestCheckDigit(t *testing.T) {
 	type checkDigitCase struct {
@@ -122,4 +125,32 @@ func FuzzValidate(f *testing.F) {
 	f.Fuzz(func(t *testing.T, inputDigits string) {
 		Validate(inputDigits)
 	})
+}
+
+func TestFindMyNumbers(t *testing.T) {
+	testCases := []struct {
+		name        string
+		inputText   string
+		wantMatches []Match
+	}{
+		{"only the number", "123456789018", []Match{{0, 12}}},
+		{"in a sentence", "id 123456789018 ok", []Match{{3, 15}}},
+		{"with spaces", "1234 5678 9018", []Match{{0, 14}}},
+		{"letters touching", "a123456789018b", []Match{{1, 13}}},
+		{"13 digits", "1234567890180", nil},
+		{"bad check digit", "123456789019", nil},
+		{"mixed separators", "1234 5678-9018", nil},
+		{"two numbers", "123456789018 and 999999999996", []Match{{0, 12}, {17, 29}}},
+		{"empty text", "", nil},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			gotMatches := FindMyNumbers(testCase.inputText)
+
+			if !slices.Equal(gotMatches, testCase.wantMatches) {
+				t.Errorf("FindMyNumbers(%q) = %v, want %v", testCase.inputText, gotMatches, testCase.wantMatches)
+			}
+		})
+	}
 }
