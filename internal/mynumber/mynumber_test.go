@@ -150,6 +150,10 @@ func TestFindMyNumbers(t *testing.T) {
 		{"full-width and ASCII mixed", "１２３４５６７８９０１8", []Match{{0, 34}}},
 		{"full-width, digit after", "１２３４５６７８９０１８１", nil},
 		{"full-width, digit before", "０１２３４５６７８９０１８", nil},
+		{"full-width space", "1234　5678　9018", []Match{{0, 18}}},
+		{"full-width space and digits", "１２３４　５６７８　９０１８", []Match{{0, 42}}},
+		{"full-width space mixed with normal space", "1234　5678 9018", nil},
+		{"full-width space, bad check digit", "1234　5678　9019", nil},
 	}
 
 	for _, testCase := range testCases {
