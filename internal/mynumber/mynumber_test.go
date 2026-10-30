@@ -142,6 +142,8 @@ func TestFindMyNumbers(t *testing.T) {
 		{"mixed separators", "1234 5678-9018", nil},
 		{"two numbers", "123456789018 and 999999999996", []Match{{0, 12}, {17, 29}}},
 		{"empty text", "", nil},
+		{"digit only after", "1234567890181", nil},
+		{"digit only before", "0123456789018", nil},
 	}
 
 	for _, testCase := range testCases {
@@ -153,4 +155,15 @@ func TestFindMyNumbers(t *testing.T) {
 			}
 		})
 	}
+}
+
+func FuzzFindMyNumbers(f *testing.F) {
+	f.Add("id 123456789018")
+	f.Add("1234 5678 9018")
+	f.Add("1234567890180")
+	f.Add("")
+
+	f.Fuzz(func(t *testing.T, inputText string) {
+		FindMyNumbers(inputText)
+	})
 }
