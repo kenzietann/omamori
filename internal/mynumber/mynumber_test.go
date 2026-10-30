@@ -144,6 +144,12 @@ func TestFindMyNumbers(t *testing.T) {
 		{"empty text", "", nil},
 		{"digit only after", "1234567890181", nil},
 		{"digit only before", "0123456789018", nil},
+		{"full-width digits", "１２３４５６７８９０１８", []Match{{0, 36}}},
+		{"full-width in a sentence", "id １２３４５６７８９０１８ ok", []Match{{3, 39}}},
+		{"full-width with spaces", "１２３４ ５６７８ ９０１８", []Match{{0, 38}}},
+		{"full-width and ASCII mixed", "１２３４５６７８９０１8", []Match{{0, 34}}},
+		{"full-width, digit after", "１２３４５６７８９０１８１", nil},
+		{"full-width, digit before", "０１２３４５６７８９０１８", nil},
 	}
 
 	for _, testCase := range testCases {
