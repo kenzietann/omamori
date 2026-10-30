@@ -106,7 +106,7 @@ func FindMyNumbers(text string) []Match {
 				firstSeparator := characters[index+4]
 				secondSeparator := characters[index+9]
 
-				if (firstSeparator == ' ' || firstSeparator == '-') && firstSeparator == secondSeparator {
+				if (firstSeparator == ' ' || firstSeparator == '-' || firstSeparator == '　') && firstSeparator == secondSeparator {
 					length = 14
 				}
 			}
