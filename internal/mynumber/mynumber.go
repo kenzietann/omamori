@@ -62,7 +62,7 @@ func FindMyNumbers(text string) []Match {
 	var matches []Match
 
 	index := 0
-	for index < len(text) { 
+	for index < len(text) {
 		startsWithDigit := text[index] >= '0' && text[index] <= '9'
 
 		digitBefore := index > 0 && text[index-1] >= '0' && text[index-1] <= '9'
@@ -73,17 +73,17 @@ func FindMyNumbers(text string) []Match {
 			digits := ""
 			length := 0
 
-			if index + 12 <= len(text) {
+			if index+12 <= len(text) {
 				digits = text[index : index+12]
 				length = 12
 			}
 
-			if index + 14 <= len(text) {
+			if index+14 <= len(text) {
 				firstSeparator := text[index+4]
 				secondSeparator := text[index+9]
 
 				if (firstSeparator == ' ' || firstSeparator == '-') && firstSeparator == secondSeparator {
-					digits = text[index:index + 4] + text[index + 5:index + 9] + text[index + 10:index + 14]
+					digits = text[index:index+4] + text[index+5:index+9] + text[index+10:index+14]
 					length = 14
 				}
 			}
@@ -105,7 +105,7 @@ func FindMyNumbers(text string) []Match {
 
 		if matchLength > 0 {
 			matches = append(matches, Match{Start: index, End: index + matchLength})
-			index += matchLength 
+			index += matchLength
 		} else {
 			index++
 		}
