@@ -129,3 +129,14 @@ func FuzzSanitize(f *testing.F) {
 		}
 	})
 }
+
+func TestAPrivateKeyBlockBecomesOnePlaceholderAndNoLineOfItRemains(t *testing.T) {
+	block := "-----BEGIN RSA PRIVATE KEY-----\nFAKEFAKEFAKEFAKEFAKE\nFAKEFAKEFAKE/+=\n-----END RSA PRIVATE KEY-----"
+	var sanitizer Sanitizer
+
+	got, findings := sanitizer.Sanitize("line one\n" + block + "\nline last\n")
+
+	if got != "line one\n[SECRET:private-key:001]\nline last\n" || len(findings) != 1 {
+		t.Errorf("got %q with %d findings", got, len(findings))
+	}
+}

@@ -129,7 +129,7 @@ func renderLimits(stats Stats) string {
 	var limits strings.Builder
 
 	limits.WriteString("## Limits\n\n")
-	limits.WriteString("- Omamori looks for four things: AWS access key IDs (AKIA, ASIA), GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_), My Number, and Japanese phone numbers.\n")
+	limits.WriteString("- Omamori looks for: AWS access key IDs (AKIA, ASIA), GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_), AI provider keys (sk-), Google API keys (AIza), Slack tokens (xox), Stripe live keys, JWTs, private key blocks, passwords written inside web addresses, My Number, and Japanese phone numbers.\n")
 	limits.WriteString("- It does not find or hide other secret formats, passwords, email addresses, IP addresses, names, or street addresses.\n")
 	limits.WriteString("- A My Number with a valid check digit is a possible identifier, not proof.\n")
 	limits.WriteString("- Findings come only from the files that the scans in this run covered. Anything else is not covered.\n")

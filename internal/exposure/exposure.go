@@ -120,6 +120,14 @@ func describe(label string) (findingType, severity, advice string) {
 		return "aws-access-key", "high", "Rotate this AWS access key in IAM, then check CloudTrail for use. Remove it from the code and from the git history. Use a secrets manager or an environment variable."
 	case label == "SECRET:github-token":
 		return "github-token", "high", "Revoke this token in the GitHub settings, then create a new one with the smallest scope. Remove it from the code and from the git history."
+	case label == "SECRET:private-key":
+		return "private-key", "high", "Treat this private key as leaked: create a new key pair and replace the old one everywhere it was used. Remove the file from the code and from the git history."
+	case label == "SECRET:ai-api-key":
+		return "ai-api-key", "high", "Revoke this AI provider key in the provider console, then create a new one. Check the usage page for calls you did not make. Remove it from the code and from the git history."
+	case label == "SECRET:url-credentials":
+		return "url-credentials", "high", "Change the password of this account. Take the password out of the address and read it from an environment variable or a secrets manager."
+	case label == "SECRET:jwt":
+		return "jwt", "high", "A token that is still valid can be used by anyone who has it. Revoke or let it expire, check that its signing key is not exposed, and remove it from the code."
 	case strings.HasPrefix(label, "SECRET:"):
 		return strings.TrimPrefix(label, "SECRET:"), "high", "Rotate this secret. Remove it from the code and from the git history."
 	case label == "MYNUMBER":
