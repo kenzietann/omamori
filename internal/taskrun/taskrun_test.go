@@ -1188,3 +1188,51 @@ func TestMarkupInFileNamesFileContentsAndAINotesIsOnlyTextInTheHTMLReport(t *tes
 		t.Error("the page or the report is wrong about the phone number")
 	}
 }
+
+func TestNewSecretFormatsAreFoundWithTheRightLineAndNeverReachTheProviderOrAFile(t *testing.T) {
+	setup := newSetup(t, scanAll(), answerText("Rotate them."))
+	project := filepath.Join(t.TempDir(), "project")
+	copyTree(t, setup.project, project)
+	setup.config.Target = project
+	block := "-----BEGIN PRIVATE KEY-----\nFAKEFAKEFAKEFAKEBODYLINE1\nFAKEFAKEFAKEFAKEBODYLINE2\n-----END PRIVATE KEY-----\n"
+	files := map[string]string{
+		"deploy/key.pem":  "# fake\n" + block,
+		"app/settings.py": "x = 1\nAI = 'sk-" + "proj-FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE1234'\nDB = 'postgres://admin:FakePass123@db.example.com/app'\n",
+	}
+	for name, content := range files {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(project, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(project, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	session := setup.session(t)
+	session.Confirm()
+
+	result, err := session.Run(context.Background(), func(string) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{"| deploy/key.pem | 2 |", "| app/settings.py | 2 |", "| app/settings.py | 3 |", "private-key", "ai-api-key", "url-credentials"} {
+		if !strings.Contains(result.Report, want) {
+			t.Errorf("the report has no %q:\n%s", want, result.Report)
+		}
+	}
+	var sent strings.Builder
+	for _, request := range setup.provider.recorded {
+		for _, message := range request.Messages {
+			sent.WriteString(message.Text)
+		}
+	}
+	everything := sent.String() + result.Report
+	for _, content := range outputFiles(t, setup.output) {
+		everything += content
+	}
+	for _, planted := range []string{"BODYLINE1", "BODYLINE2", "sk-proj-FAKEFAKE", "FakePass123"} {
+		if strings.Contains(everything, planted) {
+			t.Errorf("%q reached a request, the report or a file", planted)
+		}
+	}
+}

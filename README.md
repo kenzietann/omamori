@@ -99,12 +99,25 @@ numbers changed between runs.
 - Your API key is never printed, logged, or written to a file. On macOS it can be
   kept in the Keychain.
 
+## What it detects
+
+- AWS access key IDs (`AKIA`, `ASIA`) and GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`)
+- AI provider keys (`sk-`, including `sk-ant-` and `sk-proj-`), Google API keys (`AIza`),
+  Slack tokens (`xox`), Stripe live keys (`sk_live_`, `rk_live_`)
+- JWTs (three parts, starting with `eyJ`)
+- Private key blocks (the whole block, from BEGIN to END)
+- Passwords written inside web or database addresses (`scheme://user:password@host`)
+- マイナンバー (a valid check digit gives "possible identifier" only) and Japanese phone numbers
+
+Every detector has a test table with fake values, a list of look-alikes that must not match,
+and a fuzz test.
+
 ## What it cannot do
 
 I want to be clear about the limits.
 
-- It only removes the data types it can detect: some secret formats,
-  マイナンバー, and Japanese phone numbers.
+- It only removes the data types it can detect (see above). A password in a
+  config line like `password = hunter2` is not found.
 - It does **not** remove IP addresses, names, or street addresses in v1.
   IP addresses stay because log triage needs them.
 - A valid マイナンバー check digit only means "possible identifier". About 1 in
