@@ -151,7 +151,7 @@ func newStack(t testing.TB, script func(int) reply, authorize bool) *stack {
 func (built *stack) agent(t testing.TB, recorder Recorder, limits Limits) *Agent {
 	t.Helper()
 
-	agent, err := New(built.sender, built.gateway, recorder, limits)
+	agent, err := New(built.sender, built.gateway, recorder, limits, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func TestTheLoopChecksCancelItselfBeforeEveryProviderCall(t *testing.T) {
 	cancel()
 	built := newStack(t, always(finalText("hi")), true)
 	sender := &countingSender{}
-	agent, err := New(sender, built.gateway, &fakeRecorder{}, generousLimits)
+	agent, err := New(sender, built.gateway, &fakeRecorder{}, generousLimits, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -536,7 +536,7 @@ func TestNewRejectsBadSetup(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if _, err := New(testCase.sender, testCase.tools, testCase.recorder, testCase.limits); !errors.Is(err, ErrInvalidSetup) {
+			if _, err := New(testCase.sender, testCase.tools, testCase.recorder, testCase.limits, nil); !errors.Is(err, ErrInvalidSetup) {
 				t.Errorf("err = %v, want ErrInvalidSetup", err)
 			}
 		})
@@ -569,4 +569,99 @@ func FuzzRun(f *testing.F) {
 		}
 		assertNothingSensitiveWasSent(t, built)
 	})
+}
+
+func toolWithID(id, name string, arguments map[string]string) outbound.ToolCall {
+	return outbound.ToolCall{ID: id, Name: name, Arguments: arguments}
+}
+
+func TestEveryToolResultPointsToItsToolCall(t *testing.T) {
+	script := inOrder(
+		calls(
+			toolWithID("toolu_first", "list_dir", nil),
+			toolWithID("toolu_second", "read_file", map[string]string{"path": "notes/harmless.txt"}),
+			toolWithID("bad id with spaces", "list_dir", nil),
+			tool("read file", nil),
+		),
+		finalText("done"),
+	)
+	built := newStack(t, script, true)
+
+	outcome := built.agent(t, &fakeRecorder{}, generousLimits).Run(context.Background(), "go")
+	if outcome.Status != Complete {
+		t.Fatalf("outcome = %+v", outcome)
+	}
+
+	secondRequest := built.provider.recorded[1].Messages
+	assistant := secondRequest[1]
+	if len(assistant.ToolCalls) != 2 || assistant.ToolCalls[0].ID != "toolu_first" || assistant.ToolCalls[1].ID != "toolu_second" {
+		t.Errorf("the assistant calls lost their IDs: %+v", assistant.ToolCalls)
+	}
+
+	var linked, unlinked []string
+	for _, message := range secondRequest[2:] {
+		if message.Role != "tool" {
+			t.Errorf("unexpected role %q after the tool calls", message.Role)
+		}
+		if message.ToolCallID != "" {
+			linked = append(linked, message.ToolCallID)
+		} else {
+			unlinked = append(unlinked, message.Text)
+		}
+	}
+	if !reflect.DeepEqual(linked, []string{"toolu_first", "toolu_second"}) {
+		t.Errorf("results are linked to %v, want the two real calls in order", linked)
+	}
+	if len(unlinked) != 2 || !strings.Contains(unlinked[0], "invalid_call") {
+		t.Errorf("the dropped calls should be reported without an ID: %v", unlinked)
+	}
+}
+
+func TestEveryRequestCarriesTheToolSpecs(t *testing.T) {
+	built := newStack(t, inOrder(calls(tool("list_dir", nil)), finalText("done")), true)
+	specs := SpecsFromGateway(built.gateway.Specs())
+	runner, err := New(built.sender, built.gateway, &fakeRecorder{}, generousLimits, specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runner.Run(context.Background(), "go")
+
+	if len(specs) != 4 || len(built.provider.recorded) != 2 {
+		t.Fatalf("specs = %d, requests = %d", len(specs), len(built.provider.recorded))
+	}
+	for index, recorded := range built.provider.recorded {
+		if !reflect.DeepEqual(recorded.Tools, specs) {
+			t.Errorf("request %d has the wrong tools: %+v", index, recorded.Tools)
+		}
+	}
+	for _, spec := range specs {
+		if spec.Name == "run_detectors" && (len(spec.Parameters) != 1 || !spec.Parameters[0].Required || spec.Parameters[0].Name != "path") {
+			t.Errorf("run_detectors was converted wrongly: %+v", spec)
+		}
+	}
+}
+
+func TestRefusalAndKeyProblemsHaveTheirOwnReasons(t *testing.T) {
+	testCases := []struct {
+		name        string
+		providerErr error
+		wantReason  string
+	}{
+		{"declined", outbound.ErrRefused, "provider declined"},
+		{"bad key", outbound.ErrAuth, "key rejected"},
+		{"other error", errors.New("boom"), "provider failed"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			built := newStack(t, always(reply{err: testCase.providerErr}), true)
+
+			outcome := built.agent(t, &fakeRecorder{}, generousLimits).Run(context.Background(), "go")
+
+			if outcome.Status != Incomplete || outcome.Reason != testCase.wantReason || len(built.provider.recorded) != 1 {
+				t.Errorf("outcome = %+v, provider calls = %d", outcome, len(built.provider.recorded))
+			}
+		})
+	}
 }

@@ -229,6 +229,16 @@ func TestInvalidRequests(t *testing.T) {
 		{"a secret as an argument name", Request{Messages: []Message{{Role: "assistant", ToolCalls: []ToolCall{{Name: "read_file", Arguments: map[string]string{fakeAWSKey: "x"}}}}}}},
 		{"empty tool name", Request{Messages: []Message{{Role: "assistant", ToolCalls: []ToolCall{{Name: ""}}}}}},
 		{"tool name with a space", Request{Messages: []Message{{Role: "assistant", ToolCalls: []ToolCall{{Name: "read file"}}}}}},
+		{"a result ID on a user message", Request{Messages: []Message{{Role: "user", Text: "hi", ToolCallID: "toolu_1"}}}},
+		{"a result ID with a space", Request{Messages: []Message{{Role: "tool", Text: "x", ToolCallID: "bad id"}}}},
+		{"a secret-shaped result ID with brackets", Request{Messages: []Message{{Role: "tool", Text: "x", ToolCallID: "[SECRET:aws:001]"}}}},
+		{"a call ID that is too long", Request{Messages: []Message{{Role: "assistant", ToolCalls: []ToolCall{{ID: strings.Repeat("a", 65), Name: "read_file"}}}}}},
+		{"a tool spec with a bad name", Request{Messages: []Message{{Role: "user", Text: "hi"}}, Tools: []ToolSpec{{Name: "Read File"}}}},
+		{"a tool spec with a bad parameter name", Request{Messages: []Message{{Role: "user", Text: "hi"}}, Tools: []ToolSpec{{Name: "read_file", Parameters: []ToolParameter{{Name: fakeAWSKey}}}}}},
+		{"too many tool specs", Request{Messages: []Message{{Role: "user", Text: "hi"}}, Tools: manyToolSpecs(17)}},
+		{"too many parameters", Request{Messages: []Message{{Role: "user", Text: "hi"}}, Tools: []ToolSpec{{Name: "read_file", Parameters: manyParameters(9)}}}},
+		{"a long tool description", Request{Messages: []Message{{Role: "user", Text: "hi"}}, Tools: []ToolSpec{{Name: "read_file", Description: strings.Repeat("a", 1001)}}}},
+		{"a long parameter description", Request{Messages: []Message{{Role: "user", Text: "hi"}}, Tools: []ToolSpec{{Name: "read_file", Parameters: []ToolParameter{{Name: "path", Description: strings.Repeat("a", 1001)}}}}}},
 	}
 
 	for _, testCase := range testCases {
@@ -339,4 +349,44 @@ func FuzzSend(f *testing.F) {
 			}
 		}
 	})
+}
+
+func manyToolSpecs(count int) []ToolSpec {
+	specs := make([]ToolSpec, count)
+	for index := range specs {
+		specs[index] = ToolSpec{Name: fmt.Sprintf("tool_%d", index)}
+	}
+
+	return specs
+}
+
+func manyParameters(count int) []ToolParameter {
+	parameters := make([]ToolParameter, count)
+	for index := range parameters {
+		parameters[index] = ToolParameter{Name: fmt.Sprintf("parameter_%d", index)}
+	}
+
+	return parameters
+}
+
+func TestValidToolSpecsAndIDsAreAccepted(t *testing.T) {
+	provider := &fakeProvider{}
+	sender, _ := newTestSender(t, provider)
+	request := Request{
+		Messages: []Message{
+			{Role: "user", Text: "hi"},
+			{Role: "assistant", ToolCalls: []ToolCall{{ID: "toolu_01A-b_c", Name: "read_file", Arguments: map[string]string{"path": "a.go"}}}},
+			{Role: "tool", Text: "result", ToolCallID: "toolu_01A-b_c"},
+		},
+		Tools: append(manyToolSpecs(15), ToolSpec{Name: "read_file", Description: "Read a file.", Parameters: manyParameters(8)}),
+	}
+
+	if _, err := sender.Send(context.Background(), request); err != nil {
+		t.Fatalf("a valid request was refused: %v", err)
+	}
+
+	got := provider.recorded[0]
+	if len(got.Tools) != 16 || got.Messages[2].ToolCallID != "toolu_01A-b_c" || got.Messages[1].ToolCalls[0].ID != "toolu_01A-b_c" {
+		t.Errorf("the IDs or the tools were lost: %+v", got)
+	}
 }

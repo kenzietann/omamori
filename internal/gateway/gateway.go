@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/kenzietann/omamori/internal/pathguard"
@@ -50,13 +51,27 @@ type Event struct {
 }
 
 type argumentSpec struct {
-	name     string
-	required bool
+	name        string
+	description string
+	required    bool
 }
 
 type tool struct {
-	arguments []argumentSpec
-	run       func(ctx context.Context, gateway *Gateway, arguments map[string]string) (Result, error)
+	description string
+	arguments   []argumentSpec
+	run         func(ctx context.Context, gateway *Gateway, arguments map[string]string) (Result, error)
+}
+
+type ParameterSpec struct {
+	Name        string
+	Description string
+	Required    bool
+}
+
+type Spec struct {
+	Name        string
+	Description string
+	Parameters  []ParameterSpec
 }
 
 type Gateway struct {
@@ -73,12 +88,53 @@ func New(root *pathguard.Root, limits Limits) *Gateway {
 		root:   root,
 		limits: limits,
 		tools: map[string]tool{
-			"read_file":     {arguments: []argumentSpec{{"path", true}}, run: readFile},
-			"list_dir":      {arguments: []argumentSpec{{"path", false}}, run: listDir},
-			"search_text":   {arguments: []argumentSpec{{"query", true}, {"path", false}}, run: searchText},
-			"run_detectors": {arguments: []argumentSpec{{"path", true}}, run: runDetectors},
+			"read_file": {
+				description: "Read one text file inside the project. The text is cut at a size limit.",
+				arguments:   []argumentSpec{{name: "path", description: "File path relative to the project folder.", required: true}},
+				run:         readFile,
+			},
+			"list_dir": {
+				description: "List the files and folders in one folder of the project.",
+				arguments:   []argumentSpec{{name: "path", description: "Folder path relative to the project folder. The default is the project folder."}},
+				run:         listDir,
+			},
+			"search_text": {
+				description: "Search for a text in the files of the project. Returns file names, line numbers and short lines.",
+				arguments: []argumentSpec{
+					{name: "query", description: "The text to look for.", required: true},
+					{name: "path", description: "Folder or file to search in. The default is the project folder."},
+				},
+				run: searchText,
+			},
+			"run_detectors": {
+				description: "Scan a file or a folder for secrets, My Number and Japanese phone numbers. Returns only placeholders, file names and line numbers, never the values.",
+				arguments:   []argumentSpec{{name: "path", description: "File or folder path relative to the project folder. Use \".\" for the whole project.", required: true}},
+				run:         runDetectors,
+			},
 		},
 	}
+}
+
+// Specs describes the tools in a fixed order. The order must not change between requests,
+// because the model's cached prefix includes the tool list.
+func (gateway *Gateway) Specs() []Spec {
+	names := make([]string, 0, len(gateway.tools))
+	for name := range gateway.tools {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	specs := make([]Spec, 0, len(names))
+	for _, name := range names {
+		selected := gateway.tools[name]
+		spec := Spec{Name: name, Description: selected.description}
+		for _, argument := range selected.arguments {
+			spec.Parameters = append(spec.Parameters, ParameterSpec{Name: argument.name, Description: argument.description, Required: argument.required})
+		}
+		specs = append(specs, spec)
+	}
+
+	return specs
 }
 
 func (gateway *Gateway) Events() []Event {

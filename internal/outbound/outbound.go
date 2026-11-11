@@ -13,7 +13,12 @@ import (
 	"github.com/kenzietann/omamori/internal/sanitizer"
 )
 
-const maxRetries = 2
+const (
+	maxRetries     = 2
+	maxTools       = 16
+	maxParameters  = 8
+	maxDescription = 1000
+)
 
 var (
 	ErrInvalidSetup    = errors.New("the sender is not set up correctly")
@@ -23,25 +28,43 @@ var (
 	ErrProviderFailed  = errors.New("the provider call failed")
 	ErrCancelled       = errors.New("the run was cancelled")
 	ErrTemporary       = errors.New("the provider had a temporary problem")
+	ErrRefused         = errors.New("the provider declined the request")
+	ErrAuth            = errors.New("the provider rejected the API key")
 	validRoles         = []string{"user", "assistant", "tool"}
 	validIdentifier    = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+	validCallID        = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 	pathContinuesChars = regexp.MustCompile(`^([A-Za-z0-9_-]|\.[A-Za-z0-9_-])`)
 )
 
 type ToolCall struct {
+	ID        string
 	Name      string
 	Arguments map[string]string
 }
 
 type Message struct {
-	Role      string
-	Text      string
-	ToolCalls []ToolCall
+	Role       string
+	Text       string
+	ToolCalls  []ToolCall
+	ToolCallID string
+}
+
+type ToolParameter struct {
+	Name        string
+	Description string
+	Required    bool
+}
+
+type ToolSpec struct {
+	Name        string
+	Description string
+	Parameters  []ToolParameter
 }
 
 type Request struct {
 	System   string
 	Messages []Message
+	Tools    []ToolSpec
 }
 
 type Response struct {
@@ -51,7 +74,7 @@ type Response struct {
 }
 
 func ValidToolCall(call ToolCall) bool {
-	if !validIdentifier.MatchString(call.Name) {
+	if !validIdentifier.MatchString(call.Name) || (call.ID != "" && !validCallID.MatchString(call.ID)) {
 		return false
 	}
 	for key := range call.Arguments {
@@ -148,7 +171,12 @@ func (sender *Sender) Send(ctx context.Context, request Request) (Response, erro
 		if ctx.Err() != nil {
 			return Response{}, ErrCancelled
 		}
-		if !errors.Is(err, ErrTemporary) {
+		switch {
+		case errors.Is(err, ErrRefused):
+			return Response{}, ErrRefused
+		case errors.Is(err, ErrAuth):
+			return Response{}, ErrAuth
+		case !errors.Is(err, ErrTemporary):
 			return Response{}, ErrProviderFailed
 		}
 	}
@@ -169,10 +197,10 @@ func (sender *Sender) prepare(request Request) (SafeRequest, error) {
 
 	safe := Request{System: clean(request.System)}
 	for _, message := range request.Messages {
-		safeMessage := Message{Role: message.Role, Text: clean(message.Text)}
+		safeMessage := Message{Role: message.Role, Text: clean(message.Text), ToolCallID: message.ToolCallID}
 
 		for _, call := range message.ToolCalls {
-			safeCall := ToolCall{Name: call.Name, Arguments: make(map[string]string, len(call.Arguments))}
+			safeCall := ToolCall{ID: call.ID, Name: call.Name, Arguments: make(map[string]string, len(call.Arguments))}
 			for key, value := range call.Arguments {
 				safeCall.Arguments[key] = clean(value)
 			}
@@ -180,6 +208,14 @@ func (sender *Sender) prepare(request Request) (SafeRequest, error) {
 		}
 
 		safe.Messages = append(safe.Messages, safeMessage)
+	}
+
+	for _, spec := range request.Tools {
+		safeSpec := ToolSpec{Name: spec.Name, Description: clean(spec.Description)}
+		for _, parameter := range spec.Parameters {
+			safeSpec.Parameters = append(safeSpec.Parameters, ToolParameter{Name: parameter.Name, Description: clean(parameter.Description), Required: parameter.Required})
+		}
+		safe.Tools = append(safe.Tools, safeSpec)
 	}
 
 	if encodingHasFindings(safe) {
@@ -194,8 +230,20 @@ func validate(request Request) error {
 		return ErrInvalidRequest
 	}
 
+	if len(request.Tools) > maxTools {
+		return ErrInvalidRequest
+	}
+	for _, spec := range request.Tools {
+		if !validToolSpec(spec) {
+			return ErrInvalidRequest
+		}
+	}
+
 	for _, message := range request.Messages {
 		if !slices.Contains(validRoles, message.Role) {
+			return ErrInvalidRequest
+		}
+		if message.ToolCallID != "" && (message.Role != "tool" || !validCallID.MatchString(message.ToolCallID)) {
 			return ErrInvalidRequest
 		}
 		for _, call := range message.ToolCalls {
@@ -206,6 +254,19 @@ func validate(request Request) error {
 	}
 
 	return nil
+}
+
+func validToolSpec(spec ToolSpec) bool {
+	if !validIdentifier.MatchString(spec.Name) || len(spec.Description) > maxDescription || len(spec.Parameters) > maxParameters {
+		return false
+	}
+	for _, parameter := range spec.Parameters {
+		if !validIdentifier.MatchString(parameter.Name) || len(parameter.Description) > maxDescription {
+			return false
+		}
+	}
+
+	return true
 }
 
 func encodingHasFindings(request Request) bool {

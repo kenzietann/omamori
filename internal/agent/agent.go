@@ -58,14 +58,28 @@ type Agent struct {
 	tools    Tools
 	recorder Recorder
 	limits   Limits
+	specs    []outbound.ToolSpec
 }
 
-func New(sender Sender, tools Tools, recorder Recorder, limits Limits) (*Agent, error) {
+func New(sender Sender, tools Tools, recorder Recorder, limits Limits, specs []outbound.ToolSpec) (*Agent, error) {
 	if sender == nil || tools == nil || recorder == nil || limits.MaxSteps < 1 || limits.MaxTokens < 1 {
 		return nil, ErrInvalidSetup
 	}
 
-	return &Agent{sender: sender, tools: tools, recorder: recorder, limits: limits}, nil
+	return &Agent{sender: sender, tools: tools, recorder: recorder, limits: limits, specs: specs}, nil
+}
+
+func SpecsFromGateway(described []gateway.Spec) []outbound.ToolSpec {
+	specs := make([]outbound.ToolSpec, 0, len(described))
+	for _, spec := range described {
+		converted := outbound.ToolSpec{Name: spec.Name, Description: spec.Description}
+		for _, parameter := range spec.Parameters {
+			converted.Parameters = append(converted.Parameters, outbound.ToolParameter{Name: parameter.Name, Description: parameter.Description, Required: parameter.Required})
+		}
+		specs = append(specs, converted)
+	}
+
+	return specs
 }
 
 type plannedCall struct {
@@ -99,7 +113,7 @@ func (agent *Agent) Run(ctx context.Context, instruction string) Outcome {
 			return agent.finish(outcome, "step limit reached")
 		}
 
-		response, err := agent.sender.Send(ctx, outbound.Request{System: systemPrompt, Messages: history})
+		response, err := agent.sender.Send(ctx, outbound.Request{System: systemPrompt, Messages: history, Tools: agent.specs})
 		outcome.Steps = agent.sender.Attempts() - firstAttempt
 		if err != nil {
 			return agent.finish(outcome, reasonForSendError(err))
@@ -156,7 +170,7 @@ func (agent *Agent) runCalls(ctx context.Context, plan []plannedCall, outcome *O
 	var messages []outbound.Message
 
 	for _, planned := range plan {
-		var text string
+		var text, callID string
 
 		switch {
 		case planned.skipped:
@@ -182,10 +196,10 @@ func (agent *Agent) runCalls(ctx context.Context, plan []plannedCall, outcome *O
 			case errors.Is(err, gateway.ErrLogFailed):
 				return nil, "log failed"
 			}
-			text = formatToolResult(planned.call.Name, result, err)
+			text, callID = formatToolResult(planned.call.Name, result, err), planned.call.ID
 		}
 
-		messages = append(messages, outbound.Message{Role: "tool", Text: text})
+		messages = append(messages, outbound.Message{Role: "tool", Text: text, ToolCallID: callID})
 	}
 
 	return messages, ""
@@ -210,6 +224,10 @@ func reasonForSendError(err error) string {
 		return "cancelled"
 	case errors.Is(err, outbound.ErrNotAuthorized):
 		return "not authorized"
+	case errors.Is(err, outbound.ErrRefused):
+		return "provider declined"
+	case errors.Is(err, outbound.ErrAuth):
+		return "key rejected"
 	case errors.Is(err, outbound.ErrInvalidRequest), errors.Is(err, outbound.ErrUnsafeRequest):
 		return "request refused"
 	}

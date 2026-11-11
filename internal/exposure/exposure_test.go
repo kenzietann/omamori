@@ -111,7 +111,7 @@ func runFixture(t testing.TB, script func(int) outbound.Response, limits agent.L
 	toolGateway.Observe(log.RecordGatewayEvent)
 	collector := NewCollector(toolGateway)
 
-	runner, err := agent.New(sender, collector, log, limits)
+	runner, err := agent.New(sender, collector, log, limits, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

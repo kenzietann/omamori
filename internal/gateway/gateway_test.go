@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -284,5 +286,56 @@ func TestFileLimitStopsTheWalk(t *testing.T) {
 
 	if !gotResult.Truncated {
 		t.Error("the result is not marked as cut, but the walk stopped at the file limit")
+	}
+}
+
+func TestSpecsDescribeExactlyTheAllowedTools(t *testing.T) {
+	root, err := pathguard.NewRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	toolGateway := New(root, DefaultLimits)
+
+	specs := toolGateway.Specs()
+
+	wantNames := []string{"list_dir", "read_file", "run_detectors", "search_text"}
+	var gotNames []string
+	for _, spec := range specs {
+		gotNames = append(gotNames, spec.Name)
+
+		if spec.Description == "" {
+			t.Errorf("the tool %s has no description", spec.Name)
+		}
+		for _, parameter := range spec.Parameters {
+			if parameter.Name == "" || parameter.Description == "" {
+				t.Errorf("the tool %s has a parameter without a name or a description: %+v", spec.Name, parameter)
+			}
+		}
+
+		// A described tool must be a tool that the gateway really runs: an empty call is
+		// refused because of its arguments, never because the tool is unknown.
+		if _, err := toolGateway.Call(context.Background(), spec.Name, map[string]any{"unknown_argument": "x"}); errors.Is(err, ErrUnknownTool) {
+			t.Errorf("the tool %s is described but the gateway does not know it", spec.Name)
+		}
+	}
+	if !slices.Equal(gotNames, wantNames) {
+		t.Errorf("tool names = %v, want %v", gotNames, wantNames)
+	}
+
+	required := map[string][]string{"read_file": {"path"}, "list_dir": nil, "search_text": {"query"}, "run_detectors": {"path"}}
+	for _, spec := range specs {
+		var gotRequired []string
+		for _, parameter := range spec.Parameters {
+			if parameter.Required {
+				gotRequired = append(gotRequired, parameter.Name)
+			}
+		}
+		if !slices.Equal(gotRequired, required[spec.Name]) {
+			t.Errorf("tool %s: required parameters = %v, want %v", spec.Name, gotRequired, required[spec.Name])
+		}
+	}
+
+	if !reflect.DeepEqual(specs, toolGateway.Specs()) {
+		t.Error("the specs changed between two calls")
 	}
 }
