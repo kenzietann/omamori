@@ -3,6 +3,7 @@ package outbound
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/kenzietann/omamori/internal/outbound/internal/anthropicclient"
 	"github.com/kenzietann/omamori/internal/outbound/internal/openaicompat"
@@ -67,6 +68,42 @@ func Providers() []Info {
 // and a key is required unless the provider runs on this computer. The clients enforce both.
 func NewProvider(id, apiKey, model string) (Provider, error) {
 	return newAt(id, apiKey, model, "")
+}
+
+const listTimeout = 20 * time.Second
+
+// ListModels asks the provider which models it offers. It sends only the key, never project data,
+// so it needs no consent and does not go through the sender.
+func ListModels(ctx context.Context, id, apiKey string) ([]string, error) {
+	return listAt(ctx, id, apiKey, "")
+}
+
+func listAt(ctx context.Context, id, apiKey, baseURL string) ([]string, error) {
+	var chosen *descriptor
+	for index := range descriptors {
+		if descriptors[index].id == id {
+			chosen = &descriptors[index]
+		}
+	}
+	if chosen == nil {
+		return nil, ErrInvalidSetup
+	}
+	if baseURL == "" {
+		baseURL = chosen.baseURL
+	}
+
+	var models []string
+	var err error
+	if chosen.kind == kindAnthropic {
+		models, err = anthropicclient.ListModels(ctx, apiKey, baseURL, listTimeout)
+	} else {
+		models, err = openaicompat.ListModels(ctx, baseURL, apiKey, listTimeout)
+	}
+	if err != nil {
+		return nil, fromWireError(err)
+	}
+
+	return models, nil
 }
 
 func NewAnthropic(apiKey, model string) (Provider, error) {

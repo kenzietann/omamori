@@ -249,3 +249,36 @@ func parseResponse(message *anthropic.Message) (Response, error) {
 
 	return response, nil
 }
+
+// ListModels asks Anthropic which models the key can use. No project data is sent, only the key.
+func ListModels(ctx context.Context, apiKey, baseURL string, timeout time.Duration) ([]string, error) {
+	if apiKey == "" {
+		return nil, ErrNoKey
+	}
+	if baseURL == "" {
+		baseURL = DefaultBaseURL
+	}
+	if !wire.SafeBaseURL(baseURL) {
+		return nil, ErrBadConfig
+	}
+
+	api := anthropic.NewClient(
+		option.WithoutEnvironmentDefaults(),
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL(baseURL),
+		option.WithMaxRetries(0),
+		option.WithHTTPClient(wire.NewHTTPClient(timeout)),
+	)
+
+	page, err := api.Models.List(ctx, anthropic.ModelListParams{})
+	if err != nil {
+		return nil, classify(err)
+	}
+
+	ids := make([]string, 0, len(page.Data))
+	for _, entry := range page.Data {
+		ids = append(ids, entry.ID)
+	}
+
+	return wire.CleanModelIDs(ids), nil
+}

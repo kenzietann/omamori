@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"slices"
@@ -354,5 +355,24 @@ func TestPinnedAddressesAreSortedLikeTheList(t *testing.T) {
 	}
 	if !slices.Contains(ids, "anthropic") || ids[0] != "anthropic" {
 		t.Errorf("anthropic must stay the first provider, the list is %v", ids)
+	}
+}
+
+func TestListModelsChecksTheProviderAndReturnsCleanNames(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, `{"data":[{"id":"models/b"},{"id":"a"}]}`)
+	}))
+	t.Cleanup(server.Close)
+
+	gotIDs, err := listAt(context.Background(), "ollama", "", server.URL)
+	if err != nil || !slices.Equal(gotIDs, []string{"a", "b"}) {
+		t.Errorf("got %q, err %v", gotIDs, err)
+	}
+
+	if _, err := listAt(context.Background(), "nope", apiTestKey, server.URL); !errors.Is(err, ErrInvalidSetup) {
+		t.Errorf("an unknown provider: err = %v", err)
+	}
+	if _, err := ListModels(context.Background(), "openai", ""); err == nil {
+		t.Error("a remote provider without a key was asked")
 	}
 }

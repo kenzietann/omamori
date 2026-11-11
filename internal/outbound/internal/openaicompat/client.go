@@ -274,3 +274,57 @@ func parseResponse(answer []byte) (wire.Response, error) {
 
 	return response, nil
 }
+
+// ListModels asks the provider which models it offers. No project data is sent, only the key.
+func ListModels(ctx context.Context, baseURL, apiKey string, timeout time.Duration) ([]string, error) {
+	parsed, err := url.Parse(baseURL)
+	if err != nil || !wire.SafeBaseURL(baseURL) {
+		return nil, wire.ErrBadConfig
+	}
+	if apiKey == "" && !wire.IsLoopback(parsed) {
+		return nil, wire.ErrNoKey
+	}
+
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(baseURL, "/")+"/models", nil)
+	if err != nil {
+		return nil, wire.ErrBadConfig
+	}
+	httpRequest.Header.Set("Accept", "application/json")
+	if apiKey != "" {
+		httpRequest.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
+	httpResponse, err := wire.NewHTTPClient(timeout).Do(httpRequest)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return nil, context.Canceled
+		}
+
+		return nil, wire.ErrRetryable
+	}
+	defer httpResponse.Body.Close()
+
+	if httpResponse.StatusCode < 200 || httpResponse.StatusCode > 299 {
+		return nil, wire.StatusError(httpResponse.StatusCode)
+	}
+	answer, err := io.ReadAll(io.LimitReader(httpResponse.Body, wire.MaxResponseBytes+1))
+	if err != nil || len(answer) > wire.MaxResponseBytes {
+		return nil, wire.ErrBadResponse
+	}
+
+	var decoded struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(answer, &decoded); err != nil {
+		return nil, wire.ErrBadResponse
+	}
+
+	ids := make([]string, 0, len(decoded.Data))
+	for _, entry := range decoded.Data {
+		ids = append(ids, entry.ID)
+	}
+
+	return wire.CleanModelIDs(ids), nil
+}

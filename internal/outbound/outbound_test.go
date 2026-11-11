@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -388,5 +390,60 @@ func TestValidToolSpecsAndIDsAreAccepted(t *testing.T) {
 	got := provider.recorded[0]
 	if len(got.Tools) != 16 || got.Messages[2].ToolCallID != "toolu_01A-b_c" || got.Messages[1].ToolCalls[0].ID != "toolu_01A-b_c" {
 		t.Errorf("the IDs or the tools were lost: %+v", got)
+	}
+}
+
+func TestTheObserverSeesEveryCleanedRequestBeforeItIsSent(t *testing.T) {
+	provider := &fakeProvider{scripted: []error{ErrTemporary, nil}}
+	sender, projectDirectory := newTestSender(t, provider)
+
+	var seen []Request
+	var providerCallsWhenSeen []int
+	sender.Observe(func(request Request) error {
+		seen = append(seen, request)
+		providerCallsWhenSeen = append(providerCallsWhenSeen, provider.callCount)
+
+		return nil
+	})
+
+	if _, err := sender.Send(context.Background(), plantedRequest(projectDirectory)); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(seen) != 2 || !slices.Equal(providerCallsWhenSeen, []int{0, 1}) {
+		t.Fatalf("the observer saw %d requests, provider calls at those moments = %v, want 2 and [0 1]", len(seen), providerCallsWhenSeen)
+	}
+	for index, request := range seen {
+		searchText := encodeForSearch(t, request)
+		for _, planted := range append(plantedValues, projectDirectory) {
+			if strings.Contains(searchText, planted) {
+				t.Errorf("the observer saw %q in request %d", planted, index)
+			}
+		}
+	}
+	if !reflect.DeepEqual(seen[0], provider.recorded[0]) {
+		t.Error("the observer saw a different request than the provider")
+	}
+}
+
+func TestARequestWithoutALogEntryIsNotSent(t *testing.T) {
+	provider := &fakeProvider{}
+	sender, _ := newTestSender(t, provider)
+	sender.Observe(func(Request) error { return errors.New("disk full " + fakeAWSKey) })
+
+	_, err := sender.Send(context.Background(), Request{Messages: []Message{{Role: "user", Text: "hi"}}})
+
+	if !errors.Is(err, ErrLogFailed) || provider.callCount != 0 || sender.Attempts() != 0 || strings.Contains(err.Error(), fakeAWSKey) {
+		t.Errorf("err = %v, provider calls = %d, attempts = %d, want ErrLogFailed and nothing sent", err, provider.callCount, sender.Attempts())
+	}
+}
+
+func TestPreviewDoesNotCallTheObserver(t *testing.T) {
+	sender, _ := newTestSender(t, &fakeProvider{})
+	called := 0
+	sender.Observe(func(Request) error { called++; return nil })
+
+	if _, err := sender.Preview(Request{Messages: []Message{{Role: "user", Text: "hi"}}}); err != nil || called != 0 {
+		t.Errorf("err = %v, observer calls = %d, want none", err, called)
 	}
 }

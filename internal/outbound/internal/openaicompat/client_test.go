@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -565,4 +566,70 @@ func FuzzParseResponse(f *testing.F) {
 			t.Fatalf("unexpected error kind: %v", err)
 		}
 	})
+}
+
+func TestListModels(t *testing.T) {
+	server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, `{"data":[{"id":"zeta"},{"id":"text-embedding-x"},{"id":"alpha"},{"id":"alpha"}]}`)
+	})
+
+	gotIDs, err := ListModels(context.Background(), server.URL+"/v1", fakeKey, time.Second)
+
+	if err != nil || !slices.Equal(gotIDs, []string{"alpha", "zeta"}) {
+		t.Fatalf("got %q, err %v", gotIDs, err)
+	}
+	sent := server.requests()
+	if len(sent) != 1 || sent[0].method != http.MethodGet || sent[0].path != "/v1/models" || sent[0].header.Get("Authorization") != "Bearer "+fakeKey || len(sent[0].body) != 0 {
+		t.Errorf("the request is wrong: %+v", sent)
+	}
+}
+
+func TestListModelsErrors(t *testing.T) {
+	testCases := []struct {
+		name    string
+		baseURL string
+		key     string
+		reply   http.HandlerFunc
+		wantErr error
+	}{
+		{"a key is wrong", "ok", fakeKey, func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(401) }, wire.ErrAuth},
+		{"the server is down", "ok", fakeKey, func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }, wire.ErrRetryable},
+		{"the answer is not JSON", "ok", fakeKey, func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "<html>") }, wire.ErrBadResponse},
+		{"a redirect is not followed", "ok", fakeKey, func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "http://127.0.0.1:1/x", 302) }, wire.ErrRejected},
+		{"a remote address over plain http", "http://example.com/v1", fakeKey, nil, wire.ErrBadConfig},
+		{"no key for a remote address", "https://example.com/v1", "", nil, wire.ErrNoKey},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			baseURL := testCase.baseURL
+			if baseURL == "ok" {
+				baseURL = newFakeServer(t, testCase.reply).URL
+			}
+
+			_, err := ListModels(context.Background(), baseURL, testCase.key, time.Second)
+
+			if !errors.Is(err, testCase.wantErr) {
+				t.Errorf("err = %v, want %v", err, testCase.wantErr)
+			}
+			if err != nil && strings.Contains(err.Error(), fakeKey) {
+				t.Error("the error holds the key")
+			}
+		})
+	}
+}
+
+func TestListModelsWorksWithoutAKeyOnThisComputer(t *testing.T) {
+	server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, `{"data":[{"id":"local-model"}]}`)
+		if request.Header.Get("Authorization") != "" {
+			t.Error("a header was sent without a key")
+		}
+	})
+
+	gotIDs, err := ListModels(context.Background(), server.URL, "", time.Second)
+
+	if err != nil || !slices.Equal(gotIDs, []string{"local-model"}) {
+		t.Errorf("got %q, err %v", gotIDs, err)
+	}
 }

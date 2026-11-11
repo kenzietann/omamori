@@ -14,15 +14,19 @@ import (
 )
 
 var keyMessages = map[string]tea.KeyMsg{
-	"up":     {Type: tea.KeyUp},
-	"down":   {Type: tea.KeyDown},
-	"enter":  {Type: tea.KeyEnter},
-	"esc":    {Type: tea.KeyEsc},
-	"pgup":   {Type: tea.KeyPgUp},
-	"pgdown": {Type: tea.KeyPgDown},
-	"ctrl+c": {Type: tea.KeyCtrlC},
-	"q":      {Type: tea.KeyRunes, Runes: []rune{'q'}},
-	"b":      {Type: tea.KeyRunes, Runes: []rune{'b'}},
+	"up":        {Type: tea.KeyUp},
+	"down":      {Type: tea.KeyDown},
+	"enter":     {Type: tea.KeyEnter},
+	"backspace": {Type: tea.KeyBackspace},
+	"esc":       {Type: tea.KeyEsc},
+	"pgup":      {Type: tea.KeyPgUp},
+	"pgdown":    {Type: tea.KeyPgDown},
+	"ctrl+c":    {Type: tea.KeyCtrlC},
+	"q":         {Type: tea.KeyRunes, Runes: []rune{'q'}},
+	"b":         {Type: tea.KeyRunes, Runes: []rune{'b'}},
+	"n":         {Type: tea.KeyRunes, Runes: []rune{'n'}},
+	"y":         {Type: tea.KeyRunes, Runes: []rune{'y'}},
+	"x":         {Type: tea.KeyRunes, Runes: []rune{'x'}},
 }
 
 func press(t testing.TB, model Model, key string) (Model, tea.Cmd) {
@@ -88,10 +92,80 @@ func lastLine(view string) string {
 	return lines[len(lines)-1]
 }
 
+type modelCall struct {
+	providerID string
+	key        string
+}
+
+type fakeBackend struct {
+	consent    string
+	choices    []Choice
+	runner     Runner
+	prepareErr error
+	preview    string
+	setups     []Setup
+	confirmed  int
+	// models is the list the provider gives. nil means a short default list, and an empty list means none.
+	models     []string
+	modelsErr  error
+	modelCalls []modelCall
+}
+
+func (backend *fakeBackend) Providers() []Choice { return backend.choices }
+
+func (backend *fakeBackend) Models(ctx context.Context, providerID, key string) ([]string, error) {
+	backend.modelCalls = append(backend.modelCalls, modelCall{providerID, key})
+	if backend.modelsErr != nil {
+		return nil, backend.modelsErr
+	}
+	if backend.models == nil {
+		return []string{"m", "other-model"}, nil
+	}
+
+	return backend.models, nil
+}
+
+func (backend *fakeBackend) Prepare(setup Setup) (Plan, error) {
+	backend.setups = append(backend.setups, setup)
+	if backend.prepareErr != nil {
+		return Plan{}, backend.prepareErr
+	}
+
+	consent := backend.consent
+	if consent == "" {
+		consent = "Omamori will send sanitized content to FakeAI during this run."
+	}
+
+	return Plan{
+		ConsentText: consent,
+		Preview:     backend.preview,
+		Confirm:     func() { backend.confirmed++ },
+		Run:         backend.runner,
+	}, nil
+}
+
+var localChoice = Choice{ID: "fake", Name: "FakeAI", Local: true, DefaultModel: "m"}
+
+func newModelWith(target string, backend *fakeBackend, defaults Defaults) Model {
+	return New(target, backend, defaults)
+}
+
+func newModel(target string, runner Runner) Model {
+	return New(target, &fakeBackend{choices: []Choice{localChoice}, runner: runner, preview: "first request text"}, Defaults{})
+}
+
+// beginRun goes through the whole setup of a provider that needs no key: choose Task A, accept the
+// provider, pick the default model from the list, and confirm on the consent screen.
+func beginRun(t testing.TB, model Model) (Model, tea.Cmd) {
+	t.Helper()
+
+	return pressAll(t, model, "enter", "enter", "enter", "enter")
+}
+
 func startedRun(t testing.TB, runner Runner) (Model, tea.Cmd) {
 	t.Helper()
 
-	return press(t, New("/work/project", runner), "enter")
+	return beginRun(t, newModel("/work/project", runner))
 }
 
 func TestHomeMenuMovesAndStaysInsideTheMenu(t *testing.T) {
@@ -110,7 +184,7 @@ func TestHomeMenuMovesAndStaysInsideTheMenu(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			model := New("/work/project", nil)
+			model := newModel("/work/project", nil)
 			for _, key := range testCase.keys {
 				model, _ = press(t, model, key)
 			}
@@ -128,13 +202,17 @@ func pressAll(t testing.TB, model Model, keys ...string) (Model, tea.Cmd) {
 	var command tea.Cmd
 	for _, key := range keys {
 		model, command = press(t, model, key)
+		// The list of models comes over the network. The fake answers at once, so it is applied here.
+		if model.modelsLoading {
+			model, command = settle(model, command), nil
+		}
 	}
 
 	return model, command
 }
 
 func TestHomeChoices(t *testing.T) {
-	model := New("/work/project", finishedRunner("r", true))
+	model := newModel("/work/project", finishedRunner("r", true))
 
 	taskB, command := pressAll(t, model, "down", "enter")
 	if taskB.screen != homeScreen || command != nil || !strings.Contains(taskB.View(), "Task B is not built yet.") {
@@ -152,14 +230,14 @@ func TestHomeChoices(t *testing.T) {
 	}
 }
 
-func TestNoTargetOrNoRunnerStartsNothing(t *testing.T) {
+func TestNoTargetOrNoBackendStartsNothing(t *testing.T) {
 	calls := 0
 	counting := func(ctx context.Context, step func(string)) (Result, error) {
 		calls++
 		return Result{}, nil
 	}
 
-	for name, model := range map[string]Model{"no target": New("", counting), "no runner": New("/work/project", nil)} {
+	for name, model := range map[string]Model{"no target": newModel("", counting), "no backend": New("/work/project", nil, Defaults{})} {
 		after, command := press(t, model, "enter")
 
 		if after.screen != homeScreen || command != nil || after.notice == "" || calls != 0 {
@@ -256,7 +334,7 @@ func TestQuitWorksOnEveryScreenAndStopsARunningTask(t *testing.T) {
 	}
 
 	screens := map[string]func() Model{
-		"home": func() Model { return New("/work/project", waiting) },
+		"home": func() Model { return newModel("/work/project", waiting) },
 		"run": func() Model {
 			model, command := startedRun(t, waiting)
 			batch := command().(tea.BatchMsg)
@@ -292,7 +370,7 @@ func TestQuitWorksOnEveryScreenAndStopsARunningTask(t *testing.T) {
 }
 
 func TestEveryScreenShowsItsKeysOnTheLastLine(t *testing.T) {
-	home := New("/work/project", finishedRunner("r", true))
+	home := newModel("/work/project", finishedRunner("r", true))
 	running, command := startedRun(t, finishedRunner("r", true))
 	results := settle(running, command)
 
@@ -331,7 +409,7 @@ func TestBackToHomeAndRunAgain(t *testing.T) {
 	}
 
 	home, _ := press(t, model, "b")
-	again, command := press(t, home, "enter")
+	again, command := beginRun(t, home)
 	if again.screen != runScreen || len(again.steps) != 0 || again.report != "" || again.runID != 2 {
 		t.Errorf("a new run starts with old data: %+v", again)
 	}
@@ -386,7 +464,7 @@ func TestAnOldRunCannotChangeANewRun(t *testing.T) {
 	model, command := startedRun(t, finishedRunner("first", true))
 	model = settle(model, command)
 	model, _ = press(t, model, "b")
-	model, _ = press(t, model, "enter")
+	model, _ = beginRun(t, model)
 
 	for _, message := range []tea.Msg{
 		stepMsg{run: 1, text: "from the old run"},
@@ -408,8 +486,8 @@ func TestUntrustedTextIsCleanedBeforeItIsShown(t *testing.T) {
 		return Result{Report: hostile, Complete: true}, nil
 	}
 
-	home := New(hostile, runner)
-	running, command := press(t, home, "enter")
+	home := newModel(hostile, runner)
+	running, command := beginRun(t, home)
 	results := settle(running, command)
 	failed, failCommand := startedRun(t, func(ctx context.Context, step func(string)) (Result, error) {
 		return Result{}, errors.New(hostile)
@@ -478,14 +556,14 @@ func FuzzView(f *testing.F) {
 			return Result{Report: report, Complete: true}, nil
 		}
 
-		model, command := press(t, New(target, runner), "enter")
+		model, command := beginRun(t, newModel(target, runner))
 		updated, _ := model.Update(tea.WindowSizeMsg{Width: width % 500, Height: height % 200})
 		model = settle(updated.(Model), command)
 
 		for _, key := range []string{"down", "pgdown", "pgup", "up"} {
 			model, _ = press(t, model, key)
 		}
-		for _, shown := range []Model{model, New(target, runner)} {
+		for _, shown := range []Model{model, newModel(target, runner)} {
 			for _, character := range styleCodes.ReplaceAllString(shown.View(), "") {
 				if character != '\n' && (unicode.IsControl(character) || unicode.Is(unicode.Cf, character)) {
 					t.Fatalf("the view holds the character %U", character)

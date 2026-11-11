@@ -568,3 +568,35 @@ func FuzzParseArguments(f *testing.F) {
 		}
 	})
 }
+
+func TestListModels(t *testing.T) {
+	server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(writer, `{"data":[{"id":"claude-b","type":"model","display_name":"B","created_at":"2026-01-01T00:00:00Z"},{"id":"claude-a","type":"model","display_name":"A","created_at":"2026-01-01T00:00:00Z"}],"has_more":false,"first_id":"claude-b","last_id":"claude-a"}`)
+	})
+
+	gotIDs, err := ListModels(context.Background(), fakeKey, server.URL, time.Second)
+
+	if err != nil || len(gotIDs) != 2 || gotIDs[0] != "claude-a" || gotIDs[1] != "claude-b" {
+		t.Fatalf("got %q, err %v", gotIDs, err)
+	}
+	sent := server.requests()
+	if len(sent) != 1 || sent[0].method != http.MethodGet || sent[0].path != "/v1/models" || sent[0].header.Get("Authorization") != "Bearer "+fakeKey {
+		t.Errorf("the request is wrong: %+v", sent)
+	}
+}
+
+func TestListModelsErrors(t *testing.T) {
+	if _, err := ListModels(context.Background(), "", "", time.Second); !errors.Is(err, ErrNoKey) {
+		t.Errorf("no key: err = %v", err)
+	}
+	if _, err := ListModels(context.Background(), fakeKey, "http://example.com", time.Second); !errors.Is(err, ErrBadConfig) {
+		t.Errorf("remote plain http: err = %v", err)
+	}
+
+	server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) { writer.WriteHeader(401) })
+	_, err := ListModels(context.Background(), fakeKey, server.URL, time.Second)
+	if !errors.Is(err, ErrAuth) || strings.Contains(err.Error(), fakeKey) {
+		t.Errorf("a wrong key: err = %v", err)
+	}
+}

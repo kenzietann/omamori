@@ -30,6 +30,7 @@ var (
 	ErrTemporary       = errors.New("the provider had a temporary problem")
 	ErrRefused         = errors.New("the provider declined the request")
 	ErrAuth            = errors.New("the provider rejected the API key")
+	ErrLogFailed       = errors.New("the request could not be logged")
 	validRoles         = []string{"user", "assistant", "tool"}
 	validIdentifier    = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 	validCallID        = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
@@ -104,6 +105,7 @@ type Sender struct {
 	roots      []string
 	authorized bool
 	attempts   int
+	observer   func(Request) error
 }
 
 func New(provider Provider, projectDirectory string) (*Sender, error) {
@@ -135,6 +137,12 @@ func (sender *Sender) Authorize() {
 	sender.authorized = true
 }
 
+// Observe sets a function that sees every cleaned request before it is sent. If it fails,
+// the request is not sent, so nothing leaves without a log entry.
+func (sender *Sender) Observe(observer func(Request) error) {
+	sender.observer = observer
+}
+
 func (sender *Sender) Attempts() int {
 	return sender.attempts
 }
@@ -161,6 +169,12 @@ func (sender *Sender) Send(ctx context.Context, request Request) (Response, erro
 		safe, err := sender.prepare(request)
 		if err != nil {
 			return Response{}, err
+		}
+
+		if sender.observer != nil {
+			if observeErr := sender.observer(safe.request); observeErr != nil {
+				return Response{}, ErrLogFailed
+			}
 		}
 
 		sender.attempts++

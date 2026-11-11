@@ -45,8 +45,8 @@ func TestEveryLineFitsTheWindow(t *testing.T) {
 		withProfile(t, profile)
 
 		for _, size := range [][2]int{{80, 30}, {40, 30}, {20, 12}, {200, 50}, {100, 60}, {60, 50}} {
-			home := sized(New("/very/long/folder/name/that/goes/on/and/on", finishedRunner("r", true)), size[0], size[1])
-			running, command := press(t, home, "enter")
+			home := sized(newModel("/very/long/folder/name/that/goes/on/and/on", finishedRunner("r", true)), size[0], size[1])
+			running, command := beginRun(t, home)
 			results := sized(settle(running, command), size[0], size[1])
 
 			for name, model := range map[string]Model{"home": home, "run": sized(running, size[0], size[1]), "results": results} {
@@ -127,8 +127,8 @@ func TestOnlyOurStylingMakesEscapeCodes(t *testing.T) {
 		step(hostile)
 		return Result{Report: hostile, Complete: true}, nil
 	}
-	home := New(hostile, runner)
-	running, command := press(t, home, "enter")
+	home := newModel(hostile, runner)
+	running, command := beginRun(t, home)
 	results := settle(running, command)
 	failed, failCommand := startedRun(t, func(ctx context.Context, step func(string)) (Result, error) {
 		return Result{}, errors.New(hostile)
@@ -185,7 +185,7 @@ func TestWordmarkMatchesTheArt(t *testing.T) {
 }
 
 func TestWithoutColorTheWordmarkIsPlain(t *testing.T) {
-	view := New("/work/project", nil).View()
+	view := newModel("/work/project", nil).View()
 
 	if strings.Contains(view, "\x1b") {
 		t.Error("the plain view holds an escape code")
@@ -213,7 +213,7 @@ func TestSmallWindowsGetAOneLineHeader(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			view := sized(New("/work/project", nil), testCase.width, testCase.height).View()
+			view := sized(newModel("/work/project", nil), testCase.width, testCase.height).View()
 
 			if strings.ContainsAny(view, "█╗╔╝╚║") || !strings.Contains(view, "OMAMORI") {
 				t.Errorf("the header is not the small one:\n%s", view)
@@ -221,7 +221,7 @@ func TestSmallWindowsGetAOneLineHeader(t *testing.T) {
 		})
 	}
 
-	exact := sized(New("/work/project", nil), wordmarkWidth(), minWordmarkHeight)
+	exact := sized(newModel("/work/project", nil), wordmarkWidth(), minWordmarkHeight)
 	if !strings.Contains(exact.View(), wordmarkRows[1]) {
 		t.Error("a window that is exactly big enough did not get the wordmark")
 	}
@@ -298,7 +298,7 @@ func TestGradientColors(t *testing.T) {
 func TestWithColorTheWordmarkIsAGradientWithShadows(t *testing.T) {
 	withProfile(t, termenv.TrueColor)
 
-	lines := strings.Split(New("/work/project", nil).View(), "\n")
+	lines := strings.Split(newModel("/work/project", nil).View(), "\n")
 	for index, wantRow := range wordmarkRows {
 		line := lines[index]
 
@@ -346,7 +346,7 @@ var coloredCharacter = regexp.MustCompile(`\x1b\[38;2;(\d+);(\d+);(\d+)m(.)\x1b\
 func TestEveryCharacterHasTheColorOfItsColumn(t *testing.T) {
 	withProfile(t, termenv.TrueColor)
 
-	lines := strings.Split(New("/work/project", nil).View(), "\n")
+	lines := strings.Split(newModel("/work/project", nil).View(), "\n")
 	checked := 0
 	for rowIndex := range wordmarkRows {
 		line := lines[rowIndex]
@@ -391,7 +391,7 @@ func distinctColors(colors []rgb) map[rgb]bool {
 func TestTheGradientWorksWithFewerColors(t *testing.T) {
 	withProfile(t, termenv.ANSI256)
 
-	lines := strings.Split(New("/work/project", nil).View(), "\n")
+	lines := strings.Split(newModel("/work/project", nil).View(), "\n")
 	for index, wantRow := range wordmarkRows {
 		if got := styleCodes.ReplaceAllString(lines[index], ""); got != wantRow {
 			t.Errorf("row %d: the text changed: %q", index, got)

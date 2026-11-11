@@ -69,6 +69,11 @@ func New(sender Sender, tools Tools, recorder Recorder, limits Limits, specs []o
 	return &Agent{sender: sender, tools: tools, recorder: recorder, limits: limits, specs: specs}, nil
 }
 
+// FirstRequest is the request that starts a run. The dry run shows it before anything is sent.
+func FirstRequest(instruction string, specs []outbound.ToolSpec) outbound.Request {
+	return outbound.Request{System: systemPrompt, Messages: []outbound.Message{{Role: "user", Text: instruction}}, Tools: specs}
+}
+
 func SpecsFromGateway(described []gateway.Spec) []outbound.ToolSpec {
 	specs := make([]outbound.ToolSpec, 0, len(described))
 	for _, spec := range described {
@@ -101,7 +106,7 @@ func (agent *Agent) Run(ctx context.Context, instruction string) Outcome {
 	}
 
 	firstAttempt := agent.sender.Attempts()
-	history := []outbound.Message{{Role: "user", Text: instruction}}
+	history := FirstRequest(instruction, nil).Messages
 
 	for {
 		outcome.Steps = agent.sender.Attempts() - firstAttempt
@@ -228,6 +233,8 @@ func reasonForSendError(err error) string {
 		return "provider declined"
 	case errors.Is(err, outbound.ErrAuth):
 		return "key rejected"
+	case errors.Is(err, outbound.ErrLogFailed):
+		return "log failed"
 	case errors.Is(err, outbound.ErrInvalidRequest), errors.Is(err, outbound.ErrUnsafeRequest):
 		return "request refused"
 	}

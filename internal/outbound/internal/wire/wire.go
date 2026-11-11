@@ -8,7 +8,11 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // MaxResponseBytes stops a server from filling the memory with one answer.
@@ -131,4 +135,54 @@ func ParseArguments(raw string) map[string]string {
 	}
 
 	return arguments
+}
+
+const (
+	MaxModelChoices = 100
+	maxModelIDRunes = 100
+)
+
+// notChat are parts of a name that belong to models which cannot answer a chat.
+var notChat = []string{"embed", "whisper", "tts", "dall-e", "moderation", "transcribe", "realtime", "image", "audio", "guard", "rerank"}
+
+// CleanModelIDs makes a list from a provider safe to show: the provider is not trusted
+// with what appears on the screen. It drops odd names and non-chat models, removes doubles, and sorts.
+func CleanModelIDs(ids []string) []string {
+	seen := make(map[string]bool, len(ids))
+	var cleaned []string
+
+	for _, id := range ids {
+		id = strings.TrimPrefix(id, "models/")
+		if !usableModelID(id) || seen[id] {
+			continue
+		}
+		seen[id] = true
+		cleaned = append(cleaned, id)
+	}
+
+	sort.Strings(cleaned)
+	if len(cleaned) > MaxModelChoices {
+		cleaned = cleaned[:MaxModelChoices]
+	}
+
+	return cleaned
+}
+
+func usableModelID(id string) bool {
+	if id == "" || strings.HasPrefix(id, "models/") || utf8.RuneCountInString(id) > maxModelIDRunes {
+		return false
+	}
+	for _, character := range id {
+		if character > unicode.MaxASCII || unicode.IsSpace(character) || unicode.IsControl(character) {
+			return false
+		}
+	}
+	lower := strings.ToLower(id)
+	for _, part := range notChat {
+		if strings.Contains(lower, part) {
+			return false
+		}
+	}
+
+	return true
 }

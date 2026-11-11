@@ -34,14 +34,18 @@ func (model Model) showWordmark() bool {
 	return (model.width == 0 || model.width >= wordmarkWidth()) && (model.height == 0 || model.height >= minWordmarkHeight)
 }
 
+func (model Model) oneLineHeader() string {
+	title := styleTitle.Render("OMAMORI")
+	if model.width == 0 || model.width >= len("OMAMORI  ")+len(tagline) {
+		title += styleDim.Render("  " + tagline)
+	}
+
+	return title
+}
+
 func (model Model) headerLines() []string {
 	if !model.showWordmark() {
-		title := styleTitle.Render("OMAMORI")
-		if model.width == 0 || model.width >= len("OMAMORI  ")+len(tagline) {
-			title += styleDim.Render("  " + tagline)
-		}
-
-		return []string{title}
+		return []string{model.oneLineHeader()}
 	}
 
 	lines := make([]string, 0, len(wordmarkRows)+1)

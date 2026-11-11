@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -129,4 +131,57 @@ func TestErrorKindsAreDifferent(t *testing.T) {
 	if fmt.Sprint(ErrAuth) == "" {
 		t.Error("an error has no text")
 	}
+}
+
+func TestCleanModelIDs(t *testing.T) {
+	testCases := []struct {
+		name        string
+		providerIDs []string
+		wantIDs     []string
+	}{
+		{"sorted and without doubles", []string{"b-model", "a-model", "b-model"}, []string{"a-model", "b-model"}},
+		{"the models/ prefix is removed", []string{"models/gemini-x", "gemini-x"}, []string{"gemini-x"}},
+		{"a doubled prefix is dropped", []string{"models/models/x", "models/"}, nil},
+		{"empty and spaced names are dropped", []string{"", "a b", "ok"}, []string{"ok"}},
+		{"control and non-ASCII names are dropped", []string{"a\x1b[2J", "a‮b", "モデル", "fine"}, []string{"fine"}},
+		{"too long names are dropped", []string{strings.Repeat("m", 101), strings.Repeat("m", 100)}, []string{strings.Repeat("m", 100)}},
+		{"models that cannot chat are dropped", []string{"text-embedding-3", "whisper-large", "gpt-4o-mini-tts", "DALL-E-3", "omni-moderation", "llama-guard", "gpt-image-1", "chat-model"}, []string{"chat-model"}},
+		{"nothing in, nothing out", nil, nil},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			gotIDs := CleanModelIDs(testCase.providerIDs)
+
+			if !slices.Equal(gotIDs, testCase.wantIDs) {
+				t.Errorf("got %q, want %q", gotIDs, testCase.wantIDs)
+			}
+		})
+	}
+}
+
+func TestCleanModelIDsStopsAtTheLimit(t *testing.T) {
+	var providerIDs []string
+	for number := range 250 {
+		providerIDs = append(providerIDs, fmt.Sprintf("model-%03d", number))
+	}
+
+	gotIDs := CleanModelIDs(providerIDs)
+
+	if len(gotIDs) != MaxModelChoices || gotIDs[0] != "model-000" {
+		t.Errorf("got %d names, first %q", len(gotIDs), gotIDs[0])
+	}
+}
+
+func FuzzCleanModelIDs(f *testing.F) {
+	f.Add("gpt-x", "models/y")
+	f.Add("\x00\xff", "a b")
+
+	f.Fuzz(func(t *testing.T, first, second string) {
+		for _, id := range CleanModelIDs([]string{first, second}) {
+			if !usableModelID(id) || strings.HasPrefix(id, "models/") {
+				t.Fatalf("unsafe name %q", id)
+			}
+		}
+	})
 }

@@ -665,3 +665,37 @@ func TestRefusalAndKeyProblemsHaveTheirOwnReasons(t *testing.T) {
 		})
 	}
 }
+
+func TestFirstRequestIsWhatTheRunStartsWith(t *testing.T) {
+	specs := []outbound.ToolSpec{{Name: "read_file", Description: "Read."}}
+
+	first := FirstRequest("check this", specs)
+
+	if first.System != systemPrompt || len(first.Messages) != 1 || first.Messages[0].Role != "user" || first.Messages[0].Text != "check this" || !reflect.DeepEqual(first.Tools, specs) {
+		t.Errorf("first request = %+v", first)
+	}
+
+	built := newStack(t, finalScript(), true)
+	runner, err := New(built.sender, built.gateway, &fakeRecorder{}, generousLimits, specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner.Run(context.Background(), "check this")
+
+	if got := built.provider.recorded[0]; got.System != first.System || !reflect.DeepEqual(got.Messages, first.Messages) || !reflect.DeepEqual(got.Tools, first.Tools) {
+		t.Errorf("the run started with %+v, the dry run shows %+v", got, first)
+	}
+}
+
+func finalScript() func(int) reply { return always(finalText("done")) }
+
+func TestALogFailureInTheSenderStopsTheRun(t *testing.T) {
+	built := newStack(t, always(finalText("hi")), true)
+	built.sender.Observe(func(outbound.Request) error { return errors.New("disk full") })
+
+	outcome := built.agent(t, &fakeRecorder{}, generousLimits).Run(context.Background(), "go")
+
+	if outcome.Status != Incomplete || outcome.Reason != "log failed" || len(built.provider.recorded) != 0 {
+		t.Errorf("outcome = %+v, provider calls = %d", outcome, len(built.provider.recorded))
+	}
+}
