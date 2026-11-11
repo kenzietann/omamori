@@ -14,10 +14,11 @@ review. It uses read-only tools, and a guard sits between the AI and your data.
 The CLI is available now. A dashboard running locally on `127.0.0.1` is planned
 and will use the same detection and analyst services.
 
-**Status: work in progress, Task A, Task B, local detection and the AI analyst run.** Task A
+**Status: work in progress, detection, AI analysis and persistent investigation data run.** Task A
 (exposure check), Task B (AI log triage), the guard, a terminal screen and replay
 mode work. `detect` checks local logs with rules and `scenario` makes synthetic
 demo logs. `analyze` reviews detected alerts with the AI and verifies its claims.
+SQLite, PostgreSQL and MariaDB can store runs for search, cases and timelines.
 The local dashboard, AI rule generation (Task C) and the Should items are not
 done. I am learning Go while I build it.
 
@@ -62,7 +63,8 @@ an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all
 timestamp. It normalizes supported Suricata EVE, Zeek, Wazuh and Windows/Sysmon
 JSON exports into the shared event fields. It applies 17 built-in rules, including counts, distinct counts and
 ordered sequences such as password guessing followed by a successful login.
-It uses no API key and sends nothing over the network.
+Rule evaluation uses no API key. The command stays local unless you enable
+storage on a configured database server.
 
 Try it with made-up logs in a new folder:
 
@@ -122,6 +124,30 @@ The [multi-source fixture](testdata/fixtures/intake/README.md) exercises all fou
 new source families with eight synthetic records and six expected observation
 alerts. It runs through the same detection and analyst services as the CLI and
 future local dashboard.
+
+### Store, search and investigate
+
+Add `--store` to `detect` or `analyze` to keep the sanitized run, including all
+parsed events, its alerts and checked analysis. SQLite is the default local
+backend at `~/omamori-data/omamori.db`; `--db file` chooses another SQLite file.
+PostgreSQL and MariaDB use `OMAMORI_DB_DRIVER` and `OMAMORI_DB_DSN` from the
+environment. Request previews never open the database.
+
+```sh
+omamori detect ./demo-logs --year 2026 --timezone Asia/Tokyo --store
+omamori store runs
+omamori store search --field src_ip --value 203.0.113.9
+omamori store search --kind alerts --level critical
+omamori store cases create --title 'Authentication review'
+omamori store timeline --from 2026-11-10T00:00:00Z --to 2026-11-11T00:00:00Z
+```
+
+Cases link chosen alerts across runs and use versions to prevent stale updates.
+Timelines retain event/alert provenance, and AI citations resolve to full stored
+events. These APIs are shared with the future local dashboard. See the
+[storage guide](docs/storage.md) for backend setup, case commands, query semantics
+and limits. PostgreSQL and MariaDB have been tested with disposable real servers,
+including the CLI detection and analyst replay paths.
 
 ## Live test results
 
@@ -256,6 +282,8 @@ AI is limited by the guard and can only use read-only tools.
 - [Local rules](docs/rules.md): supported detection and correlation YAML.
 - [Log intake](docs/intake.md): supported source formats, field maps and a
   mixed-source demo.
+- [Storage and investigations](docs/storage.md): SQLite/PostgreSQL/MariaDB,
+  persistent runs, search, cases, timelines and dashboard APIs.
 - [My Number test table](docs/mynumber-test-table.md): my test cases for the
   first detector. All numbers are dummy numbers.
 

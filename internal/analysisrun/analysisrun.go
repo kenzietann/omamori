@@ -20,7 +20,9 @@ import (
 	"github.com/kenzietann/omamori/internal/pathguard"
 	"github.com/kenzietann/omamori/internal/replay"
 	"github.com/kenzietann/omamori/internal/reportwriter"
+	"github.com/kenzietann/omamori/internal/runstore"
 	"github.com/kenzietann/omamori/internal/sanitizer"
+	"github.com/kenzietann/omamori/internal/store"
 	"github.com/kenzietann/omamori/internal/taskrun"
 )
 
@@ -43,6 +45,8 @@ const (
 type Config struct {
 	Provider taskrun.Config
 	Sources  []string
+	// Store is optional. Both the CLI and local dashboard can persist the same frozen run.
+	Store runstore.Writer
 }
 
 // Progress is safe to show in a terminal, local dashboard, or event stream. Message is fixed text.
@@ -65,24 +69,26 @@ type Result struct {
 	Mode            string         `json:"mode"`
 	RecordingStatus string         `json:"recording_status"`
 	SavedTo         string         `json:"-"`
+	RunID           string         `json:"run_id,omitempty"`
 }
 
 // Session freezes the evidence and request at preparation. It can run once.
 type Session struct {
-	mutex      sync.Mutex
-	confirmed  bool
-	started    bool
-	config     Config
-	snapshot   analyst.Snapshot
-	request    outbound.Request
-	sender     *outbound.Sender
-	recorder   *replay.Recorder
-	mode       string
-	label      string
-	directory  string
-	baseReport string
-	baseAlerts string
-	noAlerts   bool
+	mutex       sync.Mutex
+	confirmed   bool
+	started     bool
+	config      Config
+	snapshot    analyst.Snapshot
+	request     outbound.Request
+	sender      *outbound.Sender
+	recorder    *replay.Recorder
+	mode        string
+	label       string
+	directory   string
+	baseReport  string
+	baseAlerts  string
+	noAlerts    bool
+	storedInput *store.RunInput
 }
 
 // Prepare reads no additional logs, writes no files, and makes no provider requests.
@@ -110,6 +116,13 @@ func Prepare(ctx context.Context, config Config, outcome detect.Outcome, setup t
 	session := &Session{
 		config: config, snapshot: snapshot, request: request, baseReport: detect.Markdown(outcome), baseAlerts: alerts,
 		mode: "live", noAlerts: snapshot.Coverage.TotalAlerts == 0 && setup.Recording == nil,
+	}
+	if config.Store != nil {
+		input, err := runstore.Build(outcome, nil)
+		if err != nil {
+			return nil, err
+		}
+		session.storedInput = &input
 	}
 	session.directory = filepath.Join(config.Provider.OutputBase, "analyze-"+config.Provider.Now().UTC().Format("20060102-150405"))
 	for _, source := range config.Sources {
@@ -245,6 +258,24 @@ func (session *Session) Run(ctx context.Context, progress func(Progress)) (Resul
 	}
 	if err := log.Close(); err != nil {
 		result.Status, result.Complete, result.Reason = StatusIncomplete, false, "event logging failed"
+	}
+	if session.config.Store != nil {
+		progress(Progress{Stage: "storing", Message: "saving the sanitized run for search and cases"})
+		analysis := &runstore.Analysis{Version: result.Version, Analysis: result.Analysis, Complete: result.Complete,
+			Status: result.Status, Reason: result.Reason, Requests: result.Requests, Tokens: result.Tokens,
+			Mode: result.Mode, RecordingStatus: result.RecordingStatus}
+		input, buildErr := runstore.WithAnalysis(*session.storedInput, analysis)
+		var saved store.Run
+		var saveErr error
+		if buildErr == nil {
+			saved, saveErr = session.config.Store.SaveRun(ctx, input)
+		}
+		if buildErr != nil || saveErr != nil {
+			result.Status, result.Complete = StatusIncomplete, false
+			result.Reason += "; the sanitized run could not be stored"
+		} else {
+			result.RunID = saved.ID
+		}
 	}
 	progress(Progress{Stage: "saving", Message: "saving detection findings and checked analysis"})
 	if err := session.save(writer, result); err != nil {

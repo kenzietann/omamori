@@ -17,10 +17,11 @@ import (
 	"github.com/kenzietann/omamori/internal/intake"
 	"github.com/kenzietann/omamori/internal/replay"
 	"github.com/kenzietann/omamori/internal/rules"
+	"github.com/kenzietann/omamori/internal/store"
 	"github.com/kenzietann/omamori/internal/taskrun"
 )
 
-const usageAnalyze = "usage: omamori analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] [--rules folder] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] <log file or folder>..."
+const usageAnalyze = "usage: omamori analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] [--rules folder] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
 
 // runAnalyze is the terminal adapter for the shared analysis service. The future local dashboard
 // can use the same Prepare/Preview/Confirm/Run lifecycle without invoking this command or a TUI.
@@ -31,6 +32,8 @@ func runAnalyze(args []string, env environment) int {
 	}
 	flags := flag.NewFlagSet("analyze", flag.ContinueOnError)
 	var chosen settings
+	var database storageFlags
+	database.bind(flags, true)
 	var rulesFolder, format, recordingPath, reasoning string
 	var confirmed, dryRun bool
 	var timeout time.Duration
@@ -133,10 +136,21 @@ func runAnalyze(args []string, env environment) int {
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	session, err := analysisrun.Prepare(ctx, analysisrun.Config{
+	config := analysisrun.Config{
 		Provider: taskrun.Config{Target: target, OutputBase: chosen.output, LookupEnv: lookup, Keys: env.keys, Now: env.now, NewProvider: env.newProvider},
 		Sources:  sources,
-	}, outcome, setup)
+	}
+	// Preview never opens or initializes a database. Persistence is enabled only for an actual run.
+	if database.wanted() && !dryRun && (confirmed || recordingPath != "") {
+		var db *store.DB
+		db, err = database.open(ctx, env, sources)
+		if err != nil {
+			return fail(err)
+		}
+		defer db.Close()
+		config.Store = db
+	}
+	session, err := analysisrun.Prepare(ctx, config, outcome, setup)
 	if err != nil {
 		return fail(err)
 	}
@@ -164,6 +178,9 @@ func runAnalyze(args []string, env environment) int {
 	fmt.Fprintf(env.stdout, "Analyst: %s. %d verified findings, %d rejected claims, %d unreviewed alerts.\nReport: %s\nAnalysis JSON: %s\n",
 		result.Status, len(result.Analysis.Verified), len(result.Analysis.Rejected), len(result.Analysis.Unreviewed),
 		filepath.Join(result.SavedTo, "report.html"), filepath.Join(result.SavedTo, "analysis.json"))
+	if result.RunID != "" {
+		fmt.Fprintf(env.stdout, "Stored run: %s\n", result.RunID)
+	}
 	if !result.Complete {
 		fmt.Fprintln(env.stderr, "omamori: analysis is incomplete:", result.Reason)
 		return exitFailed

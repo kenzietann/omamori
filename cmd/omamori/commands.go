@@ -34,9 +34,10 @@ Usage:
 Commands:
   check <folder>      Task A: check a project for leaked data (opens the screen)
   triage <log file>   Task B: triage an sshd auth.log for guessing and password spraying
-  detect <logs>...    read log files or folders, run the detection rules, write a report (no AI, no network)
+  detect <logs>...    read logs, run local rules, write a report (no AI; optional SQL storage)
   analyze <logs>...   detect, ask the AI to review alerts, and verify its claims against the evidence
   scenario <folder>   write synthetic logs of one day with attacks into a new folder, for demos and tests
+  store <command>    stored runs, event/alert search, cases and timelines (run "omamori store" for usage)
   ui <folder>         open the home screen, where you choose a task
   replay <recording> [folder or log file]
                       play back the recorded answers of an earlier run. Nothing is sent
@@ -65,6 +66,12 @@ Flags for detect:
   --format name       syslog, web, json, suricata, zeek, wazuh or windows (default: look at the first lines of each file)
   --year, --timezone  for syslog lines, which have no year and no time zone
   --output folder     where the report folder is made (default ~/omamori-output)
+  --store             persist the sanitized run for search, cases and timelines
+  --db file           choose a SQLite file and enable storage (default ~/omamori-data/omamori.db)
+
+SQL storage defaults to SQLite. For PostgreSQL or MariaDB, set OMAMORI_DB_DRIVER
+to postgres or mariadb and provide OMAMORI_DB_DSN in the environment. Database
+credentials are never command-line flags. The same store is used by detect and analyze.
 
 Flags for analyze (also accepts the detect flags):
   --provider, --model, --reasoning  provider settings, or use saved settings
@@ -149,6 +156,8 @@ func run(args []string, env environment) int {
 		return runAnalyze(rest, env)
 	case "scenario":
 		return runScenario(rest, env)
+	case "store":
+		return runStore(rest, env)
 	}
 
 	fmt.Fprintf(env.stderr, "omamori: %q is not a command. Run omamori help to see the commands.\n", command)

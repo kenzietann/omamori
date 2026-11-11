@@ -9,7 +9,7 @@ One Go binary, `omamori`. Everything is a library package under `internal/`, and
 
     log files ──> intake (parsers) ──> event.Event ──> rules (Sigma subset) ──> alerts
                                             │                                     │
-                                            └──> store (later: SQLite) <──────────┤
+                                            └──> SQL store <─────────────────────┤
                                                                                   ├──> report (Markdown, HTML)
     Linux artifacts ──> forensics (later) ──> event.Event (same timeline)         └──> AI analyst,
                                                                                        every claim checked by code
@@ -28,7 +28,7 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
 | 1 | `omamori detect`: sshd/syslog, web access logs and JSON lines in; Sigma-subset rules with count, distinct count, ordered sequence; alerts; Markdown, HTML and JSON report; synthetic scenarios with measured detection and false positives | built and verified (2026-11-12) |
 | 2 | AI analyst on alerts: sanitized alert summaries out, claims in, each claim checked against alerts and events, only verified claims shown; replay recording; shared run service for CLI and local dashboard | built and verified (2026-11-12); live model evaluation pending |
 | 3 | More intake: Suricata eve.json, Zeek, Wazuh alerts, Sysmon/Windows event JSON, with field maps and fuzz tests | built and verified (2026-11-12), documented JSON subsets |
-| 4 | Store (SQLite), search, cases, timeline across runs | January |
+| 4 | SQLite/PostgreSQL/MariaDB storage, search, cases, timelines across runs | built and verified (2026-11-12) |
 | 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | January |
 | 6 | Local web UI on 127.0.0.1 over the store | February |
 | 7 | Full synthetic scenario across sources (SSH takeover, persistence, lateral movement), rehearsed demo | February |
@@ -60,9 +60,10 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
    not only events. It is refused until there is a real use.
 8. **Rules can carry their own tests, and a rule whose tests fail is not loaded.** (Kept from the draft.)
    The built-in rules are inside the binary (`go:embed`), each with attack and benign test events.
-9. **Batch first, no store yet.** Slice 1 reads files, sorts events by time and evaluates in memory, with
-   hard limits on lines, events and alerts. The store comes in slice 4. Planned: `modernc.org/sqlite`
-   (pure Go, so the single static binary stays; no cgo).
+9. **Batch detection with optional durable storage.** Intake and rules evaluate bounded batches in
+   memory. Slice 4 adds a shared SQL store: pure-Go SQLite for local use, PostgreSQL and MariaDB for
+   configured server use. Database-specific details stay behind `internal/store`; CLI and dashboard
+   use the same typed APIs. Persistence is opt-in with `--store` or a SQLite `--db` path.
 10. **Reports go through the code that already exists.** `reportwriter` (new folder, never overwrite,
     output must not overlap the input) and `htmlreport` (everything escaped, no script). Values from logs
     pass the sanitizer before they are written, so a token in a URL does not land in a report.
@@ -89,6 +90,14 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
     policy actions and connection states do not imply attack success. Windows target accounts are
     domain-qualified when the domain is present, so same-named accounts in different domains are
     not silently combined.
+17. **Store sanitized evidence, keep run identity explicit.** Every parsed event is retained within
+    bounded run-size limits, including benign events. Runs are immutable and saves are atomic and
+    idempotent. Alert links are resolved before redaction. Case links use run/alert IDs; placeholders
+    never create inferred identity links. Analyst citation IDs map to stored event IDs within a run.
+18. **Portable queries before specialized search.** Exact field filters and literal substring search
+    have the same contract on all three databases. Cases use optimistic versions and explicit
+    evidence membership. Timelines merge selected events and alerts with deterministic ordering.
+    Full-text indexing, retention and data migration between backends are separate work.
 
 ## Slice 1 verification (2026-11-12)
 
@@ -120,7 +129,7 @@ Try the commands in the [README](../README.md#local-detection-without-an-ai-prov
 The supported YAML syntax is in [rules.md](rules.md).
 
 The detection slice is batch-only and uses no AI provider. Slow guessing below the thresholds is a named miss.
-Compressed inputs, production log baselines, streaming and storage remain outside the detection slice.
+Compressed inputs, production log baselines and streaming remain outside the detection slice.
 Source-specific mappings were added in slice 3.
 
 ## Slice 2 verification (2026-11-12)
@@ -177,11 +186,42 @@ The source field dictionary and primary references are in [intake.md](intake.md)
 
 The 17 built-in rules are unchanged. Parser support is not complete detection coverage. Native EVTX,
 XML, Zeek TSV, JSON arrays and arbitrary PowerShell object dumps are not supported. Real sensor
-deployments and live AI quality remain unmeasured. The next planned slice is SQLite storage, search,
-cases and timelines, which will support the local dashboard.
+deployments and live AI quality remain unmeasured. The SQL store added in slice 4 supports these
+normalized records and will supply the local dashboard.
+
+## Slice 4 verification (2026-11-12)
+
+The shared store supports SQLite, PostgreSQL and MariaDB with versioned schema initialization,
+parameterized queries, atomic immutable run saves, sanitized case notes and bounded pagination.
+`detect` and `analyze` can persist runs, and `store` provides run listing/details, event and alert search,
+case create/update/link/detach operations, and cross-run timelines. Previews never touch the database.
+
+- SQLite scenario integration stores all 1,254 parsed events and 14 alerts; all 288 benign health-check
+  events remain searchable. Re-saving identical data is idempotent.
+- A case linked to the critical SSH sequence has 42 timeline entries: 41 retained step events plus
+  the alert. Unrelated run events stay outside the case; cross-run evidence keeps its run identity.
+- Opaque AI citations map to full stored event IDs through each alert payload. Regression tests cover
+  duplicated input records, pre-redaction identity, final successful-login evidence and run scoping.
+- Shared contracts passed on SQLite, PostgreSQL 18.4 and MariaDB 12.2.2, including a MariaDB database
+  with case-insensitive defaults. Real testing exposed padded-string comparison differences; the
+  MariaDB schema uses explicit nonpadding binary collation and exact-value hashes.
+- Real server CLI smoke tests stored 8 mixed-source events/6 alerts, searched them, linked a case,
+  rendered its timeline, rejected stale updates and persisted a 6-claim analyst replay. No live AI
+  provider was used, and source-file hashes stayed unchanged.
+- Tests cover rollback after an insert failure, foreign keys, future-schema rejection, concurrent
+  idempotent saves, cancellation, database-error redaction and restrictive new SQLite file modes.
+- `go build ./...`, `go vet ./...`, the full `go test -race ./...` suite, formatting and diff checks
+  passed. A final race-enabled contract run passed on both real server backends after the combined
+  case/filter regression was fixed. Disposable servers, test credentials and data were cleaned up.
+- A `CGO_ENABLED=0` build also passed an actual SQLite CLI smoke: 8 events/6 alerts persisted,
+  a linked case timeline returned its 2 expected entries, a versioned close succeeded, and the new
+  database file had mode `0600`.
+
+See [storage.md](storage.md) for configuration, command examples, query semantics and limits.
+The local web dashboard remains planned; this slice provides its persistent application APIs.
 
 ## Not decided yet
 
 - Streaming (tail -f) evaluation. The engine is written so that state is per group, which is what a
   stream needs, but slice 1 is batch only.
-- How cases are stored and linked to alerts.
+- Dashboard interaction and presentation over the shared store.

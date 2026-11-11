@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -18,11 +19,12 @@ import (
 	"github.com/kenzietann/omamori/internal/pathguard"
 	"github.com/kenzietann/omamori/internal/reportwriter"
 	"github.com/kenzietann/omamori/internal/rules"
+	"github.com/kenzietann/omamori/internal/runstore"
 	"github.com/kenzietann/omamori/internal/scenario"
 )
 
 const (
-	usageDetect   = "usage: omamori detect [--rules folder] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] <log file or folder>..."
+	usageDetect   = "usage: omamori detect [--rules folder] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
 	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] <new folder>"
 )
 
@@ -79,10 +81,13 @@ func splitFlags(flags *flag.FlagSet, args []string) ([]string, error) {
 	return positional, nil
 }
 
-// runDetect reads logs, runs the rules and writes a report into a new folder. It uses no AI and no network.
+// runDetect reads logs, runs rules and writes a report. Optional storage can use a configured SQL server;
+// without storage the command stays local, and it never uses an AI provider.
 func runDetect(args []string, env environment) int {
 	flags := flag.NewFlagSet("detect", flag.ContinueOnError)
 	var chosen settings
+	var database storageFlags
+	database.bind(flags, true)
 	var rulesFolder, format string
 	flags.StringVar(&rulesFolder, "rules", "", "folder with rules, in place of the built-in rules")
 	flags.StringVar(&format, "format", "", "syslog, web, json, suricata, zeek, wazuh or windows")
@@ -179,6 +184,20 @@ func runDetect(args []string, env environment) int {
 		}
 	}
 	fmt.Fprintf(env.stdout, ".\nReport: %s\n", filepath.Join(directory, "report.html"))
+	if database.wanted() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		db, err := database.open(ctx, env, sources)
+		if err != nil {
+			return fail(err)
+		}
+		defer db.Close()
+		run, err := runstore.Save(ctx, db, outcome, nil)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(env.stdout, "Stored run: %s\n", run.ID)
+	}
 
 	return exitOK
 }
