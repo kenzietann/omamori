@@ -61,25 +61,27 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 	}
 	fmt.Fprintf(&report, "Scans completed: %d\n\n", stats.Scans)
 
-	var exposed, keptOut, notYours []Finding
+	var exposed, keptOut, notYours, doubtful []Finding
 	for _, finding := range findings {
 		switch finding.Severity {
 		case SeverityKeptOut:
 			keptOut = append(keptOut, finding)
 		case SeverityNotYours:
 			notYours = append(notYours, finding)
+		case SeverityDoubtful:
+			doubtful = append(doubtful, finding)
 		default:
 			exposed = append(exposed, finding)
 		}
 	}
-	notCounted := len(keptOut) + len(notYours)
+	notCounted := len(keptOut) + len(notYours) + len(doubtful)
 
 	report.WriteString("## Findings\n\n")
 	switch {
 	case stats.Scans == 0:
 		report.WriteString("No scan ran, so nothing was checked. This report has no findings because nothing was looked at.\n\n")
 	case len(exposed) == 0 && notCounted > 0:
-		report.WriteString("The scans that ran reported no exposed data. Matches that are not counted (a key that .gitignore keeps out of git, or text in a library or a generated file) are listed below. This does not prove that the project is clean. See Limits.\n\n")
+		report.WriteString("The scans that ran reported no exposed data. Matches that are not counted (a key that .gitignore keeps out of git, text in a library or a generated file, or digits inside a decimal number or a name) are listed below. This does not prove that the project is clean. See Limits.\n\n")
 	case len(exposed) == 0:
 		report.WriteString("The scans that ran reported no findings. This does not prove that the project is clean. See Limits.\n\n")
 	default:
@@ -113,6 +115,13 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 		report.WriteString("## Library and generated files (not counted as findings)\n\n")
 		report.WriteString("These matches are in code of other projects, in caches, or in files that a tool made. They are not your code, so they are not counted. Most are sample text. A real number in a library is not your responsibility.\n\n")
 		report.WriteString(renderNotYours(notYours))
+		report.WriteString("\n")
+	}
+
+	if len(doubtful) > 0 {
+		report.WriteString("## Probably not real (not counted as findings)\n\n")
+		report.WriteString("These look like a phone number, a My Number or a password in an address, but most likely they are not: digits inside a long decimal, a UUID, a table of numbers or a name (coordinates, ids, hashes), test values (digits that count up or repeat), and example passwords like user:pass. Omamori hides them from the AI like any other match, and does not count them. Look at them with omamori peek if you want to be sure.\n\n")
+		report.WriteString(renderNotYours(doubtful))
 		report.WriteString("\n")
 	}
 
@@ -200,7 +209,7 @@ func renderLimits(stats Stats) string {
 	limits.WriteString("- A placeholder in a file name stands for a secret found in the name. The real name is not shown. Placeholder numbers come from the scan and can change from run to run.\n")
 	limits.WriteString("- The AI notes are written by the AI. Omamori did not check them.\n")
 	if stats.Skipped > 0 {
-		fmt.Fprintf(&limits, "- %d files were skipped because they were too large or could not be read.\n", stats.Skipped)
+		fmt.Fprintf(&limits, "- %d files were skipped because they were too large, binary, or could not be read.\n", stats.Skipped)
 	}
 	if stats.Truncated {
 		limits.WriteString("- At least one scan stopped at a limit, so some findings may be missing.\n")

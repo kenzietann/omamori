@@ -121,6 +121,23 @@ Matches in libraries (`deps`, `.angular`, `site-packages`, ...) and phone-like n
 output (`dist`, `.map`, `.min.js`, test reports) are listed in their own section, one line per
 file line, and are not counted as findings. A secret in your own build output still counts.
 
+### What is not counted as a finding
+
+Every match is still hidden from the AI. These are only left out of the count, and each one is
+listed in its own section of the report:
+
+- digits inside a long decimal (`-0.0643290124`), a UUID, a table or hex dump, next to letters
+  (`abc0312345678`), or between colons (an AWS account number in an ARN)
+- test values: digits that count up or repeat (`0123456789`, `0000000000`)
+- example passwords in an address (`user:pass@`, `${PASSWORD}`, `<password>`)
+- library, cache and plugin folders (`deps`, `.angular`, `.agents/skills`, `.claude/plugins`, ...)
+- phone numbers and My Numbers in build output
+- a key in an env file that `.gitignore` keeps out of git
+- binary files (images, archives) are not scanned
+
+A real password in an address, a key in your own code, and a phone number in your own data are
+still counted.
+
 ### Looking at the matches
 
 A report holds places and placeholders only. To tell a false alarm from a real leak, look at

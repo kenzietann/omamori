@@ -49,6 +49,14 @@ func TestTheReportIsReadWithRangesAndWithoutDoubles(t *testing.T) {
 	}
 }
 
+func TestExampleAndNumberLikeBulletsAreRead(t *testing.T) {
+	items, err := ReadReport("- docs/readme.md:3 [EXAMPLE:url-credentials:001] (url-credentials (example))\n- web/shader.js:9 [NUMBERLIKE:002]–[NUMBERLIKE:004] (3 number-like matches)\n")
+
+	if err != nil || len(items) != 4 || items[0].Placeholder != "[EXAMPLE:url-credentials:001]" || items[3].Placeholder != "[NUMBERLIKE:004]" {
+		t.Errorf("items = %+v, err = %v", items, err)
+	}
+}
+
 func TestAReportWithNoMatchesIsAnError(t *testing.T) {
 	for _, report := range []string{"", "# Omamori report\n\nNo findings.\n", "- a:1 [PASSWORD:001]\n", "- a:1 [PHONE:002]–[PHONE:001]\n", "- a:1 [PHONE:001]–[PHONE:999999]\n"} {
 		if _, err := ReadReport(report); err == nil {

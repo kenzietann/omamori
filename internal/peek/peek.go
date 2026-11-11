@@ -31,7 +31,7 @@ var (
 	ErrNoMatches = errors.New("the report lists no matches")
 
 	// "- path:line [LABEL:001]" or "- path:line [LABEL:001]–[LABEL:005] (5 phone matches)".
-	bulletPattern      = regexp.MustCompile(`^- (.+):(\d+) \[((?:SECRET:[a-z0-9-]+)|MYNUMBER|PHONE):(\d{3,})\](?:–\[[A-Za-z:0-9-]+:(\d{3,})\])?`)
+	bulletPattern      = regexp.MustCompile(`^- (.+):(\d+) \[((?:SECRET|EXAMPLE):[a-z0-9-]+|MYNUMBER|PHONE|NUMBERLIKE):(\d{3,})\](?:–\[[A-Za-z:0-9-]+:(\d{3,})\])?`)
 	placeholderPattern = regexp.MustCompile(`^\[(.+):(\d{3,})\]$`)
 )
 

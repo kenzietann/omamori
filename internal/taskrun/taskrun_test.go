@@ -1236,3 +1236,70 @@ func TestNewSecretFormatsAreFoundWithTheRightLineAndNeverReachTheProviderOrAFile
 		}
 	}
 }
+
+func TestOrdinaryCodeAndAssetsAreNotCountedButRealDataStillIs(t *testing.T) {
+	setup := newSetup(t, scanAll(), answerText("Done."))
+	project := filepath.Join(t.TempDir(), "project")
+	copyTree(t, setup.project, project)
+	setup.config.Target = project
+
+	svg := "<svg><path d=\"M0.0643290124,12.5 L0.000428679482,175.6 C-0.0197873902 206.3\"/></svg>\n"
+	files := map[string][]byte{
+		".agents/skills/design/assets/icon.svg": []byte(svg),
+		".agents/skills/design/assets/real.txt": []byte("call 03-5555-0100\n"),
+		"web/shader.js":                         []byte("const k = [4.0767416621, -3.3077115913, 0.2309699292];\n"),
+		"web/ids.go":                            []byte("const id = \"123e4567-e89b-12d3-a456-426614174000\"\nconst other = \"123e4567-e89b-12d3-a456-123123123128\"\n"),
+		"docs/dump.txt":                         []byte("0024 ffff ffff 8000 0014 0000 0000 0000\n"),
+		"web/digits.go":                         []byte("const digits = \"0123456789\"\n"),
+		"docs/readme.md":                        []byte("connect with postgres://user:pass@localhost/db\n"),
+		"app/db.py":                             []byte("URL = 'postgres://admin:k8Zq2vLp9Xw@db.example.com/app'\n"),
+		"app/contacts.csv":                      []byte("name,phone\nSato,03-6666-0199\n"),
+		"assets/logo.bmp":                       append([]byte("BM\x00\x00\x00"), []byte("09012345678 090-1234-5678 AKIAIOSFODNN7EXAMPLE")...),
+	}
+	for name, content := range files {
+		path := filepath.Join(project, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, content, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	session := setup.session(t)
+	session.Confirm()
+
+	result, err := session.Run(context.Background(), func(string) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table := result.Report[strings.Index(result.Report, "## Findings"):]
+	table = table[:strings.Index(table, "\n## ")]
+	for _, want := range []string{"app/contacts.csv", "app/db.py"} {
+		if !strings.Contains(table, want) {
+			t.Errorf("the table has no %s:\n%s", want, table)
+		}
+	}
+	for _, notWanted := range []string{"icon.svg", "shader.js", "ids.go", "dump.txt", "digits.go", "readme.md", "logo.bmp"} {
+		if strings.Contains(table, notWanted) {
+			t.Errorf("the table holds %s:\n%s", notWanted, table)
+		}
+	}
+	if !strings.Contains(table, "[SECRET:url-credentials:001] | high | url-credentials | app/db.py") {
+		t.Errorf("a real password in an address must be counted:\n%s", table)
+	}
+
+	for _, want := range []string{"## Library and generated files", ".agents/skills/design/assets/real.txt", "## Probably not real", "web/shader.js", "web/ids.go", "docs/dump.txt", "web/digits.go", "docs/readme.md", "[EXAMPLE:url-credentials:001]"} {
+		if !strings.Contains(result.Report, want) {
+			t.Errorf("the report has no %q:\n%s", want, result.Report)
+		}
+	}
+	if strings.Contains(result.Report, "logo.bmp") {
+		t.Error("a binary file was scanned")
+	}
+	for _, content := range outputFiles(t, setup.output) {
+		if strings.Contains(content, "k8Zq2vLp9Xw") || strings.Contains(content, "0.0643290124") {
+			t.Error("a value is in an output file")
+		}
+	}
+}

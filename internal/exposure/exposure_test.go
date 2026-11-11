@@ -643,3 +643,57 @@ func TestAKeyInADotenvFileGetsAdviceThatSaysWhenItIsReallyExposed(t *testing.T) 
 		t.Errorf("a phone number in .env: %+v", phoneInEnv)
 	}
 }
+
+func TestNumberLikeTextIsNotCountedAndHasItsOwnSection(t *testing.T) {
+	var findings []Finding
+	for _, line := range []string{
+		"app/customers.csv:2: [PHONE:001]",
+		"web/shader.js:34: [NUMBERLIKE:001]", "web/shader.js:34: [NUMBERLIKE:002]", "web/shader.js:34: [NUMBERLIKE:003]",
+		"web/curve.svg:2: [NUMBERLIKE:004]",
+	} {
+		finding, ok := parseDetectorLine(line)
+		if !ok || (strings.Contains(line, "NUMBERLIKE") && finding.Severity != SeverityDoubtful) {
+			t.Fatalf("%s: %+v, ok %v", line, finding, ok)
+		}
+		findings = append(findings, finding)
+	}
+
+	report, err := Render(findings, Stats{Scans: 1}, agent.Outcome{Status: agent.Complete})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table := report[strings.Index(report, "## Findings"):strings.Index(report, "## Probably not real")]
+	if strings.Contains(table, "shader.js") || strings.Contains(table, "curve.svg") || !strings.Contains(table, "app/customers.csv") {
+		t.Errorf("only the real phone number belongs in the table:\n%s", table)
+	}
+	section := report[strings.Index(report, "## Probably not real"):]
+	for _, want := range []string{"not counted as findings", "- web/shader.js:34 [NUMBERLIKE:001]–[NUMBERLIKE:003] (3 number-like matches)", "- web/curve.svg:2 [NUMBERLIKE:004] (number-like)", "digits that count up or repeat"} {
+		if !strings.Contains(section, want) {
+			t.Errorf("the section has no %q:\n%s", want, section)
+		}
+	}
+	if strings.Contains(report[strings.Index(report, "## Fixes"):strings.Index(report, "## Probably not real")], "number-like") {
+		t.Error("number-like text has a fix line")
+	}
+}
+
+func TestExampleAndLookalikeMatchesAreDoubtfulAndRealOnesStayHigh(t *testing.T) {
+	for line, want := range map[string]string{
+		"docs/readme.md:3: [EXAMPLE:url-credentials:001]":        SeverityDoubtful,
+		"app/db.py:1: [SECRET:url-credentials:001]":              "high",
+		"web/shader.js:9: [NUMBERLIKE:001]":                      SeverityDoubtful,
+		".agents/skills/x/assets/a.svg:2: [NUMBERLIKE:002]":      SeverityNotYours,
+		".agents/skills/x/assets/a.svg:2: [PHONE:003]":           SeverityNotYours,
+		".claude/settings.local.json:4: [SECRET:ai-api-key:001]": "high",
+		".claude/skills/x/run.sh:4: [SECRET:ai-api-key:001]":     SeverityNotYours,
+	} {
+		finding, ok := parseDetectorLine(line)
+		if !ok || finding.Severity != want {
+			t.Errorf("%s: severity %q (ok %v), want %q", line, finding.Severity, ok, want)
+		}
+	}
+	if finding, _ := parseDetectorLine("docs/readme.md:3: [EXAMPLE:url-credentials:001]"); finding.Type != "url-credentials (example)" {
+		t.Errorf("type = %q", finding.Type)
+	}
+}

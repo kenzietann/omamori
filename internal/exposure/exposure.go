@@ -17,7 +17,7 @@ import (
 const Instruction = `Check this project for exposed secrets and personal data. ` +
 	`Run run_detectors on the path "." first. Then explain each finding by its placeholder and suggest a fix. Do not guess any value.`
 
-var detectorLine = regexp.MustCompile(`^(.*):(\d+): (\[(SECRET:[a-z0-9-]+|MYNUMBER|PHONE):\d{3,}\])$`)
+var detectorLine = regexp.MustCompile(`^(.*):(\d+): (\[((?:SECRET|EXAMPLE):[a-z0-9-]+|MYNUMBER|PHONE|NUMBERLIKE):\d{3,}\])$`)
 
 // SeverityKeptOut is for a key in an env file that .gitignore keeps out of git. It is the normal setup,
 // so it is listed in its own section and is not counted as a finding.
@@ -26,6 +26,11 @@ const SeverityKeptOut = "kept-out"
 // SeverityNotYours is for a match in a library or in a file that a tool made. Code of other people is
 // not the responsibility of the project, and a phone-like number in it is nearly always sample text.
 const SeverityNotYours = "not-yours"
+
+// SeverityDoubtful is for a match that is most likely not real: digits inside a decimal number, a UUID or a name
+// (coordinates, ids, hashes), a test value like 0123456789, or an example password like user:pass. It is hidden from
+// the AI like any other match, and it is not counted.
+const SeverityDoubtful = "doubtful"
 
 type Finding struct {
 	Severity    string
@@ -151,6 +156,10 @@ func describe(label string) (findingType, severity, advice string) {
 		return "jwt", "high", "A token that is still valid can be used by anyone who has it. Revoke or let it expire, check that its signing key is not exposed, and remove it from the code."
 	case strings.HasPrefix(label, "SECRET:"):
 		return strings.TrimPrefix(label, "SECRET:"), "high", "Rotate this secret. Remove it from the code and from the git history."
+	case label == "NUMBERLIKE":
+		return "number-like", SeverityDoubtful, "These digits look like a phone number or a My Number, but they sit inside a longer number, a UUID, a table of numbers or a name, or they are a test value (digits that count up or repeat). Most likely a coordinate, a hash or an id. Not counted. Look at it with omamori peek."
+	case strings.HasPrefix(label, "EXAMPLE:"):
+		return strings.TrimPrefix(label, "EXAMPLE:") + " (example)", SeverityDoubtful, "The password in this address is an example from a document or a test (like user:pass). Not counted. Look at it with omamori peek."
 	case label == "MYNUMBER":
 		return "mynumber", "high", "This is a possible My Number (the check digit is valid). Remove it from the file. Check if the file is shared or kept in version control."
 	}
@@ -173,11 +182,20 @@ var libraryFolders = map[string]bool{
 	".turbo": true, ".gradle": true,
 }
 
+// Folders of AI coding tools hold plugins and skills that other people wrote. Their settings files stay yours.
+var toolFolders = map[string]bool{".agents": true, ".claude": true, ".codex": true, ".gemini": true, ".cursor": true, ".windsurf": true}
+
+var toolPluginFolders = map[string]bool{"skills": true, "plugins": true, "extensions": true, "marketplace": true}
+
 // libraryFile says whether a path is code of another project or a cache of it.
 func libraryFile(path string) bool {
 	parts := strings.Split(path, "/")
-	for _, folder := range parts[:len(parts)-1] {
+	folders := parts[:len(parts)-1]
+	for index, folder := range folders {
 		if libraryFolders[folder] {
+			return true
+		}
+		if toolFolders[folder] && index+1 < len(folders) && toolPluginFolders[folders[index+1]] {
 			return true
 		}
 	}
@@ -221,6 +239,8 @@ func severityRank(severity string) int {
 		return 3
 	case SeverityNotYours:
 		return 4
+	case SeverityDoubtful:
+		return 5
 	}
 
 	return 1
