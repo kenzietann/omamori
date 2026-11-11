@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	usageDetect   = "usage: omamori detect [--rules folder] [--format syslog|web|json] [--year n] [--timezone name] [--output folder] <log file or folder>..."
+	usageDetect   = "usage: omamori detect [--rules folder] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] <log file or folder>..."
 	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] <new folder>"
 )
 
@@ -85,7 +85,7 @@ func runDetect(args []string, env environment) int {
 	var chosen settings
 	var rulesFolder, format string
 	flags.StringVar(&rulesFolder, "rules", "", "folder with rules, in place of the built-in rules")
-	flags.StringVar(&format, "format", "", "syslog, web or json")
+	flags.StringVar(&format, "format", "", "syslog, web, json, suricata, zeek, wazuh or windows")
 	flags.IntVar(&chosen.year, "year", 0, "year of syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of syslog lines")
 	flags.StringVar(&chosen.output, "output", "", "folder for the reports")
@@ -145,7 +145,7 @@ func runDetect(args []string, env environment) int {
 		return fail(err)
 	}
 	if len(outcome.Intake.Files) == 0 {
-		return fail(errors.New("no log file could be read. Give the format with --format syslog, web or json"))
+		return fail(errors.New("no log file could be read. Give the format with --format syslog, web, json, suricata, zeek, wazuh or windows"))
 	}
 
 	report := detect.Markdown(outcome)

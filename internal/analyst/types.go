@@ -22,6 +22,8 @@ type Coverage struct {
 	OmittedAlerts  int `json:"omitted_alerts"`
 	// OmittedEvidence is a lower bound; a nested correlation can hide earlier engine evidence limits.
 	OmittedEvidence int `json:"omitted_evidence"`
+	// TruncatedFields counts selected evidence fields shortened or omitted by display budgets.
+	TruncatedFields int `json:"truncated_fields"`
 	MalformedLines  int `json:"malformed_lines"`
 	SkippedFiles    int `json:"skipped_files"`
 	RulesCut        int `json:"rules_cut"`
@@ -35,11 +37,12 @@ type Entity struct {
 }
 
 type Evidence struct {
-	ID       string            `json:"id"`
-	Ref      string            `json:"ref"`
-	Time     string            `json:"time"`
-	Fields   map[string]string `json:"fields"`
-	Entities []string          `json:"entities"`
+	ID              string            `json:"id"`
+	Ref             string            `json:"ref"`
+	Time            string            `json:"time"`
+	Fields          map[string]string `json:"fields"`
+	Entities        []string          `json:"entities"`
+	TruncatedFields int               `json:"truncated_fields"`
 }
 
 type Alert struct {

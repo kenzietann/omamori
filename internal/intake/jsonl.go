@@ -26,40 +26,154 @@ var timeLayouts = []string{time.RFC3339Nano, "2006-01-02T15:04:05.999999999Z0700
 // jsonParser reads JSON lines: one object for each line. Nested objects become names with dots
 // ("alert.signature"). An event must have a time under one of the usual keys.
 func jsonParser(options Options) lineParser {
+	parse := jsonSourceParser(options)
 	return func(line string) (map[string]string, time.Time, bool) {
+		fields, moment, _, ok := parse(line)
+		return fields, moment, ok
+	}
+}
+
+// jsonSourceParser recognizes documented exporter shapes. A generic JSON object remains generic;
+// explicit source formats refuse objects from another source rather than guessing a mapping.
+func jsonSourceParser(options Options) func(string) (map[string]string, time.Time, string, bool) {
+	return func(line string) (map[string]string, time.Time, string, bool) {
 		trimmed := strings.TrimSpace(line)
 		if !strings.HasPrefix(trimmed, "{") {
-			return nil, time.Time{}, false
+			return nil, time.Time{}, "", false
 		}
 
 		decoder := json.NewDecoder(bytes.NewReader([]byte(trimmed)))
 		decoder.UseNumber()
 		var object map[string]any
 		if err := decoder.Decode(&object); err != nil {
-			return nil, time.Time{}, false
+			return nil, time.Time{}, "", false
 		}
 		// More only checks for the end of an array or object. A line is valid only when nothing follows its object.
 		var trailing any
 		if err := decoder.Decode(&trailing); err != io.EOF {
-			return nil, time.Time{}, false
+			return nil, time.Time{}, "", false
 		}
 
+		fields := map[string]string{}
+		mapping, recognized := normalizeHostJSON(object, fields)
+		if !recognized {
+			mapping, recognized = normalizeNetworkJSON(object, fields)
+		}
+		if options.Format != FormatAuto && options.Format != FormatJSON && (!recognized || mapping.Source != options.Format) {
+			return nil, time.Time{}, "", false
+		}
 		var moment time.Time
 		found := false
-		for _, key := range timeKeys {
-			if moment, found = jsonTime(object[key], options.Location); found {
+		if recognized {
+			for _, candidate := range mapping.Times {
+				if candidate.Value == nil || candidate.Value == "" {
+					continue
+				}
+				location := options.Location
+				if candidate.UTC {
+					location = time.UTC
+				}
+				moment, found = jsonTime(candidate.Value, location)
+				// An explicitly supplied event time that is malformed must not silently become a collector time.
+				if !found {
+					return nil, time.Time{}, "", false
+				}
 				break
 			}
 		}
 		if !found {
-			return nil, time.Time{}, false
+			for _, key := range timeKeys {
+				if moment, found = jsonTime(object[key], options.Location); found {
+					break
+				}
+			}
+		}
+		if !found {
+			return nil, time.Time{}, "", false
 		}
 
-		fields := map[string]string{}
+		if recognized {
+			fields[event.Collector] = mapping.Source
+			// Original fields remain available for source-specific rules. Namespacing prevents a raw
+			// action/outcome/product field from replacing the normalized interpretation.
+			raw := map[string]string{}
+			if !flattenOriginal(object, raw) {
+				return nil, time.Time{}, "", false
+			}
+			names := make([]string, 0, len(raw))
+			for name := range raw {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			for _, name := range names {
+				if len(fields) >= maxJSONFields {
+					break
+				}
+				fields[name] = raw[name]
+			}
+			return fields, moment, mapping.Source, true
+		}
+		fields = map[string]string{}
 		flatten("", object, fields, 0)
 
-		return fields, moment, true
+		return fields, moment, FormatJSON, true
 	}
+}
+
+// flattenOriginal refuses ambiguous evidence paths: a literal "id.orig_h" key and
+// an id.orig_h nested object must not produce one raw field with contradictory values.
+// Names are checked even after the retained-field limit, so omission does not choose a winner.
+func flattenOriginal(object map[string]any, fields map[string]string) bool {
+	seen := map[string]bool{}
+	var walk func(string, map[string]any, int) bool
+	walk = func(prefix string, object map[string]any, depth int) bool {
+		keys := make([]string, 0, len(object))
+		for key := range object {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			name := prefix + "." + key
+			value := object[key]
+			if nested, ok := value.(map[string]any); ok {
+				if depth < maxJSONDepth && !walk(name, nested, depth+1) {
+					return false
+				}
+				continue
+			}
+			var text string
+			if list, ok := value.([]any); ok {
+				var items []string
+				for _, item := range list {
+					if part, ok := scalar(item); ok {
+						items = append(items, part)
+					}
+				}
+				if len(items) == 0 {
+					continue
+				}
+				text = strings.Join(items, ",")
+			} else {
+				var ok bool
+				if text, ok = scalar(value); !ok {
+					continue
+				}
+			}
+			name = limit(name, 200)
+			if !clean(name) {
+				continue
+			}
+			if seen[name] {
+				return false
+			}
+			seen[name] = true
+			if len(fields) < maxJSONFields {
+				fields[name] = limit(strings.Map(dropControl, text), maxValueRunes)
+			}
+		}
+		return true
+	}
+	return walk("raw", object, 0)
 }
 
 func jsonTime(raw any, location *time.Location) (time.Time, bool) {

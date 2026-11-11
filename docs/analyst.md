@@ -62,6 +62,12 @@ alerts and reports omitted alerts and evidence. Opaque IDs preserve entity links
 even when sensitive values are replaced by placeholders. Secret filtering is
 limited to Omamori's supported detectors; it is not universal anonymization.
 
+Selected source metadata includes event IDs, collector type, ports, signatures
+and process context from the [source adapters](intake.md). Each evidence item has
+a 1,600-rune budget across field values and a 200-rune limit per field, including
+any ellipsis. `truncated_fields` reports shortened or omitted fields. This keeps
+the serialized request bounded while retaining useful high-priority evidence.
+
 ## Results and replay
 
 Each completed or partial run creates a fresh output folder containing the

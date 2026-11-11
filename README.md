@@ -59,7 +59,8 @@ an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all
 ### Local detection, without an AI provider
 
 `detect` reads sshd/Linux syslog, Apache/Nginx access logs, or JSON lines with a
-timestamp. It applies 17 built-in rules, including counts, distinct counts and
+timestamp. It normalizes supported Suricata EVE, Zeek, Wazuh and Windows/Sysmon
+JSON exports into the shared event fields. It applies 17 built-in rules, including counts, distinct counts and
 ordered sequences such as password guessing followed by a successful login.
 It uses no API key and sends nothing over the network.
 
@@ -77,7 +78,11 @@ unchanged. `expected.json` describes the synthetic scenario; the report lists it
 as skipped because it is not a log.
 
 Use `scenario --benign` for a day without planted attacks, `detect --rules ./rules`
-to load your own YAML rules, or `--format syslog|web|json` to choose a parser.
+to load your own YAML rules, or `--format syslog|web|json|suricata|zeek|wazuh|windows`
+to choose a parser. Auto mode can read mixed JSON sources; an explicit source
+format counts other shapes as unread. See the [intake guide](docs/intake.md)
+for field mappings, supported exporters and limits. The built-in rules cover
+their existing scenarios; additional sources can use custom rules.
 Custom rules replace the built-in set. The rule format is a documented subset of
 Sigma: unsupported conditions and modifiers are refused. Rules can include test
 events, and a rule set with failing tests is refused too.
@@ -112,6 +117,11 @@ It checks 14 alert reviews plus one shared-entity link, and is explicitly labele
 as scripted. See the [analyst guide](docs/analyst.md) for the schema boundaries,
 replay behavior and integration APIs. Local fake-provider and replay tests verify
 the pipeline; live model quality has not been measured for this slice.
+
+The [multi-source fixture](testdata/fixtures/intake/README.md) exercises all four
+new source families with eight synthetic records and six expected observation
+alerts. It runs through the same detection and analyst services as the CLI and
+future local dashboard.
 
 ## Live test results
 
@@ -244,6 +254,8 @@ AI is limited by the guard and can only use read-only tools.
 - [AI analyst](docs/analyst.md): checked alert reviews, replay and the shared
   service for the future local dashboard.
 - [Local rules](docs/rules.md): supported detection and correlation YAML.
+- [Log intake](docs/intake.md): supported source formats, field maps and a
+  mixed-source demo.
 - [My Number test table](docs/mynumber-test-table.md): my test cases for the
   first detector. All numbers are dummy numbers.
 

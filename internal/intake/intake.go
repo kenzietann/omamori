@@ -23,10 +23,14 @@ import (
 
 // Formats of log files.
 const (
-	FormatAuto   = ""
-	FormatSyslog = "syslog"
-	FormatWeb    = "web"
-	FormatJSON   = "json"
+	FormatAuto     = ""
+	FormatSyslog   = "syslog"
+	FormatWeb      = "web"
+	FormatJSON     = "json"
+	FormatSuricata = "suricata"
+	FormatZeek     = "zeek"
+	FormatWazuh    = "wazuh"
+	FormatWindows  = "windows"
 )
 
 const (
@@ -41,7 +45,7 @@ const (
 var (
 	ErrTooBig   = errors.New("the logs hold more events than one run can take")
 	ErrBadInput = errors.New("the log cannot be read")
-	ErrFormat   = errors.New("the format is not known. Use syslog, web or json")
+	ErrFormat   = errors.New("the format is not known. Use syslog, web, json, suricata, zeek, wazuh or windows")
 )
 
 // Options say how to read lines that do not say everything themselves.
@@ -57,8 +61,10 @@ type Options struct {
 type Stats struct {
 	File   string
 	Format string
-	Lines  int
-	Events int
+	// Sources lists the recognized event sources in this file; a JSON file can mix several.
+	Sources []string
+	Lines   int
+	Events  int
 	// Blank counts empty lines. Malformed counts lines that could not be read as the format of the file.
 	Blank     int
 	Malformed int
@@ -77,7 +83,7 @@ func (options Options) valid() error {
 		return ErrBadInput
 	}
 	switch options.Format {
-	case FormatAuto, FormatSyslog, FormatWeb, FormatJSON:
+	case FormatAuto, FormatSyslog, FormatWeb, FormatJSON, FormatSuricata, FormatZeek, FormatWazuh, FormatWindows:
 		return nil
 	}
 
@@ -236,17 +242,19 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 	}
 
 	var parse lineParser
+	var parseJSON func(string) (map[string]string, time.Time, string, bool)
 	switch format {
 	case FormatSyslog:
 		parse = newSyslogParser(options)
 	case FormatWeb:
 		parse = parseWebLine
 	default:
-		parse = jsonParser(options)
+		parseJSON = jsonSourceParser(options)
 	}
 
 	stats := Stats{File: name, Format: format}
 	var events []event.Event
+	sources := map[string]bool{}
 	for {
 		line, tooLong, err := readLine(buffered)
 		if err != nil && !errors.Is(err, io.EOF) {
@@ -263,8 +271,17 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 		case strings.TrimSpace(line) == "":
 			stats.Blank++
 		default:
-			if fields, moment, ok := parse(line); ok {
-				events = append(events, event.Event{Time: moment, Source: format, Ref: fmt.Sprintf("%s:%d", name, stats.Lines), Fields: fields})
+			var fields map[string]string
+			var moment time.Time
+			source, ok := format, false
+			if parseJSON != nil {
+				fields, moment, source, ok = parseJSON(line)
+			} else {
+				fields, moment, ok = parse(line)
+			}
+			if ok {
+				sources[source] = true
+				events = append(events, event.Event{Time: moment, Source: source, Ref: fmt.Sprintf("%s:%d", name, stats.Lines), Fields: fields})
 				if len(events) > maxEvents {
 					return nil, Stats{}, ErrTooBig
 				}
@@ -277,6 +294,10 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 		}
 	}
 	stats.Events = len(events)
+	for source := range sources {
+		stats.Sources = append(stats.Sources, source)
+	}
+	sort.Strings(stats.Sources)
 
 	return events, stats, nil
 }

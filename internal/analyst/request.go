@@ -14,6 +14,7 @@ You have no tools. Do not request tools, execute commands, change systems, fetch
 An alert is a rule match, not proof of compromise. A common entity does not prove causation or one attacker.
 Use only identifiers and facts in this snapshot. Omitted evidence is not available to you. A quiet or incomplete
 snapshot is not proof that a system is safe. Do not invent certainty, attribution, outcomes or incident labels.
+The truncated_fields counts disclose shortened or omitted field text. Do not infer what missing text contained.
 
 Return exactly one JSON object with a "claims" array and no prose or code fence. Allowed claim fields:
 - kind: "alert" or "related".

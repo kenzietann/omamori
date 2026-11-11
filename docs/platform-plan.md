@@ -11,7 +11,7 @@ One Go binary, `omamori`. Everything is a library package under `internal/`, and
                                             │                                     │
                                             └──> store (later: SQLite) <──────────┤
                                                                                   ├──> report (Markdown, HTML)
-    Linux artifacts ──> forensics (later) ──> event.Event (same timeline)         └──> AI analyst (later),
+    Linux artifacts ──> forensics (later) ──> event.Event (same timeline)         └──> AI analyst,
                                                                                        every claim checked by code
 
 Omamori is an AI blue-team tool with a CLI now and a local dashboard planned. The dashboard will run on
@@ -27,7 +27,7 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
 |---|---|---|
 | 1 | `omamori detect`: sshd/syslog, web access logs and JSON lines in; Sigma-subset rules with count, distinct count, ordered sequence; alerts; Markdown, HTML and JSON report; synthetic scenarios with measured detection and false positives | built and verified (2026-11-12) |
 | 2 | AI analyst on alerts: sanitized alert summaries out, claims in, each claim checked against alerts and events, only verified claims shown; replay recording; shared run service for CLI and local dashboard | built and verified (2026-11-12); live model evaluation pending |
-| 3 | More intake: Suricata eve.json, Zeek, Wazuh alerts, Sysmon/Windows event JSON, with field maps and fuzz tests | December |
+| 3 | More intake: Suricata eve.json, Zeek, Wazuh alerts, Sysmon/Windows event JSON, with field maps and fuzz tests | built and verified (2026-11-12), documented JSON subsets |
 | 4 | Store (SQLite), search, cases, timeline across runs | January |
 | 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | January |
 | 6 | Local web UI on 127.0.0.1 over the store | February |
@@ -80,6 +80,15 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
     the outbound guard, with no filesystem or shell tools. AI claims cite opaque alert, evidence and
     entity IDs. Code verifies the facts and writes the displayed explanations. Shared-entity links are
     investigation leads, not proof of causation or compromise. Review suggestions are never executed.
+15. **Source normalization is shared and explicit.** Both commands use the same intake library.
+    Documented source shapes get canonical fields plus bounded original fields under `raw.*`;
+    unknown JSON remains generic. Event source and collector identity remain available to reports
+    and the future dashboard. Source type is inferred from schema, never from filenames alone.
+16. **Source semantics are observations.** Windows login outcomes require the Security provider and
+    channel plus event ID. Sysmon process/network events do not imply malicious intent. Sensor
+    policy actions and connection states do not imply attack success. Windows target accounts are
+    domain-qualified when the domain is present, so same-named accounts in different domains are
+    not silently combined.
 
 ## Slice 1 verification (2026-11-12)
 
@@ -111,8 +120,8 @@ Try the commands in the [README](../README.md#local-detection-without-an-ai-prov
 The supported YAML syntax is in [rules.md](rules.md).
 
 The detection slice is batch-only and uses no AI provider. Slow guessing below the thresholds is a named miss.
-Compressed inputs, source-specific mappings for the later log formats, production log baselines,
-streaming and storage remain outside this slice.
+Compressed inputs, production log baselines, streaming and storage remain outside the detection slice.
+Source-specific mappings were added in slice 3.
 
 ## Slice 2 verification (2026-11-12)
 
@@ -140,6 +149,36 @@ The response schema deliberately allows checkable facts and fixed review suggest
 does not become a verified finding. Request fingerprints bind replay to the included sanitized
 snapshot rather than all source bytes or full rule definitions. Evidence caps and unreviewed alerts
 stay visible in the result. See [analyst.md](analyst.md) for these boundaries and the dashboard service API.
+
+## Slice 3 verification (2026-11-12)
+
+The shared intake now normalizes Suricata EVE alert/HTTP/DNS/flow/TLS, Zeek connection/HTTP/DNS/notice,
+Wazuh alerts (including nested Windows events), Winlogbeat and NXLog Windows JSON. Supported Windows
+behavior covers Sysmon 1/3 and Security 4624/4625; other event IDs retain metadata without inferred behavior.
+The source field dictionary and primary references are in [intake.md](intake.md).
+
+- The mixed-source CLI fixture reads 8 synthetic records using 8 custom rules and produces 6 expected
+  alerts. All four normalized source families appear in alert evidence; generic JSON remains generic.
+- A fake-provider analysis of those alerts verifies all 6 claims, includes source/process/network
+  context and leaves the original fixture unchanged. An explicit `windows` run accepts 3 records,
+  produces 2 alerts and reports the other 5 records as unread.
+- Regression tests cover source look-alikes, conflicting raw canonical fields, invalid IPs/ports,
+  source event times versus collector times, UTC Sysmon times, target versus subject accounts,
+  domain-qualified users, malformed identity text and ambiguous flattened evidence paths.
+- Network normalization fuzzing completed 517,853 executions; host normalization 240,914; the full
+  source-aware JSON parsing path completed 294,413. These bounded fuzz runs found no failures.
+- Richer analyst metadata exposed a worst-case request-size edge: a single large alert could leave
+  no alerts after pruning. Each evidence item now has a 1,600-rune cumulative field-value budget,
+  with a 200-rune per-field maximum and explicit `truncated_fields` coverage. Regression tests retain
+  useful evidence and keep the serialized request within 256 KiB.
+- `go build ./...`, `go vet ./...`, `go test -race ./...`, formatting and diff checks passed.
+  A built binary also completed the fixture through offline scripted analysis: 6 verified claims,
+  no rejected or unreviewed alerts, all four source families present and input hashes unchanged.
+
+The 17 built-in rules are unchanged. Parser support is not complete detection coverage. Native EVTX,
+XML, Zeek TSV, JSON arrays and arbitrary PowerShell object dumps are not supported. Real sensor
+deployments and live AI quality remain unmeasured. The next planned slice is SQLite storage, search,
+cases and timelines, which will support the local dashboard.
 
 ## Not decided yet
 

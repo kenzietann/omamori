@@ -13,26 +13,31 @@ import (
 
 // Field names that parsers and rules share.
 const (
-	Action    = "action"
-	Outcome   = "outcome"
-	User      = "user"
-	SourceIP  = "src_ip"
-	DestIP    = "dst_ip"
-	Host      = "host"
-	Process   = "process"
-	Command   = "command"
-	URL       = "url"
-	Method    = "method"
-	Status    = "status"
-	Bytes     = "bytes"
-	UserAgent = "user_agent"
-	Referrer  = "referrer"
-	Message   = "message"
-	Signature = "signature"
-	Service   = "service"
-	Category  = "category"
-	Product   = "product"
-	AuthBy    = "auth_method"
+	Action     = "action"
+	Outcome    = "outcome"
+	User       = "user"
+	SourceIP   = "src_ip"
+	DestIP     = "dst_ip"
+	Host       = "host"
+	Process    = "process"
+	Command    = "command"
+	URL        = "url"
+	Method     = "method"
+	Status     = "status"
+	Bytes      = "bytes"
+	UserAgent  = "user_agent"
+	Referrer   = "referrer"
+	Message    = "message"
+	Signature  = "signature"
+	Service    = "service"
+	Category   = "category"
+	Product    = "product"
+	AuthBy     = "auth_method"
+	Collector  = "collector"
+	EventID    = "event_id"
+	SourcePort = "src_port"
+	DestPort   = "dst_port"
+	Protocol   = "protocol"
 )
 
 // Event is one thing that happened. Ref says where it came from, for example "auth.log:12".
@@ -58,6 +63,7 @@ var aliases = map[string]string{
 	"cs-uri": URL, "cs-uri-query": URL, "cs-uri-stem": URL, "c-uri": URL, "request": URL,
 	"cs-username": User, "username": User, "targetusername": User,
 	"commandline": Command, "image": Process, "computername": Host, "hostname": Host,
+	"eventid": EventID, "sourceport": SourcePort, "destinationport": DestPort,
 }
 
 // Canonical gives the name under which a field is kept.

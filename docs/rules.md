@@ -118,8 +118,11 @@ Numbers and booleans in rule values are converted to text for ordinary matching.
 `logsource` supports `product`, `service` and `category`. Every specified value
 must be present and equal, ignoring case. `definition` is allowed as descriptive
 metadata. Syslog intake sets `product: linux` and the parsed service, such as
-`sshd`, `sudo` or `cron`. Web intake sets `category: webserver`. JSON intake uses
-the fields in the input; it does not infer those source labels.
+`sshd`, `sudo` or `cron`. Web intake sets `category: webserver`. Generic JSON uses
+the fields in the input. Recognized Suricata, Zeek, Wazuh and Windows JSON shapes
+have explicit source mappings; their original scalar fields are retained under
+`raw.*`. See the [intake field dictionary](intake.md) for product/service/category
+values and source-specific limits.
 
 Some common field names are mapped to the same internal field:
 
@@ -132,6 +135,7 @@ Some common field names are mapped to the same internal field:
 | `cs-uri`, `cs-uri-stem`, `cs-uri-query`, `c-uri`, `request` | `url` |
 | `cs-username`, `UserName`, `TargetUserName` | `user` |
 | `CommandLine`, `Image`, `ComputerName`, `HostName` | `command`, `process`, `host`, `host` |
+| `EventID`, `SourcePort`, `DestinationPort` | `event_id`, `src_port`, `dst_port` |
 
 Alias lookup ignores case. Other field names keep their spelling. URI aliases
 all refer to the stored URL; they do not split its path and query. Web URLs keep

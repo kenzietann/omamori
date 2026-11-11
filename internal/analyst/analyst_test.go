@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/kenzietann/omamori/internal/detect"
 	"github.com/kenzietann/omamori/internal/event"
@@ -335,7 +336,7 @@ func TestLargeEscapedEvidenceStillProducesABoundedRequest(t *testing.T) {
 		outcome.Result.Alerts = append(outcome.Result.Alerts, outcome.Result.Alerts[0])
 	}
 	snapshot := snapshotFor(t, outcome)
-	if snapshot.Coverage.OmittedAlerts == 0 || snapshot.Coverage.OmittedEvidence == 0 {
+	if len(snapshot.Alerts) == 0 || snapshot.Coverage.OmittedAlerts == 0 || snapshot.Coverage.OmittedEvidence == 0 || snapshot.Coverage.TruncatedFields == 0 {
 		t.Fatal("the limits did not disclose omissions")
 	}
 	request, err := Request(snapshot)
@@ -345,6 +346,50 @@ func TestLargeEscapedEvidenceStillProducesABoundedRequest(t *testing.T) {
 	}
 	if last := snapshot.Alerts[0].Evidence[MaxEvidence-1]; last.Time != stamp(outcome.Result.Alerts[1].Events[49].Time) {
 		t.Fatal("the evidence sample lost its final event")
+	}
+}
+
+func TestEvidenceTextBudgetKeepsTheAlertAndDisclosesShortenedFields(t *testing.T) {
+	outcome := fixture()
+	outcome.Result.Alerts = outcome.Result.Alerts[:1]
+	for _, original := range outcome.Result.Alerts[0].Events {
+		for _, field := range evidenceFields {
+			original.Fields[field] = strings.Repeat("猫", 1000)
+		}
+	}
+	snapshot := snapshotFor(t, outcome)
+	if len(snapshot.Alerts) != 1 || len(snapshot.Alerts[0].Evidence) != 3 || len(snapshot.Alerts[0].Entities) == 0 {
+		t.Fatal("the field budget removed the alert, its evidence or its identity links")
+	}
+	truncated := 0
+	for _, item := range snapshot.Alerts[0].Evidence {
+		total := 0
+		for field, value := range item.Fields {
+			runes := utf8.RuneCountInString(value)
+			if !utf8.ValidString(value) || runes > maxEvidenceFieldRunes {
+				t.Fatalf("field %s exceeds the per-field budget", field)
+			}
+			total += runes
+		}
+		if total != maxEvidenceTextRunes || item.TruncatedFields != len(evidenceFields) || len(item.Entities) == 0 {
+			t.Fatalf("budget/coverage: %d runes, %d shortened fields, %d entities", total, item.TruncatedFields, len(item.Entities))
+		}
+		truncated += item.TruncatedFields
+	}
+	if snapshot.Coverage.TruncatedFields != truncated || snapshot.Coverage.OmittedAlerts != 0 {
+		t.Fatalf("aggregate coverage: %+v", snapshot.Coverage)
+	}
+	result := Check(snapshot, responseFor(t, claimFor(snapshot.Alerts[0])))
+	if len(result.Verified) != 1 || result.Verified[0].Evidence[0].TruncatedFields == 0 {
+		t.Fatal("checked result lost the evidence field-coverage metadata")
+	}
+	if !strings.Contains(Markdown(result), fmt.Sprintf("%d selected evidence fields were shortened or omitted", truncated)) {
+		t.Fatal("the report did not disclose shortened field text")
+	}
+	request, err := Request(snapshot)
+	encoded, _ := json.Marshal(request)
+	if err != nil || len(encoded) > MaxRequestBytes {
+		t.Fatalf("request: %d bytes, %v", len(encoded), err)
 	}
 }
 

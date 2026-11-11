@@ -17,11 +17,22 @@ import (
 	"github.com/kenzietann/omamori/internal/sanitizer"
 )
 
-const snapshotBudget = MaxRequestBytes - 12<<10
+const (
+	snapshotBudget        = MaxRequestBytes - 12<<10
+	maxEvidenceFieldRunes = 200
+	maxEvidenceTextRunes  = 1600
+)
 
 var evidenceFields = []string{
 	event.Service, event.Action, event.Outcome, event.User, event.SourceIP, event.DestIP, event.Host,
 	event.Process, event.Command, event.URL, event.Method, event.Status, event.Signature, event.AuthBy, event.Message,
+	event.Collector, event.Product, event.Category, event.EventID, event.SourcePort, event.DestPort, event.Protocol,
+	"parent_process", "parent_command", "process_id", "process_guid", "logon_type", "user_domain",
+	"policy_action", "rule_id", "rule_severity", "dns_query", "dns_type", "dns_rcode", "tls_sni", "http_host",
+	"conn_state", "bytes_sent", "bytes_received", "uid", "flow_id",
+	"wazuh_rule_id", "wazuh_level", "agent_id", "signature_id", "signature_category", "app_protocol",
+	"flow_state", "bytes_to_server", "bytes_to_client", "tls_version", "target_user", "auth_status", "auth_substatus",
+	"parent_process_id", "parent_process_guid",
 }
 var entityFields = []string{event.SourceIP, event.User, event.Host}
 var severity = map[string]int{"critical": 4, "high": 3, "medium": 2, "low": 1, "informational": 0}
@@ -33,7 +44,7 @@ type snapshotBuilder struct {
 	sources    map[string]string
 }
 
-func (builder *snapshotBuilder) text(text string, limit int) string {
+func (builder *snapshotBuilder) cleaned(text string) string {
 	clean, _ := builder.clean.Sanitize(strings.ToValidUTF8(text, "?"))
 	clean = strings.Map(func(character rune) rune {
 		if character < ' ' || character == 0x7f || character == '\u2028' || character == '\u2029' {
@@ -41,10 +52,29 @@ func (builder *snapshotBuilder) text(text string, limit int) string {
 		}
 		return character
 	}, clean)
+	return clean
+}
+
+func (builder *snapshotBuilder) text(text string, limit int) string {
+	clean := builder.cleaned(text)
 	if utf8.RuneCountInString(clean) > limit {
 		clean = string([]rune(clean)[:limit]) + "…"
 	}
 	return clean
+}
+
+// evidenceText counts the displayed ellipsis within its budget. Without a cumulative budget,
+// many source-specific fields can make even one sampled alert exceed the entire request limit.
+func (builder *snapshotBuilder) evidenceText(text string, remaining int) (string, bool) {
+	clean := builder.cleaned(text)
+	maximum := min(maxEvidenceFieldRunes, remaining)
+	if utf8.RuneCountInString(clean) <= maximum {
+		return clean, false
+	}
+	if maximum == 0 {
+		return "", true
+	}
+	return string([]rune(clean)[:maximum-1]) + "…", true
 }
 
 func (builder *snapshotBuilder) entity(field, raw string) string {
@@ -116,9 +146,17 @@ func BuildSnapshot(outcome detect.Outcome) (Snapshot, error) {
 			}
 			item := Evidence{ID: fmt.Sprintf("%s_e%d", current.ID, number+1), Ref: builder.reference(original.Ref),
 				Time: stamp(original.Time), Fields: map[string]string{}, Entities: []string{}}
+			remaining := maxEvidenceTextRunes
 			for _, field := range evidenceFields {
 				if value, found := original.Get(field); found {
-					item.Fields[field] = builder.text(value, 200)
+					text, shortened := builder.evidenceText(value, remaining)
+					if shortened {
+						item.TruncatedFields++
+					}
+					if text != "" || !shortened {
+						item.Fields[field] = text
+						remaining -= utf8.RuneCountInString(text)
+					}
 				}
 			}
 			for _, field := range entityFields {
@@ -191,8 +229,12 @@ func refreshCoverage(snapshot *Snapshot) {
 	snapshot.Coverage.IncludedAlerts = len(snapshot.Alerts)
 	snapshot.Coverage.OmittedAlerts = snapshot.Coverage.TotalAlerts - len(snapshot.Alerts)
 	snapshot.Coverage.OmittedEvidence = 0
+	snapshot.Coverage.TruncatedFields = 0
 	for _, alert := range snapshot.Alerts {
 		snapshot.Coverage.OmittedEvidence += alert.OmittedEvidence
+		for _, item := range alert.Evidence {
+			snapshot.Coverage.TruncatedFields += item.TruncatedFields
+		}
 	}
 }
 

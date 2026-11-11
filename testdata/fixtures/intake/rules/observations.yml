@@ -1,0 +1,66 @@
+title: Synthetic Suricata sensor observation
+name: source_sensor_alert
+description: The sensor reported a signature match; its allowed action is not proof of attack success.
+level: medium
+logsource: {product: suricata, service: alert}
+detection:
+  selection: {signature: Synthetic sensor observation}
+  condition: selection
+---
+title: Synthetic HTTP request observed
+name: source_http_request
+level: low
+logsource: {category: webserver}
+detection:
+  selection: {url: '/.env', status: 404}
+  condition: selection
+---
+title: Synthetic Wazuh alert observed
+name: source_wazuh_alert
+level: low
+logsource: {product: wazuh}
+detection:
+  selection: {action: alert}
+  condition: selection
+---
+title: Synthetic process creation observed
+name: source_process_creation
+level: informational
+logsource: {product: windows, category: process_creation}
+detection:
+  selection: {EventID: 1}
+  condition: selection
+---
+title: Synthetic network connection observed
+name: source_network_connection
+level: informational
+logsource: {product: windows, category: network_connection}
+detection:
+  selection: {EventID: 3, DestinationPort: 443}
+  condition: selection
+---
+title: Synthetic Windows authentication failed
+name: source_windows_failure
+level: low
+logsource: {product: windows, service: security}
+detection:
+  selection: {EventID: 4625, action: login, outcome: failure}
+  condition: selection
+---
+title: Synthetic Windows authentication succeeded
+name: source_windows_success
+level: low
+logsource: {product: windows, service: security}
+detection:
+  selection: {EventID: 4624, action: login, outcome: success}
+  condition: selection
+---
+title: Windows failure followed by success
+name: source_windows_failure_then_success
+description: Observed authentication sequence; user intent is not established.
+level: medium
+correlation:
+  type: temporal_ordered
+  rules: [source_windows_failure, source_windows_success]
+  group-by: [host, user, src_ip]
+  timespan: 10m

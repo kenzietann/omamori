@@ -51,6 +51,7 @@ func Markdown(result Result) string {
 	out.WriteString("Analysis coverage:\n\n")
 	fmt.Fprintf(&out, "- %d of %d alerts were included; %d alerts were omitted by the analysis limit.\n", result.Coverage.IncludedAlerts, result.Coverage.TotalAlerts, result.Coverage.OmittedAlerts)
 	fmt.Fprintf(&out, "- At least %d events or hits from the included alerts were not shown as evidence. Nested correlation totals may be larger.\n", result.Coverage.OmittedEvidence)
+	fmt.Fprintf(&out, "- %d selected evidence fields were shortened or omitted to fit the analysis text budget.\n", result.Coverage.TruncatedFields)
 	fmt.Fprintf(&out, "- Intake reported %d malformed lines and %d skipped files; %d rules reached a match limit.\n", result.Coverage.MalformedLines, result.Coverage.SkippedFiles, result.Coverage.RulesCut)
 	out.WriteString("- These checks establish agreement with the available logs and rules. They do not establish intent, a successful attack, attribution, or the absence of activity outside this evidence.\n")
 	return out.String()

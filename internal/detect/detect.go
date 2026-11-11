@@ -169,7 +169,8 @@ func (w *writer) refs(alert *rules.Alert, limit int) string {
 // describe gives the fields of one event that matter most to a reader, in a fixed order.
 func (w *writer) describe(current event.Event) string {
 	var parts []string
-	for _, field := range []string{event.Service, event.Action, event.Outcome, event.User, event.SourceIP, event.Method, event.URL, event.Status, event.UserAgent, event.Command} {
+	for _, field := range []string{event.Collector, event.Service, event.EventID, event.Action, event.Outcome, event.User, event.SourceIP, event.SourcePort,
+		event.DestIP, event.DestPort, event.Protocol, event.Method, event.URL, event.Status, event.UserAgent, event.Process, event.Command, event.Signature} {
 		if value, found := current.Fields[field]; found && value != "" {
 			parts = append(parts, field+"="+w.value(field, value))
 		}
@@ -301,7 +302,11 @@ func Markdown(outcome Outcome) string {
 
 	out.WriteString("## Files\n\n| File | Format | Lines | Events | Empty lines | Lines not read |\n|---|---|---|---|---|---|\n")
 	for _, file := range outcome.Intake.Files {
-		row(&out, w.text(file.File, maxCell), file.Format, file.Lines, file.Events, file.Blank, file.Malformed)
+		format := file.Format
+		if file.Format == intake.FormatJSON && len(file.Sources) > 0 && !(len(file.Sources) == 1 && file.Sources[0] == intake.FormatJSON) {
+			format += " (" + strings.Join(file.Sources, ", ") + ")"
+		}
+		row(&out, w.text(file.File, maxCell), format, file.Lines, file.Events, file.Blank, file.Malformed)
 	}
 	if len(outcome.Intake.Skipped) > 0 {
 		out.WriteString("\nFiles that were not read:\n\n")
@@ -323,6 +328,7 @@ func Markdown(outcome Outcome) string {
 type jsonEvent struct {
 	Ref    string            `json:"ref"`
 	Time   string            `json:"time"`
+	Source string            `json:"source,omitempty"`
 	Fields map[string]string `json:"fields"`
 }
 
@@ -381,7 +387,11 @@ func JSON(outcome Outcome) (string, error) {
 			for _, name := range names {
 				fields[w.text(name, maxCell)] = w.value(name, item.Fields[name])
 			}
-			current.Events = append(current.Events, jsonEvent{Ref: w.text(item.Ref, maxCell), Time: stamp(item.Time), Fields: fields})
+			source := ""
+			if item.Source != "" {
+				source = w.text(item.Source, 40)
+			}
+			current.Events = append(current.Events, jsonEvent{Ref: w.text(item.Ref, maxCell), Time: stamp(item.Time), Source: source, Fields: fields})
 		}
 		list = append(list, current)
 	}

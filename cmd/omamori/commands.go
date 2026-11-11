@@ -62,7 +62,7 @@ Flags for the triage (Task B). The log lines have no year and no time zone:
 
 Flags for detect:
   --rules folder      use the rules of a folder in place of the built-in rules (Sigma format, see docs/rules.md)
-  --format name       syslog, web or json (default: look at the first lines of each file)
+  --format name       syslog, web, json, suricata, zeek, wazuh or windows (default: look at the first lines of each file)
   --year, --timezone  for syslog lines, which have no year and no time zone
   --output folder     where the report folder is made (default ~/omamori-output)
 
