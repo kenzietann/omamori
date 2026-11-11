@@ -481,3 +481,19 @@ func FuzzExtractClaimsAndCheck(f *testing.F) {
 		}
 	})
 }
+
+func TestTheInstructionSaysThatWeakPatternsAreNotFindings(t *testing.T) {
+	text := Instruction("guessing.log", testConfig())
+
+	if !strings.Contains(text, "Claim only a pattern that meets the numbers above") {
+		t.Errorf("the instruction does not warn against weak claims:\n%s", text)
+	}
+}
+
+func TestTheInstructionSaysThatInvalidUserLinesCount(t *testing.T) {
+	text := Instruction("guessing.log", testConfig())
+
+	if !strings.Contains(text, `"Failed password for invalid user NAME from ..." the user name is NAME`) {
+		t.Errorf("the instruction does not explain invalid user lines:\n%s", text)
+	}
+}
