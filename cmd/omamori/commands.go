@@ -37,6 +37,7 @@ Commands:
   ui <folder>         open the home screen, where you choose a task
   replay <recording> [folder or log file]
                       play back the recorded answers of an earlier run. Nothing is sent
+  eval --yes          run the fixed live tests on the fake fixtures and score them (costs tokens)
   providers           list the AI providers and say whether their key is set
   models <provider>   list the models that a provider offers for your key
   version             print the version
@@ -75,6 +76,9 @@ type environment struct {
 	keys taskrun.KeyStore
 	// settingsPath says where the choices are kept. Without it, they are not kept.
 	settingsPath func() (string, error)
+	// now and newProvider replace the clock and the real provider in tests. Nil means the real ones.
+	now         func() time.Time
+	newProvider taskrun.ProviderFactory
 }
 
 // mergeDefaults gives the command line and the environment the first word, then the saved choices.
@@ -117,6 +121,8 @@ func run(args []string, env environment) int {
 		return runScreen(command, rest, env)
 	case "replay":
 		return runReplay(rest, env)
+	case "eval":
+		return runEval(rest, env)
 	}
 
 	fmt.Fprintf(env.stderr, "omamori: %q is not a command. Run omamori help to see the commands.\n", command)
