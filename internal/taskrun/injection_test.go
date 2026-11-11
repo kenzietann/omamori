@@ -251,8 +251,8 @@ func TestNoPlantedValueReachesTheProviderOrAnyFileThatOmamoriCreates(t *testing.
 	}
 
 	files := outputFiles(t, run.setup.output)
-	if len(files) != 3 {
-		t.Fatalf("%d files were created, want the report, the event log and the recording", len(files))
+	if len(files) != 4 {
+		t.Fatalf("%d files were created, want the report (two forms), the event log and the recording", len(files))
 	}
 	for name, content := range files {
 		for _, planted := range injectionPlanted {

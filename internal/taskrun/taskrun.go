@@ -18,6 +18,7 @@ import (
 	"github.com/kenzietann/omamori/internal/eventlog"
 	"github.com/kenzietann/omamori/internal/exposure"
 	"github.com/kenzietann/omamori/internal/gateway"
+	"github.com/kenzietann/omamori/internal/htmlreport"
 	"github.com/kenzietann/omamori/internal/outbound"
 	"github.com/kenzietann/omamori/internal/pathguard"
 	"github.com/kenzietann/omamori/internal/replay"
@@ -668,6 +669,9 @@ func (session *Session) Run(ctx context.Context, step func(string)) (Result, err
 		report = "**" + label + ": recorded answers were played back. Nothing was sent.**\n\n" + report
 	}
 	if err := writer.Write("report.md", report); err != nil {
+		return Result{}, ErrOutput
+	}
+	if err := writer.Write("report.html", htmlreport.Render(report)); err != nil {
 		return Result{}, ErrOutput
 	}
 	step("report saved")

@@ -49,8 +49,8 @@ omamori eval --yes --runs 3             # live test on the fake fixtures, with a
 
 You can type the key in the screen. On macOS a key that works is saved in your
 Keychain (you can remove it in Settings). It is never printed or written to a
-file. Every live run saves a report, an event log and a `recording.json` in
-`~/omamori-output/`. Use `--help` for all flags.
+file. Every live run saves a report (`report.md` and a static `report.html` with no script),
+an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all flags.
 
 ## Live test results
 

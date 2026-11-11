@@ -364,8 +364,12 @@ func TestAFullRunWritesTheReportAndTheLogAndNothingElse(t *testing.T) {
 	}
 
 	files := outputFiles(t, setup.output)
-	if len(files) != 3 || files[filepath.Join("run-20261112-093000", "report.md")] != result.Report || files[filepath.Join("run-20261112-093000", "events.jsonl")] == "" || files[filepath.Join("run-20261112-093000", "recording.json")] == "" {
-		t.Fatalf("the output files are %v, want exactly report.md (the same as the result), events.jsonl and recording.json", slices.Sorted(mapKeys(files)))
+	page := files[filepath.Join("run-20261112-093000", "report.html")]
+	if !strings.HasPrefix(page, "<!doctype html>") || !strings.Contains(page, "[SECRET:aws-access-key:001]") || strings.Contains(page, "<script") {
+		t.Errorf("report.html is wrong:\n%s", page)
+	}
+	if len(files) != 4 || files[filepath.Join("run-20261112-093000", "report.md")] != result.Report || files[filepath.Join("run-20261112-093000", "events.jsonl")] == "" || files[filepath.Join("run-20261112-093000", "recording.json")] == "" {
+		t.Fatalf("the output files are %v, want exactly report.md (the same as the result), report.html, events.jsonl and recording.json", slices.Sorted(mapKeys(files)))
 	}
 
 	expected, err := os.ReadFile(filepath.Join(fixtureDirectory, "expected_findings.json"))
@@ -1154,5 +1158,33 @@ func TestTheSummaryNeverHoldsAKeyOrFileContent(t *testing.T) {
 		if strings.Contains(summary, planted) {
 			t.Errorf("the summary holds %q", planted)
 		}
+	}
+}
+
+func TestMarkupInFileNamesFileContentsAndAINotesIsOnlyTextInTheHTMLReport(t *testing.T) {
+	hostile := "<script>alert(document.domain)</script>"
+	setup := newSetup(t, scanAll(), answerText("Note: "+hostile+" <img src=x onerror=alert(1)>"))
+	project := filepath.Join(t.TempDir(), "project")
+	copyTree(t, setup.project, project)
+	setup.config.Target = project
+	name := filepath.Join(project, "notes", "<svg onload=alert(1)>.txt")
+	if err := os.WriteFile(name, []byte(hostile+"\ncall 090-1234-5678\n"), 0o600); err != nil {
+		t.Skip("this file system does not allow this file name")
+	}
+	session := setup.session(t)
+	session.Confirm()
+
+	result, err := session.Run(context.Background(), func(string) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := outputFiles(t, setup.output)[filepath.Join("run-20261112-093000", "report.html")]
+	body := page[strings.Index(page, "<body>"):]
+	if strings.Contains(body, "<script") || strings.Contains(body, "<img") || strings.Contains(body, "<svg") || !strings.Contains(body, "&lt;script&gt;") || !strings.Contains(body, "notes/_svg onload=alert(1)_.txt") {
+		t.Errorf("the markup is not shown as text:\n%s", body)
+	}
+	if strings.Contains(page, "090-1234-5678") || !strings.Contains(result.Report, "[PHONE:") {
+		t.Error("the page or the report is wrong about the phone number")
 	}
 }

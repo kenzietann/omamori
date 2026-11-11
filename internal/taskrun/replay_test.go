@@ -125,8 +125,8 @@ func TestARecordedRunIsReplayedThroughTheRealPipelineWithoutTheNetworkOrAProvide
 		t.Errorf("the live provider got %d requests in total, the replay must add none", len(setup.provider.recorded))
 	}
 	files := outputFiles(t, config.OutputBase)
-	if len(files) != 2 {
-		t.Errorf("a replay writes the report and the log only, got %d files", len(files))
+	if len(files) != 3 {
+		t.Errorf("a replay writes the report (two forms) and the log only, got %d files", len(files))
 	}
 }
 

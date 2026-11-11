@@ -85,8 +85,8 @@ func TestTheTriageRunChecksTheClaimAgainstTheLogAndSavesTheFiles(t *testing.T) {
 		t.Fatalf("complete %v, steps %q, report:\n%s", result.Complete, steps, result.Report)
 	}
 	files := outputFiles(t, setup.output)
-	if len(files) != 3 {
-		t.Errorf("%d files, want the report, the event log and the recording", len(files))
+	if len(files) != 4 {
+		t.Errorf("%d files, want the report (two forms), the event log and the recording", len(files))
 	}
 	recording, err := replay.Load(filepath.Join(result.SavedTo, "recording.json"))
 	if err != nil || recording.Task != "triage" || recording.Log != "auth.log" || len(recording.Steps) != 2 {
