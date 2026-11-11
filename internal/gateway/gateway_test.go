@@ -404,3 +404,90 @@ func TestAPathThatIsTheGitFolderItselfIsStillScanned(t *testing.T) {
 		t.Errorf("a scan of the .git folder by name found nothing:\n%s", detected.Text)
 	}
 }
+
+func TestDependencyFoldersAndGeneratedFilesAreNotScanned(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "project")
+	hit := "id " + fakeMyNumber + "\n"
+	notScanned := []string{
+		"node_modules/pkg/index.js", "backend/node_modules/@scope/pkg/CHANGELOG.md", "vendor/lib/code.go",
+		"__pycache__/mod.txt", ".venv/lib/x.txt", "venv/lib/x.txt",
+		"package-lock.json", "web/yarn.lock", "pnpm-lock.yaml", "go.sum", "Cargo.lock", "composer.lock", "poetry.lock", "Gemfile.lock",
+		"dist/tsconfig.build.tsbuildinfo", "tsconfig.tsbuildinfo",
+	}
+	scanned := []string{
+		"src/app.txt", "dist/bundle.txt", "build/out.txt", "node_modules_backup/x.txt", "my-vendor/x.txt", "venv2/x.txt",
+		"package-lock.json.bak", "yarn.lock.txt", "tsbuildinfo.txt", "notes/vendor.txt",
+	}
+	for _, name := range append(append([]string{}, notScanned...), scanned...) {
+		writeFile(t, filepath.Join(project, name), hit)
+	}
+	root, err := pathguard.NewRoot(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limits := testLimits
+	limits.MaxResults, limits.MaxFiles = 100, 100
+	gateway := New(root, limits)
+
+	detected, err := gateway.Call(context.Background(), "run_detectors", map[string]any{"path": "."})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, name := range notScanned {
+		if strings.Contains(detected.Text, name+":") {
+			t.Errorf("%s was scanned:\n%s", name, detected.Text)
+		}
+	}
+	for _, name := range scanned {
+		if !strings.Contains(detected.Text, name+":") {
+			t.Errorf("%s was not scanned, but its name is not on the list:\n%s", name, detected.Text)
+		}
+	}
+}
+
+func TestAPathInsideADependencyFolderOrALockFileIsScannedWhenNamed(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "project")
+	hit := "id " + fakeMyNumber + "\n"
+	writeFile(t, filepath.Join(project, "node_modules", "pkg", "a.txt"), hit)
+	writeFile(t, filepath.Join(project, "node_modules", "pkg", "node_modules", "deep", "b.txt"), hit)
+	writeFile(t, filepath.Join(project, "package-lock.json"), hit)
+	root, err := pathguard.NewRoot(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway := New(root, testLimits)
+
+	named, err := gateway.Call(context.Background(), "run_detectors", map[string]any{"path": "node_modules/pkg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(named.Text, "a.txt:1") || strings.Contains(named.Text, "deep/b.txt") {
+		t.Errorf("a named folder is walked, but its own dependency folders are not:\n%s", named.Text)
+	}
+
+	file, err := gateway.Call(context.Background(), "run_detectors", map[string]any{"path": "package-lock.json"})
+	if err != nil || !strings.Contains(file.Text, "package-lock.json:1") {
+		t.Errorf("a lock file named as the path was not scanned (err %v):\n%s", err, file.Text)
+	}
+}
+
+func TestSkippedEntry(t *testing.T) {
+	testCases := []struct {
+		name  string
+		isDir bool
+		want  bool
+	}{
+		{".git", true, true}, {".git", false, true}, {"node_modules", true, true}, {"node_modules", false, false},
+		{"vendor", true, true}, {"vendor", false, false}, {"venv", true, true}, {".venv", true, true}, {"__pycache__", true, true},
+		{"dist", true, false}, {"build", true, false}, {"Node_Modules", true, false},
+		{"go.sum", false, true}, {"go.sum", true, false}, {"x.tsbuildinfo", false, true}, {".tsbuildinfo", false, true},
+		{"x.tsbuildinfo.txt", false, false}, {"main.go", false, false}, {"", false, false},
+	}
+
+	for _, testCase := range testCases {
+		if got := skippedEntry(testCase.name, testCase.isDir); got != testCase.want {
+			t.Errorf("skippedEntry(%q, %v) = %v, want %v", testCase.name, testCase.isDir, got, testCase.want)
+		}
+	}
+}

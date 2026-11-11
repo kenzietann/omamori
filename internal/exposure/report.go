@@ -133,7 +133,7 @@ func renderLimits(stats Stats) string {
 	limits.WriteString("- It does not find or hide other secret formats, passwords, email addresses, IP addresses, names, or street addresses.\n")
 	limits.WriteString("- A My Number with a valid check digit is a possible identifier, not proof.\n")
 	limits.WriteString("- Findings come only from the files that the scans in this run covered. Anything else is not covered.\n")
-	limits.WriteString("- The .git folder (the history of the project) is not scanned. A secret that was committed earlier and later removed is not found.\n")
+	limits.WriteString("- These are not scanned: the .git folder (the history of the project), dependency folders (node_modules, vendor, venv, .venv, __pycache__), and lock files. A secret that was committed earlier and later removed is not found.\n")
 	limits.WriteString("- A placeholder in a file name stands for a secret found in the name. The real name is not shown. Placeholder numbers come from the scan and can change from run to run.\n")
 	limits.WriteString("- The AI notes are written by the AI. Omamori did not check them.\n")
 	if stats.Skipped > 0 {

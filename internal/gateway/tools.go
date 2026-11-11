@@ -75,13 +75,9 @@ func (gateway *Gateway) readTextFile(resolvedPath string) (string, error) {
 	return text, nil
 }
 
-// gitFolderName is the version control folder. Its files hold hashes and packed data, which look like
-// secrets and numbers by chance, so they would fill a report with false findings.
-const gitFolderName = ".git"
-
 // walkFiles lists the regular files under a path. Symlinks are skipped, never followed.
-// A .git folder inside the path is not entered. A path that is itself a .git folder is still walked,
-// because then the caller asked for it by name.
+// The folders and files in skippedEntry are left out when they are inside the path. A path that is
+// itself one of them is still walked, because then the caller asked for it by name.
 func (gateway *Gateway) walkFiles(ctx context.Context, resolvedPath string) (files []string, isFile, truncated bool, err error) {
 	info, err := os.Lstat(resolvedPath)
 	if err != nil {
@@ -101,7 +97,7 @@ func (gateway *Gateway) walkFiles(ctx context.Context, resolvedPath string) (fil
 		if ctx.Err() != nil {
 			return ErrCancelled
 		}
-		if path != resolvedPath && entry.Name() == gitFolderName {
+		if path != resolvedPath && skippedEntry(entry.Name(), entry.IsDir()) {
 			if entry.IsDir() {
 				return fs.SkipDir
 			}
