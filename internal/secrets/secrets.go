@@ -1,29 +1,25 @@
 package secrets
 
-import "regexp"
+import (
+	"cmp"
+	"regexp"
+	"slices"
+)
 
-// Match says where a possible secret sits in a text. It holds positions and the
-// type only, never the text itself, so a log or an error message can not leak it.
-// Start is the first byte. End is the byte after the last one, like text[Start:End].
-// Kind is the name used in the placeholder, like [SECRET:aws-access-key:001].
 type Match struct {
 	Start int
 	End   int
 	Kind  string
 }
 
-// rule is one row of the table: a name for the placeholder and the pattern that finds it.
-// A new secret format is one more row, so the loop in FindSecrets never changes.
 type rule struct {
 	kind    string
 	pattern *regexp.Regexp
 }
 
 var rules = []rule{
-	// An AWS access key ID is 4 prefix characters and 16 more. AKIA is a long-term key
-	// and ASIA is a temporary key. We accept A-Z and 0-9, not only Base32 (A-Z, 2-7),
-	// because a false positive costs less than a missed key.
 	{kind: "aws-access-key", pattern: regexp.MustCompile(`(AKIA|ASIA)[A-Z0-9]{16}`)},
+	{kind: "github-token", pattern: regexp.MustCompile(`(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,255}`)},
 }
 
 func FindSecrets(text string) []Match {
@@ -34,6 +30,10 @@ func FindSecrets(text string) []Match {
 			matches = append(matches, Match{Start: position[0], End: position[1], Kind: rule.kind})
 		}
 	}
+
+	slices.SortFunc(matches, func(first, second Match) int {
+		return cmp.Compare(first.Start, second.Start)
+	})
 
 	return matches
 }
