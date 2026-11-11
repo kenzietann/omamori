@@ -886,3 +886,273 @@ func TestReasoningChoicesStartWithTheDefault(t *testing.T) {
 		t.Errorf("openai: %+v", got)
 	}
 }
+
+type fakeKeys struct {
+	saved     map[string]string
+	available bool
+	failSet   bool
+	failDel   bool
+	getCalls  []string
+}
+
+func newFakeKeys(saved map[string]string) *fakeKeys {
+	return &fakeKeys{saved: saved, available: true}
+}
+
+func (keys *fakeKeys) Available() bool { return keys.available }
+
+func (keys *fakeKeys) Get(ctx context.Context, providerID string) (string, error) {
+	keys.getCalls = append(keys.getCalls, providerID)
+	if key, found := keys.saved[providerID]; found {
+		return key, nil
+	}
+
+	return "", errors.New("no saved key")
+}
+
+func (keys *fakeKeys) Set(ctx context.Context, providerID, key string) error {
+	if keys.failSet {
+		return errors.New("boom " + key)
+	}
+	keys.saved[providerID] = key
+
+	return nil
+}
+
+func (keys *fakeKeys) Delete(ctx context.Context, providerID string) error {
+	if keys.failDel {
+		return errors.New("boom")
+	}
+	delete(keys.saved, providerID)
+
+	return nil
+}
+
+func TestTheKeyComesFromTheUserThenTheEnvironmentThenTheSavedKey(t *testing.T) {
+	testCases := []struct {
+		name    string
+		typed   string
+		env     map[string]string
+		saved   map[string]string
+		wantKey string
+		wantErr error
+	}{
+		{"typed wins", "typed-key", map[string]string{"ANTHROPIC_API_KEY": "env-key"}, map[string]string{"anthropic": "saved-key"}, "typed-key", nil},
+		{"the environment beats the saved key", "", map[string]string{"ANTHROPIC_API_KEY": "env-key"}, map[string]string{"anthropic": "saved-key"}, "env-key", nil},
+		{"the saved key is the last choice", "  ", nil, map[string]string{"anthropic": "saved-key"}, "saved-key", nil},
+		{"a saved key of another provider is not used", "", nil, map[string]string{"openai": "other-key"}, "", ErrNeedsKey},
+		{"nothing at all", "", nil, nil, "", ErrNeedsKey},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			setup := newSetup(t)
+			environment := testCase.env
+			setup.config.LookupEnv = func(name string) string { return environment[name] }
+			setup.config.Keys = newFakeKeys(testCase.saved)
+
+			_, err := Prepare(setup.config, Setup{ProviderID: "anthropic", Key: testCase.typed})
+
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("err = %v, want %v", err, testCase.wantErr)
+			}
+			if testCase.wantErr == nil && (*setup.calls)[0].key != testCase.wantKey {
+				t.Errorf("the provider got the key %q, want %q", (*setup.calls)[0].key, testCase.wantKey)
+			}
+		})
+	}
+}
+
+func TestModelsUsesTheSavedKey(t *testing.T) {
+	var gotKey string
+	config := Config{
+		Keys: newFakeKeys(map[string]string{"openai": "saved-key"}),
+		ListModels: func(ctx context.Context, id, key string) ([]string, error) {
+			gotKey = key
+			return []string{"m"}, nil
+		},
+	}
+
+	if _, err := config.Models(context.Background(), "openai", ""); err != nil || gotKey != "saved-key" {
+		t.Errorf("err = %v, key = %q", err, gotKey)
+	}
+}
+
+func TestProvidersSayWhichKeysAreSavedAndAskOnlyWhenNeeded(t *testing.T) {
+	keys := newFakeKeys(map[string]string{"anthropic": "saved-key", "openai": "saved-key-2", "ollama": "never-asked"})
+	config := Config{Keys: keys, LookupEnv: func(name string) string {
+		if name == "OPENAI_API_KEY" {
+			return "env-key"
+		}
+		return ""
+	}}
+
+	byID := map[string]Choice{}
+	for _, choice := range config.Providers() {
+		byID[choice.ID] = choice
+	}
+
+	if !byID["anthropic"].KeySaved || byID["gemini"].KeySaved {
+		t.Errorf("anthropic %+v, gemini %+v", byID["anthropic"], byID["gemini"])
+	}
+	if !byID["openai"].KeyFound || byID["openai"].KeySaved {
+		t.Errorf("openai %+v: a key in the environment makes asking the store unnecessary", byID["openai"])
+	}
+	if byID["ollama"].KeySaved {
+		t.Error("a local provider has a saved key")
+	}
+	for _, asked := range keys.getCalls {
+		if asked == "openai" || asked == "ollama" {
+			t.Errorf("the store was asked about %s", asked)
+		}
+	}
+}
+
+func TestSaveKeyAndForgetKey(t *testing.T) {
+	keys := newFakeKeys(map[string]string{})
+	config := Config{Keys: keys}
+	ctx := context.Background()
+
+	if err := config.SaveKey(ctx, "openai", "  new-key \n"); err != nil || keys.saved["openai"] != "new-key" {
+		t.Fatalf("err = %v, saved = %v", err, keys.saved)
+	}
+	if err := config.ForgetKey(ctx, "openai"); err != nil || len(keys.saved) != 0 {
+		t.Fatalf("err = %v, saved = %v", err, keys.saved)
+	}
+	if err := config.ForgetKey(ctx, "openai"); err != nil {
+		t.Errorf("forgetting a key that is not there: %v", err)
+	}
+}
+
+func TestSaveKeyAndForgetKeyRefuseWhatTheyShould(t *testing.T) {
+	ctx := context.Background()
+	unavailable := newFakeKeys(map[string]string{})
+	unavailable.available = false
+	failing := newFakeKeys(map[string]string{})
+	failing.failSet, failing.failDel = true, true
+
+	testCases := []struct {
+		name    string
+		config  Config
+		action  func(Config) error
+		wantErr error
+	}{
+		{"save for an unknown provider", Config{Keys: newFakeKeys(nil)}, func(c Config) error { return c.SaveKey(ctx, "nope", "k") }, ErrUnknownProvider},
+		{"save for a local provider", Config{Keys: newFakeKeys(nil)}, func(c Config) error { return c.SaveKey(ctx, "ollama", "k") }, ErrUnknownProvider},
+		{"save without a store", Config{}, func(c Config) error { return c.SaveKey(ctx, "openai", "k") }, ErrKeyStore},
+		{"save where it is not available", Config{Keys: unavailable}, func(c Config) error { return c.SaveKey(ctx, "openai", "k") }, ErrKeyStore},
+		{"save when the store fails", Config{Keys: failing}, func(c Config) error { return c.SaveKey(ctx, "openai", "secret-key") }, ErrKeyStore},
+		{"forget an unknown provider", Config{Keys: newFakeKeys(nil)}, func(c Config) error { return c.ForgetKey(ctx, "nope") }, ErrUnknownProvider},
+		{"forget without a store", Config{}, func(c Config) error { return c.ForgetKey(ctx, "openai") }, ErrKeyStore},
+		{"forget when the store fails", Config{Keys: failing}, func(c Config) error { return c.ForgetKey(ctx, "openai") }, ErrKeyStore},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := testCase.action(testCase.config)
+
+			if err != testCase.wantErr {
+				t.Errorf("err = %v, want exactly %v", err, testCase.wantErr)
+			}
+		})
+	}
+	if (Config{}).KeysCanBeSaved() || !(Config{Keys: newFakeKeys(nil)}).KeysCanBeSaved() || (Config{Keys: unavailable}).KeysCanBeSaved() {
+		t.Error("KeysCanBeSaved is wrong")
+	}
+}
+
+func TestAWrongKeyIsReportedAsRejectedAndOtherFailuresAreNot(t *testing.T) {
+	testCases := []struct {
+		name      string
+		listerErr error
+		wantErr   error
+	}{
+		{"the provider rejects the key", outbound.ErrAuth, ErrKeyRejected},
+		{"the provider is down", outbound.ErrTemporary, ErrModelList},
+		{"another problem", errors.New("boom sk-secret"), ErrModelList},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			config := Config{ListModels: func(ctx context.Context, id, key string) ([]string, error) { return nil, testCase.listerErr }}
+
+			_, err := config.Models(context.Background(), "ollama", "")
+
+			if err != testCase.wantErr {
+				t.Errorf("err = %v, want exactly %v", err, testCase.wantErr)
+			}
+		})
+	}
+}
+
+func TestThePreviewNamesTheModel(t *testing.T) {
+	setup := newSetup(t)
+	session, err := Prepare(setup.config, Setup{ProviderID: "anthropic", Key: testKey, Model: " claude-sonnet-5-5 "})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preview, _ := session.Preview()
+
+	if !strings.Contains(preview, "\nModel: claude-sonnet-5-5\n") {
+		t.Errorf("the preview does not name the model:\n%s", preview)
+	}
+}
+
+func TestTheSummaryIsShortAndTheFullPreviewKeepsTheSystemPrompt(t *testing.T) {
+	setup := newSetup(t)
+	session, err := Prepare(setup.config, Setup{ProviderID: "anthropic", Key: testKey, Model: "claude-sonnet-5-5", Reasoning: "high"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := session.Summary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, _ := session.Preview()
+
+	for _, want := range []string{"Provider: FakeAI\n", "Model: claude-sonnet-5-5\n", "Reasoning level: high\n", "Limits for this run: up to 10 requests and 100000 tokens.", "It holds no file content.", "Later requests also hold the files", "Instruction (user):\nCheck this project"} {
+		if !strings.Contains(summary, want) {
+			t.Errorf("the summary has no %q:\n%s", want, summary)
+		}
+	}
+	for _, left := range []string{"System prompt:", "Tools the AI may call", "- read_file:"} {
+		if strings.Contains(summary, left) || !strings.Contains(preview, left) {
+			t.Errorf("%q must be in the full preview only", left)
+		}
+	}
+	if strings.Count(summary, "\n") >= strings.Count(preview, "\n") {
+		t.Errorf("the summary (%d lines) is not shorter than the preview (%d lines)", strings.Count(summary, "\n"), strings.Count(preview, "\n"))
+	}
+}
+
+func TestTheSummaryNamesAReasoningLevelOnlyWhenChosen(t *testing.T) {
+	setup := newSetup(t)
+	plain, err := Prepare(setup.config, Setup{ProviderID: "anthropic", Key: testKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, _ := plain.Summary()
+
+	if strings.Contains(summary, "Reasoning level") {
+		t.Errorf("a level is named although none was chosen:\n%s", summary)
+	}
+}
+
+func TestTheSummaryNeverHoldsAKeyOrFileContent(t *testing.T) {
+	setup := newSetup(t)
+	session, err := Prepare(setup.config, Setup{ProviderID: "anthropic", Key: testKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, _ := session.Summary()
+
+	for _, planted := range append(plantedValues, testKey) {
+		if strings.Contains(summary, planted) {
+			t.Errorf("the summary holds %q", planted)
+		}
+	}
+}

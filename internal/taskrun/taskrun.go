@@ -35,6 +35,8 @@ var (
 	ErrNeedsKey        = errors.New("this provider needs an API key")
 	ErrSetup           = errors.New("the provider could not be set up")
 	ErrReasoning       = errors.New("this reasoning level is not available for this model")
+	ErrKeyStore        = errors.New("the key could not be saved or removed")
+	ErrKeyRejected     = errors.New("the provider rejected the key")
 	ErrModelList       = errors.New("the list of models could not be loaded")
 	ErrNotConfirmed    = errors.New("the user has not confirmed the run")
 	ErrOutput          = errors.New("the output folder cannot be used: it must be outside the project and new files must be possible")
@@ -43,6 +45,14 @@ var (
 type ProviderFactory func(id, apiKey, model, reasoning string) (outbound.Provider, error)
 
 type ModelLister func(ctx context.Context, id, apiKey string) ([]string, error)
+
+// KeyStore keeps API keys between runs. The keystore package is the real one.
+type KeyStore interface {
+	Available() bool
+	Get(ctx context.Context, providerID string) (string, error)
+	Set(ctx context.Context, providerID, key string) error
+	Delete(ctx context.Context, providerID string) error
+}
 
 type Config struct {
 	Target     string
@@ -53,6 +63,8 @@ type Config struct {
 	Now         func() time.Time
 	NewProvider ProviderFactory
 	ListModels  ModelLister
+	// Keys is optional. Without it, keys come only from the environment and from the user.
+	Keys KeyStore
 }
 
 type Choice struct {
@@ -60,6 +72,7 @@ type Choice struct {
 	Name         string
 	Local        bool
 	KeyFound     bool
+	KeySaved     bool
 	KeyEnv       string
 	DefaultModel string
 }
@@ -129,31 +142,23 @@ func (config Config) lister() ModelLister {
 // Models asks the provider which models it offers. It sends the key and nothing else.
 // An empty key means the key from the environment.
 func (config Config) Models(ctx context.Context, providerID, apiKey string) ([]string, error) {
-	var chosen *Choice
-	for _, choice := range config.Providers() {
-		if choice.ID == providerID {
-			chosen = &choice
-			break
-		}
-	}
+	chosen := config.choice(providerID)
 	if chosen == nil {
 		return nil, ErrUnknownProvider
 	}
 
-	key := ""
-	if !chosen.Local {
-		if key = strings.TrimSpace(apiKey); key == "" {
-			key = strings.TrimSpace(config.lookup(chosen.KeyEnv))
-		}
-		if key == "" {
-			return nil, ErrNeedsKey
-		}
+	key, err := config.resolveKey(ctx, chosen, apiKey)
+	if err != nil {
+		return nil, err
 	}
 
 	models, err := config.lister()(ctx, chosen.ID, key)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return nil, err
+		}
+		if errors.Is(err, outbound.ErrAuth) {
+			return nil, ErrKeyRejected
 		}
 
 		return nil, ErrModelList
@@ -162,21 +167,98 @@ func (config Config) Models(ctx context.Context, providerID, apiKey string) ([]s
 	return models, nil
 }
 
-// Providers lists the providers and says for each one whether its key is already in the environment.
+// info describes a provider without asking the key store, which is slow.
+func (config Config) info(info outbound.Info) Choice {
+	return Choice{
+		ID: info.ID, Name: info.Name, Local: info.Local, KeyEnv: info.KeyEnv, DefaultModel: info.DefaultModel,
+		KeyFound: info.KeyEnv != "" && config.lookup(info.KeyEnv) != "",
+	}
+}
+
+func (config Config) choice(providerID string) *Choice {
+	for _, info := range outbound.Providers() {
+		if info.ID == providerID {
+			choice := config.info(info)
+			return &choice
+		}
+	}
+
+	return nil
+}
+
+// resolveKey picks the key: the one just typed, else the one in the environment, else the saved one.
+func (config Config) resolveKey(ctx context.Context, chosen *Choice, typed string) (string, error) {
+	if chosen.Local {
+		return "", nil
+	}
+
+	if key := strings.TrimSpace(typed); key != "" {
+		return key, nil
+	}
+	if key := strings.TrimSpace(config.lookup(chosen.KeyEnv)); key != "" {
+		return key, nil
+	}
+	if config.Keys != nil {
+		if key, err := config.Keys.Get(ctx, chosen.ID); err == nil && key != "" {
+			return key, nil
+		}
+	}
+
+	return "", ErrNeedsKey
+}
+
+// Providers lists the providers and says for each one whether its key is already in the environment
+// or saved.
 func (config Config) Providers() []Choice {
 	var choices []Choice
 	for _, info := range outbound.Providers() {
-		choices = append(choices, Choice{
-			ID: info.ID, Name: info.Name, Local: info.Local, KeyEnv: info.KeyEnv, DefaultModel: info.DefaultModel,
-			KeyFound: info.KeyEnv != "" && config.lookup(info.KeyEnv) != "",
-		})
+		choice := config.info(info)
+		if !choice.Local && !choice.KeyFound && config.Keys != nil {
+			_, err := config.Keys.Get(context.Background(), choice.ID)
+			choice.KeySaved = err == nil
+		}
+		choices = append(choices, choice)
 	}
 
 	return choices
 }
 
+// KeysCanBeSaved says whether a key can be kept between runs on this system.
+func (config Config) KeysCanBeSaved() bool {
+	return config.Keys != nil && config.Keys.Available()
+}
+
+// SaveKey keeps a key for the next runs. The error texts are fixed and never hold the key.
+func (config Config) SaveKey(ctx context.Context, providerID, key string) error {
+	chosen := config.choice(providerID)
+	if chosen == nil || chosen.Local {
+		return ErrUnknownProvider
+	}
+	if !config.KeysCanBeSaved() {
+		return ErrKeyStore
+	}
+	if config.Keys.Set(ctx, providerID, strings.TrimSpace(key)) != nil {
+		return ErrKeyStore
+	}
+
+	return nil
+}
+
+// ForgetKey removes the saved key of a provider.
+func (config Config) ForgetKey(ctx context.Context, providerID string) error {
+	if config.choice(providerID) == nil {
+		return ErrUnknownProvider
+	}
+	if !config.KeysCanBeSaved() || config.Keys.Delete(ctx, providerID) != nil {
+		return ErrKeyStore
+	}
+
+	return nil
+}
+
 type Session struct {
 	providerName string
+	model        string
 	reasoning    string
 	config       Config
 	gateway      *gateway.Gateway
@@ -192,13 +274,7 @@ func Prepare(config Config, setup Setup) (*Session, error) {
 		return nil, ErrTarget
 	}
 
-	var chosen *Choice
-	for _, choice := range config.Providers() {
-		if choice.ID == setup.ProviderID {
-			chosen = &choice
-			break
-		}
-	}
+	chosen := config.choice(setup.ProviderID)
 	if chosen == nil {
 		return nil, ErrUnknownProvider
 	}
@@ -211,14 +287,9 @@ func Prepare(config Config, setup Setup) (*Session, error) {
 		return nil, ErrNeedsModel
 	}
 
-	key := ""
-	if !chosen.Local {
-		if key = strings.TrimSpace(setup.Key); key == "" {
-			key = strings.TrimSpace(config.lookup(chosen.KeyEnv))
-		}
-		if key == "" {
-			return nil, ErrNeedsKey
-		}
+	key, err := config.resolveKey(context.Background(), chosen, setup.Key)
+	if err != nil {
+		return nil, err
 	}
 
 	if !outbound.ValidReasoning(chosen.ID, model, setup.Reasoning) {
@@ -236,7 +307,7 @@ func Prepare(config Config, setup Setup) (*Session, error) {
 
 	toolGateway := gateway.New(root, gateway.DefaultLimits)
 
-	return &Session{providerName: provider.Name(), reasoning: setup.Reasoning, config: config, gateway: toolGateway, sender: sender, specs: agent.SpecsFromGateway(toolGateway.Specs())}, nil
+	return &Session{providerName: provider.Name(), model: model, reasoning: setup.Reasoning, config: config, gateway: toolGateway, sender: sender, specs: agent.SpecsFromGateway(toolGateway.Specs())}, nil
 }
 
 // ConsentText is what the user confirms. It is made from the same provider name that the sender uses.
@@ -255,6 +326,7 @@ func (session *Session) Preview() (string, error) {
 	var preview strings.Builder
 	fmt.Fprintf(&preview, "This is the first request, as it would be sent.\n")
 	fmt.Fprintf(&preview, "Limits for this run: up to %d requests and %d tokens.\n", session.config.Limits.MaxSteps, session.config.Limits.MaxTokens)
+	fmt.Fprintf(&preview, "Model: %s\n", session.model)
 	if session.reasoning != "" {
 		fmt.Fprintf(&preview, "Reasoning level: %s\n", session.reasoning)
 	}
@@ -269,6 +341,30 @@ func (session *Session) Preview() (string, error) {
 	}
 
 	return preview.String(), nil
+}
+
+// Summary is the short form of the dry run: what is chosen, the limits, and the instruction.
+// The fixed system prompt and the tool list are left out. Preview has them.
+func (session *Session) Summary() (string, error) {
+	cleaned, err := session.sender.Preview(agent.FirstRequest(exposure.Instruction, session.specs))
+	if err != nil {
+		return "", err
+	}
+
+	var summary strings.Builder
+	fmt.Fprintf(&summary, "Provider: %s\n", session.providerName)
+	fmt.Fprintf(&summary, "Model: %s\n", session.model)
+	if session.reasoning != "" {
+		fmt.Fprintf(&summary, "Reasoning level: %s\n", session.reasoning)
+	}
+	fmt.Fprintf(&summary, "Limits for this run: up to %d requests and %d tokens.\n\n", session.config.Limits.MaxSteps, session.config.Limits.MaxTokens)
+	fmt.Fprintf(&summary, "The first request holds only the instruction below, a fixed system prompt, and a list of %d read-only tools. It holds no file content.\n", len(cleaned.Tools))
+	fmt.Fprintf(&summary, "Later requests also hold the files that the AI chooses to read. They are cleaned the same way, and every request is saved in the event log.\n")
+	for _, message := range cleaned.Messages {
+		fmt.Fprintf(&summary, "\nInstruction (%s):\n%s\n", message.Role, message.Text)
+	}
+
+	return summary.String(), nil
 }
 
 func (session *Session) Confirm() {
