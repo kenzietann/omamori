@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/muesli/termenv"
 )
 
 var keyMessages = map[string]tea.KeyMsg{
@@ -471,6 +472,7 @@ func FuzzView(f *testing.F) {
 	f.Add("", "", "", 3, 1)
 
 	f.Fuzz(func(t *testing.T, target, report, step string, width, height int) {
+		withProfile(t, termenv.TrueColor)
 		runner := func(ctx context.Context, send func(string)) (Result, error) {
 			send(step)
 			return Result{Report: report, Complete: true}, nil
@@ -484,7 +486,7 @@ func FuzzView(f *testing.F) {
 			model, _ = press(t, model, key)
 		}
 		for _, shown := range []Model{model, New(target, runner)} {
-			for _, character := range shown.View() {
+			for _, character := range styleCodes.ReplaceAllString(shown.View(), "") {
 				if character != '\n' && (unicode.IsControl(character) || unicode.Is(unicode.Cf, character)) {
 					t.Fatalf("the view holds the character %U", character)
 				}
