@@ -1,0 +1,93 @@
+package sanitizer
+
+import (
+	"cmp"
+	"fmt"
+	"slices"
+	"strings"
+
+	"github.com/kenzietann/omamori/internal/mynumber"
+	"github.com/kenzietann/omamori/internal/phone"
+	"github.com/kenzietann/omamori/internal/secrets"
+)
+
+type Finding struct {
+	Placeholder string
+	Start       int
+	End         int
+}
+
+type Sanitizer struct {
+	counters map[string]int
+}
+
+type span struct {
+	start    int
+	end      int
+	label    string
+	priority int
+}
+
+func findSpans(text string) []span {
+	var spans []span
+
+	for _, match := range secrets.FindSecrets(text) {
+		spans = append(spans, span{start: match.Start, end: match.End, label: "SECRET:" + match.Kind, priority: 0})
+	}
+	for _, match := range mynumber.FindMyNumbers(text) {
+		spans = append(spans, span{start: match.Start, end: match.End, label: "MYNUMBER", priority: 1})
+	}
+	for _, match := range phone.FindPhoneNumbers(text) {
+		spans = append(spans, span{start: match.Start, end: match.End, label: "PHONE", priority: 2})
+	}
+
+	return spans
+}
+
+func mergeSpans(spans []span) []span {
+	slices.SortFunc(spans, func(first, second span) int {
+		return cmp.Or(cmp.Compare(first.start, second.start), cmp.Compare(first.priority, second.priority))
+	})
+
+	var merged []span
+
+	for _, current := range spans {
+		last := len(merged) - 1
+
+		if last >= 0 && current.start < merged[last].end {
+			merged[last].end = max(merged[last].end, current.end)
+			if current.priority < merged[last].priority {
+				merged[last].label = current.label
+				merged[last].priority = current.priority
+			}
+			continue
+		}
+
+		merged = append(merged, current)
+	}
+
+	return merged
+}
+
+func (sanitizer *Sanitizer) Sanitize(text string) (string, []Finding) {
+	if sanitizer.counters == nil {
+		sanitizer.counters = make(map[string]int)
+	}
+
+	var builder strings.Builder
+	var findings []Finding
+	cursor := 0
+
+	for _, current := range mergeSpans(findSpans(text)) {
+		sanitizer.counters[current.label]++
+		placeholder := fmt.Sprintf("[%s:%03d]", current.label, sanitizer.counters[current.label])
+
+		builder.WriteString(text[cursor:current.start])
+		builder.WriteString(placeholder)
+		findings = append(findings, Finding{Placeholder: placeholder, Start: current.start, End: current.end})
+		cursor = current.end
+	}
+	builder.WriteString(text[cursor:])
+
+	return builder.String(), findings
+}
