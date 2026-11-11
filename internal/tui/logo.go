@@ -7,9 +7,6 @@ import (
 
 const tagline = "a blue team helper with a guard"
 
-// The wordmark, the tagline, a blank line, the target, the menu, a notice, and the footer.
-const minWordmarkHeight = 17
-
 const rawWordmark = `
  ██████╗ ███╗   ███╗ █████╗ ███╗   ███╗ ██████╗ ██████╗ ██╗
 ██╔═══██╗████╗ ████║██╔══██╗████╗ ████║██╔═══██╗██╔══██╗██║
@@ -30,12 +27,16 @@ func wordmarkWidth() int {
 	return widest
 }
 
+// The wordmark, the tagline, a blank line, the target, the menu, a notice, and the keys.
+const minWordmarkHeight = 18
+
+// showWordmark says whether the big wordmark fits the window.
 func (model Model) showWordmark() bool {
 	return (model.width == 0 || model.width >= wordmarkWidth()) && (model.height == 0 || model.height >= minWordmarkHeight)
 }
 
 func (model Model) oneLineHeader() string {
-	title := styleTitle.Render("OMAMORI")
+	title := styleTitle.Render(model.truncate("OMAMORI", 0))
 	if model.width == 0 || model.width >= len("OMAMORI  ")+len(tagline) {
 		title += styleDim.Render("  " + tagline)
 	}

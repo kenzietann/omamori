@@ -7,7 +7,15 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-const chromeLines = 4
+// The pages before a run (the menu, the choices, the settings, and the dry run) are full-screen pages.
+// A run leaves the full-screen mode: its steps and its report are printed into the normal terminal,
+// so that the scrollback, the wheel, the selection and select-all of the terminal work on them.
+// Only one status line stays at the bottom while it runs.
+
+const (
+	selectMarker = "❯ "
+	idleMarker   = "  "
+)
 
 type hint struct {
 	key         string
@@ -60,36 +68,110 @@ func (model Model) footer(hints ...hint) string {
 	return strings.Join(styled, "   ")
 }
 
-func (model Model) View() string {
-	switch model.screen {
-	case runScreen:
-		return strings.Join(model.runLines(), "\n")
-	case resultsScreen:
-		return strings.Join(model.resultsLines(), "\n")
-	}
-
-	return strings.Join(model.homeLines(), "\n")
+func (model Model) bodyLine(text string) string { return styleBody.Render(model.truncate(text, 0)) }
+func (model Model) dimLine(text string) string {
+	return styleDim.Render(model.truncate(safeText(text), 0))
+}
+func (model Model) warnLine(text string) string {
+	return styleWarn.Render(model.truncate(safeText(text), 0))
+}
+func (model Model) accentLine(text string) string {
+	return styleAccent.Render(model.truncate(safeText(text), 0))
 }
 
-func (model Model) homeLines() []string {
-	switch model.step {
-	case stepProvider:
-		return model.providerLines()
-	case stepKey:
-		return model.entryLines()
-	case stepModel:
-		if model.modelTyping {
-			return model.entryLines()
-		}
+// visibleRange picks the lines of a long list that fit, with the cursor in the middle when it can.
+func visibleRange(cursor, total, room int) (first, last int) {
+	room = min(max(room, 1), total)
+	first = min(max(cursor-room/2, 0), total-room)
 
-		return model.modelLines()
-	case stepReasoning:
-		return model.reasoningLines()
-	case stepConsent:
-		return model.consentLines()
+	return first, first + room
+}
+
+// room is how many lines a list may have, when the page has this many other lines.
+func (model Model) room(otherLines int) int {
+	if model.height <= 0 {
+		return 1 << 20
 	}
 
-	return model.menuLines()
+	return max(model.height-otherLines, 3)
+}
+
+// choiceList draws a list with a marker at the cursor. Only the lines that fit are drawn.
+// A line whose number is in dim is drawn in the dim color.
+func (model Model) choiceList(labels []string, cursor, room int, dim ...int) []string {
+	first, last := visibleRange(cursor, len(labels), room)
+
+	body := make([]string, 0, last-first)
+	for index := first; index < last; index++ {
+		marker, style := idleMarker, styleBody
+		switch {
+		case index == cursor:
+			marker, style = selectMarker, styleSelected
+		case containsIndex(dim, index):
+			style = styleDim
+		}
+		body = append(body, style.Render(model.truncate(marker+safeText(labels[index]), 0)))
+	}
+
+	return body
+}
+
+func containsIndex(indexes []int, index int) bool {
+	for _, candidate := range indexes {
+		if candidate == index {
+			return true
+		}
+	}
+
+	return false
+}
+
+// page puts a page together: the lines before the list, the list (as many lines as fit), the lines
+// after it, a blank line, and the keys.
+func (model Model) page(lead []string, labels []string, cursor int, trail []string, keys string, dim ...int) string {
+	room := model.room(len(lead) + len(trail) + 2)
+
+	lines := append([]string{}, lead...)
+	lines = append(lines, model.choiceList(labels, cursor, room, dim...)...)
+	lines = append(lines, trail...)
+	lines = append(lines, "", keys)
+
+	return strings.Join(lines, "\n")
+}
+
+// plainPage is a page without a list.
+func (model Model) plainPage(lines []string, keys string) string {
+	return strings.Join(append(append([]string{}, lines...), "", keys), "\n")
+}
+
+func (model Model) View() string {
+	if model.quitting {
+		return ""
+	}
+	if model.screen == runScreen {
+		return model.runView()
+	}
+
+	switch model.step {
+	case stepProvider:
+		return model.providerView()
+	case stepModel:
+		if model.modelTyping {
+			return model.entryView()
+		}
+
+		return model.modelView()
+	case stepKey:
+		return model.entryView()
+	case stepReasoning:
+		return model.reasoningView()
+	case stepConsent:
+		return model.consentView()
+	case stepSettings:
+		return model.settingsView()
+	}
+
+	return model.menuView()
 }
 
 func providerStatus(choice Choice) string {
@@ -98,127 +180,229 @@ func providerStatus(choice Choice) string {
 		return "no key needed"
 	case choice.KeyFound:
 		return "key found in " + choice.KeyEnv
+	case choice.KeySaved:
+		return "key saved in your Keychain"
 	}
 
 	return "needs a key (" + choice.KeyEnv + ")"
 }
 
-func (model Model) providerLines() []string {
-	lines := []string{model.oneLineHeader(), "", styleAccent.Render("Choose the AI provider"), ""}
-
-	for index, choice := range model.choices {
-		marker, style := "  ", styleBody
-		if index == model.providerCursor {
-			marker, style = "> ", styleSelected
-		}
-		lines = append(lines, style.Render(model.truncate(marker+safeText(choice.Name)+"   "+safeText(providerStatus(choice)), 0)))
+// targetLine is the label and the folder. In a window that is narrower than the label, the label is cut too.
+func (model Model) targetLine(label string) string {
+	line := model.truncate(label+safeText(model.target), 0)
+	if rest, isLonger := strings.CutPrefix(line, label); isLonger {
+		return styleDim.Render(label) + styleBody.Render(rest)
 	}
 
-	lines = append(lines, "", styleDim.Render(model.truncate("Your files are cleaned before anything is sent. You will see the first request before you confirm.", 0)))
-
-	return append(lines, "", model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
+	return styleDim.Render(line)
 }
 
-func (model Model) entryLines() []string {
+func (model Model) menuView() string {
+	menu := []string{"Task A: Exposure check", "Task B: Log triage (not built yet)", "Settings", "Quit"}
+
+	lead := append(model.headerLines(), "", model.targetLine("Target folder: "), "")
+	var trail []string
+	if model.notice != "" {
+		trail = []string{"", model.warnLine(model.notice)}
+	}
+
+	return model.page(lead, menu, model.cursor, trail,
+		model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"q", "quit"}), menuTaskB)
+}
+
+func (model Model) providerView() string {
+	lead := []string{model.oneLineHeader(), "", model.accentLine("Choose the AI provider"), ""}
+	trail := []string{"", model.dimLine("Your files are cleaned before anything is sent. You will see the first request before you confirm.")}
+
+	labels := make([]string, len(model.choices))
+	for index, choice := range model.choices {
+		labels[index] = choice.Name + "   " + providerStatus(choice)
+	}
+
+	return model.page(lead, labels, model.providerCursor, trail,
+		model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
+}
+
+func (model Model) entryView() string {
 	chosen := model.choices[model.providerCursor]
-	lines := []string{model.oneLineHeader(), "", styleAccent.Render(model.truncate("Provider: "+safeText(chosen.Name), 0)), ""}
+	lines := []string{model.oneLineHeader(), "", model.accentLine("Provider: " + chosen.Name), ""}
 
 	if model.step == stepModel {
-		lines = append(lines, styleBody.Render("Model name:"), styleSelected.Render(model.truncate("> "+safeText(string(model.modelInput))+"_", 0)), "")
+		lines = append(lines, model.bodyLine("Model name:"),
+			styleSelected.Render(model.truncate(selectMarker+safeText(string(model.modelInput))+"_", 0)), "")
 		if model.modelsNotice != "" {
-			lines = append(lines, styleDim.Render(model.truncate(model.modelsNotice, 0)))
+			lines = append(lines, model.dimLine(model.modelsNotice))
 		} else {
-			lines = append(lines, styleDim.Render(model.truncate("Type the exact model name from the documentation of the provider.", 0)))
+			lines = append(lines, model.dimLine("Type the exact model name from the documentation of the provider."))
 		}
 	} else {
+		keyText := "This system cannot save keys. The key stays in memory only. It is never shown or logged."
+		if model.backend != nil && model.backend.KeysCanBeSaved() {
+			keyText = "After it works, the key is saved in your Keychain, so you type it once. It is never shown or logged."
+		}
 		// The key is shown as dots and never as text.
-		lines = append(lines, styleBody.Render("API key (hidden):"), styleSelected.Render("> "+strings.Repeat("•", min(len(model.keyInput), 40))+"_"), "",
-			styleDim.Render(model.truncate("The key stays in memory. It is never shown, saved, or logged.", 0)))
+		lines = append(lines, model.bodyLine("API key (hidden):"),
+			styleSelected.Render(model.truncate(selectMarker+strings.Repeat("•", min(len(model.keyInput), 40))+"_", 0)), "",
+			model.dimLine(keyText))
 		if chosen.KeyEnv != "" {
-			lines = append(lines, styleDim.Render(model.truncate("To skip this step next time, set "+safeText(chosen.KeyEnv)+" before you start.", 0)))
+			lines = append(lines, model.dimLine("To skip this step next time, set "+chosen.KeyEnv+" before you start."))
 		}
 	}
-
 	if model.setupError != "" {
-		lines = append(lines, "", styleWarn.Render(model.truncate(safeText(model.setupError), 0)))
+		lines = append(lines, "", model.warnLine(model.setupError))
 	}
 
-	return append(lines, "", model.footer(hint{"enter", "next"}, hint{"esc", "back"}, hint{"ctrl+c", "quit"}))
+	return model.plainPage(lines, model.footer(hint{"enter", "next"}, hint{"esc", "back"}, hint{"ctrl+c", "quit"}))
 }
 
-// listRoom is how many lines of the model list fit in the window.
-func (model Model) listRoom() int {
-	if model.height <= 0 {
-		return len(model.models) + 1
-	}
-
-	return max(model.height-listChrome, 3)
-}
-
-func (model Model) modelLines() []string {
+func (model Model) modelView() string {
 	chosen := model.choices[model.providerCursor]
-	lines := []string{model.oneLineHeader(), "", styleAccent.Render(model.truncate("Provider: "+safeText(chosen.Name), 0)), ""}
+	lead := []string{model.oneLineHeader(), "", model.accentLine("Provider: " + chosen.Name), ""}
 
 	if model.modelsLoading {
-		lines = append(lines, styleDim.Render(model.truncate("Getting the list of models from "+safeText(chosen.Name)+"...", 0)))
-
-		return append(lines, "", model.footer(hint{"esc", "back"}, hint{"ctrl+c", "quit"}))
+		return model.plainPage(append(lead, model.dimLine("Getting the list of models from "+chosen.Name+"...")),
+			model.footer(hint{"esc", "back"}, hint{"ctrl+c", "quit"}))
 	}
 
-	lines = append(lines, styleBody.Render("Choose the model:"))
-
-	entries := make([]string, 0, len(model.models)+1)
-	for _, name := range model.models {
-		entries = append(entries, safeText(name))
+	lead = append(lead, model.bodyLine("Choose the model:"))
+	if model.keyNotice != "" {
+		lead = append(lead, model.dimLine(model.keyNotice))
 	}
-	entries = append(entries, "Type a model name myself")
-
-	room := min(model.listRoom(), len(entries))
-	start := min(max(model.modelCursor-room/2, 0), len(entries)-room)
-	for index := start; index < start+room; index++ {
-		marker, style := "  ", styleBody
-		if index == model.modelCursor {
-			marker, style = "> ", styleSelected
-		}
-		lines = append(lines, style.Render(model.truncate(marker+entries[index], 0)))
-	}
-
+	var trail []string
 	if model.setupError != "" {
-		lines = append(lines, "", styleWarn.Render(model.truncate(safeText(model.setupError), 0)))
+		trail = []string{"", model.warnLine(model.setupError)}
 	}
 
-	return append(lines, "", model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
+	labels := append(append([]string{}, model.models...), "Type a model name myself")
+
+	return model.page(lead, labels, model.modelCursor, trail,
+		model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
 }
 
-func (model Model) reasoningLines() []string {
+func (model Model) reasoningView() string {
 	chosen := model.choices[model.providerCursor]
-	lines := []string{model.oneLineHeader(), "",
-		styleAccent.Render(model.truncate("Provider: "+safeText(chosen.Name), 0)),
-		styleAccent.Render(model.truncate("Model: "+safeText(string(model.modelInput)), 0)), "",
-		styleBody.Render("Choose how much the AI reasons:")}
-
-	for index, choice := range model.reasonChoices {
-		marker, style := "  ", styleBody
-		if index == model.reasonCursor {
-			marker, style = "> ", styleSelected
-		}
-		lines = append(lines, style.Render(model.truncate(marker+safeText(choice.Label), 0)))
-	}
-
-	lines = append(lines, "", styleDim.Render(model.truncate("Not every model supports every level. The default is the safest choice.", 0)))
+	lead := []string{model.oneLineHeader(), "", model.accentLine("Provider: " + chosen.Name), model.accentLine("Model: " + string(model.modelInput)), "",
+		model.bodyLine("Choose how much the AI reasons:")}
+	trail := []string{"", model.dimLine("Not every model supports every level. The default is the safest choice.")}
 	if model.setupError != "" {
-		lines = append(lines, "", styleWarn.Render(model.truncate(safeText(model.setupError), 0)))
+		trail = append(trail, "", model.warnLine(model.setupError))
 	}
 
-	return append(lines, "", model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
+	labels := make([]string, len(model.reasonChoices))
+	for index, choice := range model.reasonChoices {
+		labels[index] = choice.Label
+	}
+
+	return model.page(lead, labels, model.reasonCursor, trail,
+		model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
 }
 
-func (model Model) consentBody() []string {
+func (model Model) settingsView() string {
+	provider, key := "(not chosen)", ""
+	for _, choice := range model.choices {
+		if choice.ID == model.defaults.ProviderID {
+			provider, key = choice.Name, providerStatus(choice)
+		}
+	}
+	modelName, level := "(not chosen)", "provider default"
+	if model.defaults.Model != "" {
+		modelName = model.defaults.Model
+	}
+	if model.defaults.Reasoning != "" {
+		level = model.defaults.Reasoning
+	}
+
+	lead := []string{model.oneLineHeader(), "", model.accentLine("Settings"), "",
+		model.bodyLine("Provider:   " + safeText(provider)),
+		model.bodyLine("Model:      " + safeText(modelName)),
+		model.bodyLine("Reasoning:  " + safeText(level))}
+	if key != "" {
+		lead = append(lead, model.bodyLine("API key:    "+safeText(key)))
+	}
+	lead = append(lead, "")
+
+	var trail []string
+	if model.notice != "" {
+		trail = []string{"", model.accentLine(model.notice)}
+	}
+
+	items := model.settingsItems()
+	labels := make([]string, len(items))
+	for index, item := range items {
+		labels[index] = item.label
+	}
+
+	return model.page(lead, labels, model.settingsCursor, trail,
+		model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
+}
+
+// shownLine is a piece of the dry run on the screen. A long line is wrapped into several pieces.
+type shownLine struct {
+	text string
+}
+
+// wrapLine cuts a line into pieces that fit the width. It cuts at a space when it can, and by width
+// when a word is longer than the line, because a Japanese character takes two columns.
+func wrapLine(text string, width int) []string {
+	if width <= 0 || runewidth.StringWidth(text) <= width {
+		return []string{text}
+	}
+
+	var pieces []string
+	runes := []rune(text)
+	for len(runes) > 0 {
+		used, cut, lastSpace := 0, 0, -1
+		for cut < len(runes) {
+			next := runewidth.RuneWidth(runes[cut])
+			if used+next > width && cut > 0 {
+				break
+			}
+			used += next
+			if runes[cut] == ' ' {
+				lastSpace = cut
+			}
+			cut++
+		}
+		if cut < len(runes) && lastSpace > 0 {
+			pieces = append(pieces, string(runes[:lastSpace]))
+			runes = runes[lastSpace+1:]
+			continue
+		}
+		pieces = append(pieces, string(runes[:cut]))
+		runes = runes[cut:]
+	}
+
+	return pieces
+}
+
+// consentLead is the lines above the dry run on the dry run page.
+func (model Model) consentLead() []string {
+	consent := ""
+	if model.plan != nil {
+		consent = model.plan.ConsentText
+	}
+
+	return []string{model.oneLineHeader(), "", model.accentLine("Please confirm before anything is sent"), "",
+		model.warnLine(consent), "", model.dimLine(model.dryRunTitle()), ""}
+}
+
+func (model Model) consentBody() []shownLine {
 	if model.plan == nil {
 		return nil
 	}
+	text := model.plan.Preview
+	if model.plan.Summary != "" && !model.consentFull {
+		text = model.plan.Summary
+	}
 
-	return strings.Split(safeText(model.plan.Preview), "\n")
+	var shown []shownLine
+	for _, line := range strings.Split(safeText(text), "\n") {
+		for _, piece := range wrapLine(line, model.width) {
+			shown = append(shown, shownLine{text: piece})
+		}
+	}
+
+	return shown
 }
 
 func (model Model) consentViewHeight() int {
@@ -226,128 +410,64 @@ func (model Model) consentViewHeight() int {
 		return max(len(model.consentBody()), 1)
 	}
 
-	return max(model.height-consentChrome, 1)
+	return max(model.height-len(model.consentLead())-2, 1)
 }
 
 func (model Model) maxConsentScroll() int {
 	return max(len(model.consentBody())-model.consentViewHeight(), 0)
 }
 
-func (model Model) consentLines() []string {
-	consent := ""
-	if model.plan != nil {
-		consent = safeText(model.plan.ConsentText)
+func (model Model) dryRunTitle() string {
+	if model.plan != nil && model.plan.Summary != "" && !model.consentFull {
+		return "Nothing has been sent yet. This is a summary of the first request:"
 	}
 
-	lines := []string{model.oneLineHeader(), "", styleAccent.Render("Please confirm before anything is sent"), "",
-		styleWarn.Render(model.truncate(consent, 0)), "", styleDim.Render("Nothing has been sent yet. This is the dry run:"), ""}
+	return "Nothing has been sent yet. This is the dry run:"
+}
+
+func (model Model) consentView() string {
+	lines := model.consentLead()
 
 	body := model.consentBody()
 	start := min(model.consentScroll, model.maxConsentScroll())
 	end := min(start+model.consentViewHeight(), len(body))
 	for _, line := range body[start:end] {
-		lines = append(lines, styleBody.Render(model.truncate(line, 0)))
+		lines = append(lines, styleBody.Render(model.truncate(line.text, 0)))
 	}
 
-	return append(lines, "", model.footer(hint{"enter", "send and start"}, hint{"up/down", "scroll"}, hint{"esc", "cancel"}, hint{"q", "quit"}))
-}
-
-func (model Model) menuLines() []string {
-	menu := []string{"Task A: Exposure check", "Task B: Log triage (not built yet)", "Quit"}
-
-	lines := model.headerLines()
-	label := "Target folder: "
-	lines = append(lines, "",
-		styleDim.Render(label)+styleBody.Render(model.truncate(safeText(model.target), len(label))), "")
-
-	for index, item := range menu {
-		marker := "  "
-		style := styleBody
-		switch {
-		case index == model.cursor:
-			marker, style = "> ", styleSelected
-		case index == menuTaskB:
-			style = styleDim
+	hints := []hint{{"enter", "send and start"}, {"up/down", "scroll"}}
+	if model.plan != nil && model.plan.Summary != "" {
+		if model.consentFull {
+			hints = append(hints, hint{"d", "summary"})
+		} else {
+			hints = append(hints, hint{"d", "full request"})
 		}
-		lines = append(lines, style.Render(model.truncate(marker+item, 0)))
-	}
-	if model.notice != "" {
-		lines = append(lines, "", styleWarn.Render(model.truncate(safeText(model.notice), 0)))
 	}
 
-	return append(lines, "", model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"q", "quit"}))
+	return model.plainPage(lines, model.footer(append(hints, hint{"esc", "cancel"}, hint{"q", "quit"})...))
 }
 
-func (model Model) runLines() []string {
+var spinnerFrames = []string{"✻", "✽", "✶", "✳"}
+
+// runView is the only line that stays at the bottom of the normal terminal. It has no frame,
+// because the output above it is what matters, and it is not a chat.
+func (model Model) runView() string {
+	if !model.running {
+		return model.footer(hint{"enter", "back to the menu"}, hint{"q", "quit"})
+	}
+
 	title, style := "Running: Task A, exposure check", styleAccent
 	if model.cancelling {
 		title, style = "Cancelling... waiting for the current step to stop", styleWarn
 	}
+	mark := spinnerFrames[model.frame%len(spinnerFrames)]
 
-	lines := []string{style.Render(model.truncate(title, 0)), ""}
-	steps := model.steps
-	if room := model.height - chromeLines; model.height > 0 && len(steps) > room && room > 0 {
-		steps = steps[len(steps)-room:]
-	}
-	for _, step := range steps {
-		lines = append(lines, styleBody.Render(model.truncate(safeText(step), 0)))
-	}
-	if len(model.steps) == 0 {
-		lines = append(lines, styleDim.Render("Starting..."))
+	// The line is cut once, as a whole, so that it never goes over the width.
+	const keys = "  (esc: cancel, q: quit)"
+	line := model.truncate(mark+" "+title+keys, 0)
+	if first, found := strings.CutSuffix(line, keys); found {
+		return style.Render(first) + styleDim.Render(keys)
 	}
 
-	return append(lines, "", model.footer(hint{"esc", "cancel"}, hint{"q", "quit"}))
-}
-
-func (model Model) bodyLines() []string {
-	body := strings.Split(safeText(model.report), "\n")
-	body = append(body, "", "Timeline")
-	if len(model.steps) == 0 {
-		body = append(body, "(no steps)")
-	}
-	for _, step := range model.steps {
-		body = append(body, "- "+safeText(step))
-	}
-
-	return body
-}
-
-func (model Model) viewHeight() int {
-	if model.height <= 0 {
-		return len(model.bodyLines())
-	}
-
-	chrome := chromeLines
-	if model.saved != "" {
-		chrome++
-	}
-
-	return max(model.height-chrome, 1)
-}
-
-func (model Model) maxScroll() int {
-	return max(len(model.bodyLines())-model.viewHeight(), 0)
-}
-
-func (model Model) resultsLines() []string {
-	title, style := "Results: Task A, complete", styleGood
-	if model.stopped {
-		title, style = "Results: Task A, incomplete", styleWarn
-	}
-
-	body := model.bodyLines()
-	start := min(model.scroll, model.maxScroll())
-	end := min(start+model.viewHeight(), len(body))
-
-	lines := []string{style.Render(model.truncate(title, 0))}
-	if model.saved != "" {
-		lines = append(lines, styleDim.Render(model.truncate("Saved to: "+safeText(model.saved), 0)))
-	}
-	lines = append(lines, "")
-	for _, line := range body[start:end] {
-		lines = append(lines, styleReportLine(line).Render(model.truncate(line, 0)))
-	}
-
-	return append(lines, "", model.footer(
-		hint{"up/down, pgup/pgdn", "scroll"}, hint{"b", "back to home"}, hint{"q", "quit"}))
+	return style.Render(line)
 }

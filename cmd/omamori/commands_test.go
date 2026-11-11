@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/kenzietann/omamori/internal/appconfig"
+	"github.com/kenzietann/omamori/internal/taskrun"
 	"github.com/kenzietann/omamori/internal/tui"
 )
 
@@ -214,6 +218,169 @@ func TestAKeyCannotBeGivenOnTheCommandLine(t *testing.T) {
 
 		if result.code == exitOK || len(result.screens) != 0 || strings.Contains(result.stdout+result.stderr, commandKey) {
 			t.Errorf("%v: code %d, stderr %q", args, result.code, result.stderr)
+		}
+	}
+}
+
+func TestMergeDefaults(t *testing.T) {
+	saved := appconfig.Settings{Provider: "openai", Model: "gpt-x", Reasoning: "high"}
+	testCases := []struct {
+		name  string
+		given settings
+		want  tui.Defaults
+	}{
+		{"nothing given uses everything saved", settings{}, tui.Defaults{ProviderID: "openai", Model: "gpt-x", Reasoning: "high"}},
+		{"the same provider keeps the saved model and level", settings{provider: "openai"}, tui.Defaults{ProviderID: "openai", Model: "gpt-x", Reasoning: "high"}},
+		{"a different model drops the saved level", settings{provider: "openai", model: "gpt-y"}, tui.Defaults{ProviderID: "openai", Model: "gpt-y"}},
+		{"a different provider drops the saved model and level", settings{provider: "mistral"}, tui.Defaults{ProviderID: "mistral"}},
+		{"a model without a provider is used with the saved provider and drops the level", settings{model: "gpt-y"}, tui.Defaults{ProviderID: "openai", Model: "gpt-y"}},
+		{"the same model on the same provider keeps the level", settings{provider: "openai", model: "gpt-x"}, tui.Defaults{ProviderID: "openai", Model: "gpt-x", Reasoning: "high"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := mergeDefaults(testCase.given, saved); got != testCase.want {
+				t.Errorf("got %+v, want %+v", got, testCase.want)
+			}
+		})
+	}
+	if got := mergeDefaults(settings{provider: "mistral", model: "m"}, appconfig.Settings{}); got != (tui.Defaults{ProviderID: "mistral", Model: "m"}) {
+		t.Errorf("with nothing saved: %+v", got)
+	}
+	if got := mergeDefaults(settings{}, appconfig.Settings{}); got != (tui.Defaults{}) {
+		t.Errorf("with nothing at all: %+v", got)
+	}
+}
+
+func runWithSettings(t testing.TB, args []string, saved *appconfig.Settings, keys taskrun.KeyStore) (commandRun, string) {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "omamori", "settings.json")
+	if saved != nil {
+		if err := appconfig.Save(path, *saved); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var result commandRun
+	var stdout, stderr bytes.Buffer
+	result.code = run(args, environment{
+		stdout: &stdout, stderr: &stderr,
+		lookupEnv: func(string) string { return "" },
+		home:      homeAt(t.TempDir()),
+		openScreen: func(model tui.Model) error {
+			result.screens = append(result.screens, model)
+			return nil
+		},
+		keys:         keys,
+		settingsPath: func() (string, error) { return path, nil },
+	})
+	result.stdout, result.stderr = stdout.String(), stderr.String()
+
+	return result, path
+}
+
+func TestCheckUsesTheSavedSettingsAndGoesToTheConsentScreen(t *testing.T) {
+	saved := appconfig.Settings{Provider: "ollama", Model: "llama"}
+
+	result, _ := runWithSettings(t, []string{"check", t.TempDir()}, &saved, nil)
+
+	if result.code != exitOK || len(result.screens) != 1 {
+		t.Fatalf("code %d, stderr %q", result.code, result.stderr)
+	}
+	view := result.screens[0].View()
+	if !strings.Contains(view, "Please confirm before anything is sent") || !strings.Contains(view, "Model: llama") || !strings.Contains(view, "Provider: Ollama") {
+		t.Errorf("check did not go to the consent screen with the saved choices:\n%s", view)
+	}
+}
+
+func TestTheCommandLineBeatsTheSavedSettings(t *testing.T) {
+	saved := appconfig.Settings{Provider: "ollama", Model: "llama"}
+
+	result, _ := runWithSettings(t, []string{"check", "--model", "other-model", t.TempDir()}, &saved, nil)
+
+	if view := result.screens[0].View(); !strings.Contains(view, "Model: other-model") {
+		t.Errorf("the flag did not win:\n%s", view)
+	}
+}
+
+func TestWithoutSavedSettingsCheckStartsTheSetup(t *testing.T) {
+	for name, saved := range map[string]*appconfig.Settings{"no file": nil, "an empty file": {}} {
+		result, _ := runWithSettings(t, []string{"check", t.TempDir()}, saved, nil)
+
+		if view := result.screens[0].View(); !strings.Contains(view, "Choose the AI provider") {
+			t.Errorf("%s:\n%s", name, view)
+		}
+	}
+}
+
+func TestABrokenSettingsFileIsIgnored(t *testing.T) {
+	var result commandRun
+	path := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(path, []byte("not json {"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+
+	result.code = run([]string{"check", t.TempDir()}, environment{
+		stdout: &bytes.Buffer{}, stderr: &stderr, lookupEnv: func(string) string { return "" }, home: homeAt(t.TempDir()),
+		openScreen:   func(model tui.Model) error { result.screens = append(result.screens, model); return nil },
+		settingsPath: func() (string, error) { return path, nil },
+	})
+
+	if result.code != exitOK || len(result.screens) != 1 || stderr.Len() != 0 || !strings.Contains(result.screens[0].View(), "Choose the AI provider") {
+		t.Errorf("code %d, stderr %q", result.code, stderr.String())
+	}
+}
+
+func TestProvidersAndModelsUseTheSavedKey(t *testing.T) {
+	keys := &memoryKeys{saved: map[string]string{"openai": commandKey}, available: true}
+	var stdout, stderr bytes.Buffer
+	var asked []string
+	env := environment{
+		stdout: &stdout, stderr: &stderr, lookupEnv: func(string) string { return "" }, keys: keys,
+		listModels: func(ctx context.Context, id, key string) ([]string, error) {
+			asked = append(asked, id+":"+key)
+			return []string{"m"}, nil
+		},
+	}
+
+	if code := run([]string{"providers"}, env); code != exitOK || !strings.Contains(stdout.String(), "key saved in your Keychain") || strings.Contains(stdout.String(), commandKey) {
+		t.Errorf("providers: code %d:\n%s", code, stdout.String())
+	}
+	stdout.Reset()
+	if code := run([]string{"models", "openai"}, env); code != exitOK || len(asked) != 1 || asked[0] != "openai:"+commandKey || strings.Contains(stdout.String()+stderr.String(), commandKey) {
+		t.Errorf("models: code %d, asked %q, stderr %q", code, asked, stderr.String())
+	}
+}
+
+func TestTheSettingsFileNeverHoldsAKeyAfterARun(t *testing.T) {
+	keys := &memoryKeys{saved: map[string]string{"openai": commandKey}, available: true}
+	saved := appconfig.Settings{Provider: "openai", Model: "gpt-x"}
+
+	result, path := runWithSettings(t, []string{"check", t.TempDir()}, &saved, keys)
+	if _, err := result.screens[0].View(), error(nil); err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(path)
+	if strings.Contains(string(data), commandKey) || strings.Contains(result.stdout+result.stderr+result.screens[0].View(), commandKey) {
+		t.Error("the key is in the settings file or on the screen")
+	}
+}
+
+func TestTheProgramStartsFullScreenAndNeverTakesTheMouse(t *testing.T) {
+	source, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(source), "tea.WithAltScreen()") {
+		t.Error("main.go does not start full-screen, so the pages before a run are not pages")
+	}
+	for _, option := range []string{"WithMouseCellMotion", "WithMouseAllMotion"} {
+		if strings.Contains(string(source), "tea."+option) {
+			t.Errorf("main.go uses %s. The mouse must stay with the terminal, so that text can be selected.", option)
 		}
 	}
 }

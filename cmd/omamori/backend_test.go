@@ -179,3 +179,123 @@ func TestTheAdapterListsTheReasoningChoicesOfTheCore(t *testing.T) {
 		t.Errorf("openai: %+v", got)
 	}
 }
+
+type memoryKeys struct {
+	saved     map[string]string
+	available bool
+	failSet   bool
+}
+
+func (keys *memoryKeys) Available() bool { return keys.available }
+
+func (keys *memoryKeys) Get(ctx context.Context, providerID string) (string, error) {
+	if key, found := keys.saved[providerID]; found {
+		return key, nil
+	}
+
+	return "", errors.New("none")
+}
+
+func (keys *memoryKeys) Set(ctx context.Context, providerID, key string) error {
+	if keys.failSet {
+		return errors.New("boom " + key)
+	}
+	keys.saved[providerID] = key
+
+	return nil
+}
+
+func (keys *memoryKeys) Delete(ctx context.Context, providerID string) error {
+	delete(keys.saved, providerID)
+
+	return nil
+}
+
+func TestTheAdapterSavesAndForgetsKeysAndSaysIfItCan(t *testing.T) {
+	adapter, _, _ := newTestBackend(t)
+	if adapter.KeysCanBeSaved() {
+		t.Error("an adapter without a store says it can save keys")
+	}
+
+	keys := &memoryKeys{saved: map[string]string{}, available: true}
+	adapter.config.Keys = keys
+	if !adapter.KeysCanBeSaved() {
+		t.Fatal("an adapter with a store cannot save keys")
+	}
+	if err := adapter.SaveKey(context.Background(), "openai", adapterKey); err != nil || keys.saved["openai"] != adapterKey {
+		t.Fatalf("err = %v, saved = %v", err, keys.saved)
+	}
+	var found bool
+	for _, choice := range adapter.Providers() {
+		if choice.ID == "anthropic" && choice.KeySaved {
+			t.Error("a provider without a saved key is marked as saved")
+		}
+		found = found || (choice.ID == "openai" && choice.KeyFound)
+	}
+	if !found {
+		t.Error("the key in the environment is not seen")
+	}
+
+	delete(keys.saved, "openai")
+	keys.saved["gemini"] = adapterKey
+	for _, choice := range adapter.Providers() {
+		if choice.ID == "gemini" && !choice.KeySaved {
+			t.Error("a saved key is not shown")
+		}
+	}
+	if err := adapter.ForgetKey("gemini"); err != nil || len(keys.saved) != 0 {
+		t.Errorf("err = %v, saved = %v", err, keys.saved)
+	}
+
+	keys.failSet = true
+	if err := adapter.SaveKey(context.Background(), "openai", adapterKey); err == nil || strings.Contains(err.Error(), adapterKey) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestTheAdapterTurnsARejectedKeyIntoTheScreensError(t *testing.T) {
+	adapter, _, _ := newTestBackend(t)
+	adapter.config.ListModels = func(context.Context, string, string) ([]string, error) { return nil, outbound.ErrAuth }
+
+	_, err := adapter.Models(context.Background(), "openai", "")
+
+	if !errors.Is(err, tui.ErrKeyRejected) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestTheAdapterSavesSettingsToTheFileAndNeverAKey(t *testing.T) {
+	adapter, _, _ := newTestBackend(t)
+	if err := adapter.SaveSettings(tui.Defaults{ProviderID: "openai"}); err == nil {
+		t.Error("settings were saved without a place for them")
+	}
+
+	adapter.settingsPath = filepath.Join(t.TempDir(), "omamori", "settings.json")
+	if err := adapter.SaveSettings(tui.Defaults{ProviderID: "openai", Model: "gpt-x", Reasoning: "high"}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(adapter.settingsPath)
+	if err != nil || !strings.Contains(string(data), `"model": "gpt-x"`) || strings.Contains(string(data), "sk-") {
+		t.Errorf("err = %v, data = %s", err, data)
+	}
+	if err := adapter.SaveSettings(tui.Defaults{ProviderID: "Open AI"}); err == nil {
+		t.Error("bad settings were saved")
+	}
+}
+
+func TestThePlanHasAShortSummaryAndTheFullPreview(t *testing.T) {
+	adapter, _, _ := newTestBackend(t)
+
+	plan, err := adapter.Prepare(tui.Setup{ProviderID: "anthropic", Key: adapterKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if plan.Summary == "" || !strings.Contains(plan.Summary, "It holds no file content.") || strings.Contains(plan.Summary, "System prompt:") {
+		t.Errorf("the summary is wrong:\n%s", plan.Summary)
+	}
+	if !strings.Contains(plan.Preview, "System prompt:") || len(plan.Summary) >= len(plan.Preview) {
+		t.Errorf("the full preview is wrong or not longer than the summary")
+	}
+}

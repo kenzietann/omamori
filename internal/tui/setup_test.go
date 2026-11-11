@@ -74,7 +74,7 @@ func TestTheSetupFlowForAProviderWithoutAKey(t *testing.T) {
 	}
 
 	model = settle(model, command)
-	if model.modelsLoading || !strings.Contains(model.View(), "Choose the model:") || !strings.Contains(model.View(), "> m\n") || !strings.Contains(model.View(), "  other-model\n") || !strings.Contains(model.View(), "Type a model name myself") {
+	if model.modelsLoading || !strings.Contains(model.View(), "Choose the model:") || !strings.Contains(model.View(), "❯ m\n") || !strings.Contains(model.View(), "  other-model\n") || !strings.Contains(model.View(), "Type a model name myself") {
 		t.Fatalf("the model list is wrong:\n%s", model.View())
 	}
 	if backend.modelCalls[0] != (modelCall{"fake", ""}) {
@@ -85,7 +85,7 @@ func TestTheSetupFlowForAProviderWithoutAKey(t *testing.T) {
 	if model.step != stepConsent || len(backend.setups) != 1 || backend.setups[0] != (Setup{ProviderID: "fake", Model: "m"}) {
 		t.Fatalf("step = %d, setups = %+v", model.step, backend.setups)
 	}
-	view := model.View()
+	view := model.View() + "\n" + strings.Join(model.transcript, "\n")
 	for _, want := range []string{"Please confirm before anything is sent", "Omamori will send sanitized content to FakeAI during this run.", "Nothing has been sent yet", "FIRST REQUEST LINE"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("the consent screen has no %q:\n%s", want, view)
@@ -94,7 +94,7 @@ func TestTheSetupFlowForAProviderWithoutAKey(t *testing.T) {
 	if backend.confirmed != 0 || model.screen != homeScreen {
 		t.Error("something started before the user confirmed")
 	}
-	if footer := lastLine(view); !strings.Contains(footer, "enter: send and start") || !strings.Contains(footer, "esc: cancel") || !strings.Contains(footer, "q: quit") {
+	if footer := lastLine(model.View()); !strings.Contains(footer, "enter: send and start") || !strings.Contains(footer, "esc: cancel") || !strings.Contains(footer, "q: quit") {
 		t.Errorf("the consent footer is %q", footer)
 	}
 
@@ -103,8 +103,9 @@ func TestTheSetupFlowForAProviderWithoutAKey(t *testing.T) {
 		t.Fatalf("confirmed = %d, screen = %d, running = %v", backend.confirmed, model.screen, model.running)
 	}
 	model = settle(model, command)
-	if model.screen != resultsScreen || !strings.Contains(model.View(), "the report") || !strings.Contains(model.View(), "- a step") {
-		t.Errorf("the run did not end on the results screen:\n%s", model.View())
+	printed := strings.Join(model.transcript, "\n")
+	if model.screen != runScreen || model.running || !strings.Contains(printed, "the report") || !strings.Contains(printed, "⎿ a step") {
+		t.Errorf("the run did not end with the results printed:\n%s", printed)
 	}
 }
 
@@ -151,13 +152,22 @@ func TestTheProviderThatIsPreselected(t *testing.T) {
 func TestTheProviderListMovesAndGoesBack(t *testing.T) {
 	model, _ := press(t, newModelWith("/work/project", &fakeBackend{choices: []Choice{keyedChoice, foundChoice, localChoice}}, Defaults{}), "enter")
 
-	for keys, want := range map[string]int{"down": 2, "up": 0} {
-		moved := model
-		for range 5 {
-			moved, _ = press(t, moved, keys)
-		}
-		if moved.providerCursor != want {
-			t.Errorf("after pressing %s five times the cursor is %d, want %d", keys, moved.providerCursor, want)
+	model.providerCursor = 0
+	for name, testCase := range map[string]struct {
+		keys []string
+		want int
+	}{
+		"down to the end":         {[]string{"down", "down"}, 2},
+		"down past the end":       {[]string{"down", "down", "down"}, 0},
+		"up from the first":       {[]string{"up"}, 2},
+		"up twice from the first": {[]string{"up", "up"}, 1},
+		"up then down comes back": {[]string{"up", "down"}, 0},
+		"many downs go around":    {[]string{"down", "down", "down", "down", "down"}, 2},
+		"many ups go around":      {[]string{"up", "up", "up", "up"}, 2},
+	} {
+		moved, _ := pressAll(t, model, testCase.keys...)
+		if moved.providerCursor != testCase.want {
+			t.Errorf("%s: the cursor is %d, want %d", name, moved.providerCursor, testCase.want)
 		}
 	}
 
@@ -187,13 +197,22 @@ func TestTheModelListMovesAndChooses(t *testing.T) {
 		t.Fatalf("models = %q, cursor = %d: the default model is added on top and selected", model.models, model.modelCursor)
 	}
 
-	for keys, want := range map[string]int{"down": 4, "up": 0, "pgdown": 4, "pgup": 0} {
-		moved := model
-		for range 6 {
-			moved, _ = press(t, moved, keys)
-		}
-		if moved.modelCursor != want {
-			t.Errorf("after pressing %s six times the cursor is %d, want %d (4 is the line to type a name)", keys, moved.modelCursor, want)
+	// The lines are m, alpha, beta, gamma, and 4 is the line to type a name.
+	for name, testCase := range map[string]struct {
+		keys []string
+		want int
+	}{
+		"down four times reaches the typing line":     {[]string{"down", "down", "down", "down"}, 4},
+		"down from the typing line goes to the top":   {[]string{"down", "down", "down", "down", "down"}, 0},
+		"up from the first goes to the last model":    {[]string{"up"}, 3},
+		"up twice from the first":                     {[]string{"up", "up"}, 2},
+		"down from the last model is the typing line": {[]string{"up", "down"}, 4},
+		"pgdown stops at the typing line":             {[]string{"pgdown", "pgdown"}, 4},
+		"pgup stops at the top":                       {[]string{"pgdown", "pgup", "pgup"}, 0},
+	} {
+		moved, _ := pressAll(t, model, testCase.keys...)
+		if moved.modelCursor != testCase.want {
+			t.Errorf("%s: the cursor is %d, want %d", name, moved.modelCursor, testCase.want)
 		}
 	}
 
@@ -260,9 +279,11 @@ func TestWhenTheListFailsTheUserTypesTheNameWithAHint(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			testCase.backend.choices = []Choice{keyedChoice, foundChoice}
+			testCase.backend.choices = []Choice{keyedChoice}
 			testCase.backend.preview = "p"
-			model, _ := pressAll(t, newModelWith("/work/project", testCase.backend, Defaults{ProviderID: "found", Model: "from-settings"}), "enter", "enter")
+			model, _ := pressAll(t, newModelWith("/work/project", testCase.backend, Defaults{ProviderID: "anthropic", Model: "from-settings"}), "enter", "enter")
+			model = typeText(t, model, "typed-key")
+			model, _ = pressAll(t, model, "enter")
 
 			if !model.modelTyping || string(model.modelInput) != "from-settings" || !strings.Contains(model.View(), testCase.wantText) || strings.Contains(model.View(), "Choose the model") {
 				t.Fatalf("typing = %v, input = %q:\n%s", model.modelTyping, string(model.modelInput), model.View())
@@ -334,7 +355,7 @@ func TestALongListScrollsInsideTheWindow(t *testing.T) {
 	if count := strings.Count(model.View(), "\n") + 1; count > 14 {
 		t.Errorf("the list has %d lines in a window of 14", count)
 	}
-	if !strings.Contains(model.View(), "> m\n") {
+	if !strings.Contains(model.View(), "❯ m\n") {
 		t.Errorf("the first window is wrong:\n%s", model.View())
 	}
 
@@ -343,15 +364,21 @@ func TestALongListScrollsInsideTheWindow(t *testing.T) {
 		if count := strings.Count(model.View(), "\n") + 1; count > 14 {
 			t.Fatalf("the list has %d lines after moving", count)
 		}
-		if !strings.Contains(model.View(), "> ") {
+		if !strings.Contains(model.View(), "❯ ") {
 			t.Fatalf("the cursor left the window at %d:\n%s", model.modelCursor, model.View())
 		}
 	}
-	for range 100 {
-		model, _ = press(t, model, "down")
+	model, _ = press(t, model, "pgdown")
+	for range 20 {
+		model, _ = press(t, model, "pgdown")
 	}
-	if !strings.Contains(model.View(), "> Type a model name myself") || !strings.Contains(model.View(), "model-100") {
+	if !strings.Contains(model.View(), "❯ Type a model name myself") || !strings.Contains(model.View(), "model-100") {
 		t.Errorf("the end of the list is not reachable:\n%s", model.View())
+	}
+
+	model.modelCursor = 0
+	if model, _ = press(t, model, "up"); model.models[model.modelCursor] != "model-100" || !strings.Contains(model.View(), "❯ model-100") {
+		t.Errorf("up from the first did not show the last model:\n%s", model.View())
 	}
 }
 
@@ -587,72 +614,22 @@ func TestQuitOnTheConsentScreenStartsNothing(t *testing.T) {
 	}
 }
 
-func TestTheDryRunScrollsAndFitsTheWindow(t *testing.T) {
-	var lines []string
-	for number := 1; number <= 60; number++ {
-		lines = append(lines, fmt.Sprintf("preview line %d", number))
-	}
-	backend := &fakeBackend{choices: []Choice{localChoice}, preview: strings.Join(lines, "\n"), runner: finishedRunner("r", true)}
-	model := sized(newModelWith("/work/project", backend, Defaults{}), 80, 24)
-	model, _ = pressAll(t, model, "enter", "enter", "enter")
-
-	view := model.View()
-	if count := strings.Count(view, "\n") + 1; count > 24 {
-		t.Errorf("the consent screen has %d lines in a window of 24", count)
-	}
-	if !strings.Contains(view, "preview line 1\n") || strings.Contains(view, "preview line 15\n") || !strings.Contains(view, "Omamori will send sanitized content") {
-		t.Errorf("the first window is wrong:\n%s", view)
-	}
-
-	model, _ = press(t, model, "down")
-	model, _ = press(t, model, "pgdown")
-	if model.consentScroll != 1+model.consentViewHeight() {
-		t.Errorf("scroll = %d after down and pgdown", model.consentScroll)
-	}
-	for range 100 {
-		model, _ = press(t, model, "down")
-	}
-	if model.consentScroll != model.maxConsentScroll() || !strings.Contains(model.View(), "preview line 60") {
-		t.Errorf("the end of the preview is not reachable (scroll %d, max %d):\n%s", model.consentScroll, model.maxConsentScroll(), model.View())
-	}
-	for range 100 {
-		model, _ = press(t, model, "up")
-	}
-	if model.consentScroll != 0 {
-		t.Errorf("scroll = %d at the top", model.consentScroll)
-	}
-	if model, _ = press(t, model, "pgup"); model.consentScroll != 0 {
-		t.Error("pgup went above the top")
-	}
-}
-
-func TestTheSavedFolderIsShownOnTheResultsScreen(t *testing.T) {
+func TestTheSavedFolderIsPrintedWithTheResults(t *testing.T) {
 	runner := func(ctx context.Context, step func(string)) (Result, error) {
-		return Result{Report: "the report\nline two\nline three\nline four\nline five\nline six", Complete: true, SavedTo: "/home/me/omamori-output/run-1"}, nil
+		return Result{Report: "the report\nline two", Complete: true, SavedTo: "/home/me/omamori-output/run-1"}, nil
 	}
 	model, command := startedRun(t, runner)
 	model = settle(model, command)
 
-	if !strings.Contains(model.View(), "Saved to: /home/me/omamori-output/run-1") {
-		t.Errorf("the saved folder is not shown:\n%s", model.View())
+	if !strings.Contains(strings.Join(model.transcript, "\n"), "Saved to: /home/me/omamori-output/run-1") {
+		t.Errorf("the saved folder is not printed:\n%s", strings.Join(model.transcript, "\n"))
 	}
 
-	small := sized(model, 60, 9)
-	if lines := strings.Count(small.View(), "\n") + 1; lines > 9 {
-		t.Errorf("the results screen has %d lines in a window of 9", lines)
+	next, command := beginRun(t, model)
+	next = settle(next, command)
+	if strings.Count(strings.Join(next.transcript, "\n"), "Saved to:") != 2 {
+		t.Error("the second run did not print its own saved folder")
 	}
-	for range 10 {
-		small, _ = press(t, small, "down")
-	}
-	if !strings.Contains(small.View(), "Timeline") {
-		t.Errorf("the end of the report is not reachable when a saved line takes room:\n%s", small.View())
-	}
-
-	next, command := beginRun(t, func() Model { home, _ := press(t, model, "b"); return home }())
-	if next.saved != "" || strings.Contains(next.View(), "Saved to") {
-		t.Error("the saved folder of the old run is still shown")
-	}
-	_ = command
 }
 
 func TestUntrustedSetupTextIsCleaned(t *testing.T) {
@@ -755,8 +732,10 @@ func hostileRunner(hostile string) Runner {
 }
 
 func TestAVeryLongDefaultModelIsCut(t *testing.T) {
-	long := Choice{ID: "long", Name: "LongAI", KeyFound: true}
+	long := Choice{ID: "long", Name: "LongAI", KeyEnv: "LONG_KEY"}
 	model, _ := pressAll(t, newModelWith("/work/project", &fakeBackend{choices: []Choice{long}}, Defaults{ProviderID: "long", Model: strings.Repeat("m", 500)}), "enter", "enter")
+	model = typeText(t, model, "typed-key")
+	model, _ = pressAll(t, model, "enter")
 
 	if len(model.models[0]) != maxModelRunes {
 		t.Errorf("the model from the settings has %d characters, want the limit %d", len(model.models[0]), maxModelRunes)
@@ -802,7 +781,7 @@ func TestTheReasoningStepComesAfterTheModelAndNothingIsSentBeforeIt(t *testing.T
 		t.Fatalf("step = %d, setups = %+v: the backend must not be asked before the level is chosen", model.step, backend.setups)
 	}
 	view := model.View()
-	for _, want := range []string{"Provider: FakeAI", "Model: m", "Choose how much the AI reasons:", "> default (medium)", "  low", "  high", "Not every model supports every level"} {
+	for _, want := range []string{"Provider: FakeAI", "Model: m", "Choose how much the AI reasons:", "❯ default (medium)", "  low", "  high", "Not every model supports every level"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("the reasoning step has no %q:\n%s", want, view)
 		}
@@ -814,7 +793,7 @@ func TestTheReasoningStepComesAfterTheModelAndNothingIsSentBeforeIt(t *testing.T
 		t.Errorf("the choices were asked for the model %q", backend.reasoningModels[0])
 	}
 
-	model, _ = pressAll(t, model, "down", "down", "down", "up", "enter")
+	model, _ = pressAll(t, model, "down", "enter")
 	if model.step != stepConsent || len(backend.setups) != 1 || backend.setups[0] != (Setup{ProviderID: "fake", Model: "m", Reasoning: "low"}) {
 		t.Errorf("step = %d, setups = %+v, want the level low", model.step, backend.setups)
 	}
@@ -900,7 +879,7 @@ func TestTheModelNameForTheChoicesIsTrimmedAndTyped(t *testing.T) {
 
 func TestAnOldReasoningChoiceDoesNotFollowADifferentModel(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{localChoice}, models: []string{"has-levels", "plain"}, reasoning: testLevels, prepareErr: errors.New("fail"), preview: "p"}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{ProviderID: "fake", Model: "has-levels"}), "enter", "enter", "enter", "down", "down", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter", "down", "enter", "down", "down", "enter")
 	if model.setupError == "" || backend.setups[0].Reasoning != "high" {
 		t.Fatalf("setups = %+v, error %q", backend.setups, model.setupError)
 	}
@@ -956,5 +935,43 @@ func TestQuitWorksOnTheReasoningStep(t *testing.T) {
 	}
 	if len(backend.setups) != 0 {
 		t.Error("quitting asked the backend")
+	}
+}
+
+func TestTheReasoningListGoesAroundTheEnds(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, reasoning: testLevels, preview: "p"}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter", "enter")
+
+	up, _ := press(t, model, "up")
+	around, _ := pressAll(t, model, "down", "down", "down")
+
+	if up.reasonCursor != 2 || around.reasonCursor != 0 {
+		t.Errorf("up from the first: %d (want 2), three downs: %d (want 0)", up.reasonCursor, around.reasonCursor)
+	}
+	chosen, _ := press(t, up, "enter")
+	if backend.setups[0].Reasoning != "high" || chosen.step != stepConsent {
+		t.Errorf("the last level was not chosen: %+v", backend.setups)
+	}
+}
+
+func TestAListWithOneLineStaysPut(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, models: []string{}, modelsErr: errors.New("x")}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter")
+
+	for _, key := range []string{"up", "down", "up"} {
+		model, _ = press(t, model, key)
+		if model.providerCursor != 0 {
+			t.Fatalf("%s moved the only line to %d", key, model.providerCursor)
+		}
+	}
+
+	onlyTyping := &fakeBackend{choices: []Choice{{ID: "x", Name: "X", Local: true}}, models: []string{"only"}}
+	listed, _ := pressAll(t, newModelWith("/work/project", onlyTyping, Defaults{}), "enter", "enter")
+	listed.models, listed.modelCursor = nil, 0
+	for _, key := range []string{"up", "down", "up"} {
+		listed, _ = press(t, listed, key)
+		if listed.modelCursor != 0 {
+			t.Fatalf("%s moved a list that has only the typing line to %d", key, listed.modelCursor)
+		}
 	}
 }

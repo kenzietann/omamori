@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kenzietann/omamori/internal/agent"
+	"github.com/kenzietann/omamori/internal/appconfig"
 	"github.com/kenzietann/omamori/internal/taskrun"
 	"github.com/kenzietann/omamori/internal/tui"
 )
@@ -51,8 +52,31 @@ type environment struct {
 	lookupEnv      func(string) string
 	home           func() (string, error)
 	openScreen     func(tui.Model) error
+
 	// listModels replaces the real request in tests.
 	listModels taskrun.ModelLister
+	// keys keeps API keys between runs. Without it, keys are not saved.
+	keys taskrun.KeyStore
+	// settingsPath says where the choices are kept. Without it, they are not kept.
+	settingsPath func() (string, error)
+}
+
+// mergeDefaults gives the command line and the environment the first word, then the saved choices.
+// A saved model is used only with the saved provider, and a saved level only with both.
+func mergeDefaults(chosen settings, saved appconfig.Settings) tui.Defaults {
+	defaults := tui.Defaults{ProviderID: chosen.provider, Model: chosen.model}
+
+	if defaults.ProviderID == "" {
+		defaults.ProviderID = saved.Provider
+	}
+	if defaults.ProviderID == saved.Provider && defaults.Model == "" {
+		defaults.Model = saved.Model
+	}
+	if defaults.ProviderID == saved.Provider && defaults.Model == saved.Model {
+		defaults.Reasoning = saved.Reasoning
+	}
+
+	return defaults
 }
 
 func run(args []string, env environment) int {
@@ -90,12 +114,14 @@ func runProviders(args []string, env environment) int {
 
 	table := tabwriter.NewWriter(env.stdout, 0, 4, 3, ' ', 0)
 	fmt.Fprintln(table, "ID\tNAME\tKEY")
-	for _, choice := range (taskrun.Config{LookupEnv: env.lookupEnv}).Providers() {
+	for _, choice := range (taskrun.Config{LookupEnv: env.lookupEnv, Keys: env.keys}).Providers() {
 		status := "no key needed"
 		switch {
 		case choice.Local:
 		case choice.KeyFound:
 			status = choice.KeyEnv + " is set"
+		case choice.KeySaved:
+			status = "key saved in your Keychain"
 		default:
 			status = choice.KeyEnv + " is not set"
 		}
@@ -112,7 +138,7 @@ func runModels(args []string, env environment) int {
 		return exitUsage
 	}
 
-	config := taskrun.Config{LookupEnv: env.lookupEnv, ListModels: env.listModels}
+	config := taskrun.Config{LookupEnv: env.lookupEnv, ListModels: env.listModels, Keys: env.keys}
 	ctx, cancel := context.WithTimeout(context.Background(), modelsWait)
 	defer cancel()
 
@@ -163,8 +189,18 @@ func runScreen(command string, args []string, env environment) int {
 		Limits:     agent.Limits{MaxSteps: chosen.maxSteps, MaxTokens: chosen.maxTokens},
 		LookupEnv:  env.lookupEnv,
 		ListModels: env.listModels,
+		Keys:       env.keys,
 	}
-	model := tui.New(chosen.target, backend{config: config}, tui.Defaults{ProviderID: chosen.provider, Model: chosen.model})
+
+	var path string
+	var saved appconfig.Settings
+	if env.settingsPath != nil {
+		if found, err := env.settingsPath(); err == nil {
+			path = found
+			saved, _ = appconfig.Load(path)
+		}
+	}
+	model := tui.New(chosen.target, backend{config: config, settingsPath: path}, mergeDefaults(chosen, saved)).WithVersion(version)
 	if command == "check" {
 		model = model.WithTaskA()
 	}

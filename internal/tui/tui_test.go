@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,11 @@ var keyMessages = map[string]tea.KeyMsg{
 	"esc":       {Type: tea.KeyEsc},
 	"pgup":      {Type: tea.KeyPgUp},
 	"pgdown":    {Type: tea.KeyPgDown},
+	"home":      {Type: tea.KeyHome},
+	"end":       {Type: tea.KeyEnd},
+	"c":         {Type: tea.KeyRunes, Runes: []rune{'c'}},
+	"m":         {Type: tea.KeyRunes, Runes: []rune{'m'}},
+	"d":         {Type: tea.KeyRunes, Runes: []rune{'d'}},
 	"ctrl+c":    {Type: tea.KeyCtrlC},
 	"q":         {Type: tea.KeyRunes, Runes: []rune{'q'}},
 	"b":         {Type: tea.KeyRunes, Runes: []rune{'b'}},
@@ -67,6 +73,16 @@ func settle(model Model, command tea.Cmd) Model {
 			queue = append(queue, batch...)
 			continue
 		}
+		// A sequence runs its commands one after the other, and before the commands that wait in the queue.
+		if fmt.Sprintf("%T", message) == "tea.sequenceMsg" {
+			list := reflect.ValueOf(message)
+			var ordered []tea.Cmd
+			for index := range list.Len() {
+				ordered = append(ordered, list.Index(index).Interface().(tea.Cmd))
+			}
+			queue = append(ordered, queue...)
+			continue
+		}
 
 		updated, next := model.Update(message)
 		model = updated.(Model)
@@ -74,6 +90,27 @@ func settle(model Model, command tea.Cmd) Model {
 	}
 
 	return model
+}
+
+// batchOf returns the batch of commands of the run, which may be inside a sequence.
+func batchOf(t testing.TB, command tea.Cmd) tea.BatchMsg {
+	t.Helper()
+
+	message := command()
+	if batch, isBatch := message.(tea.BatchMsg); isBatch {
+		return batch
+	}
+	if fmt.Sprintf("%T", message) == "tea.sequenceMsg" {
+		list := reflect.ValueOf(message)
+		for index := range list.Len() {
+			if inner, isBatch := list.Index(index).Interface().(tea.Cmd)().(tea.BatchMsg); isBatch {
+				return inner
+			}
+		}
+	}
+	t.Fatalf("no batch of commands in %T", message)
+
+	return nil
 }
 
 func finishedRunner(report string, complete bool, steps ...string) Runner {
@@ -103,6 +140,7 @@ type fakeBackend struct {
 	runner     Runner
 	prepareErr error
 	preview    string
+	summary    string
 	setups     []Setup
 	confirmed  int
 	// models is the list the provider gives. nil means a short default list, and an empty list means none.
@@ -112,6 +150,41 @@ type fakeBackend struct {
 	// reasoning is what the model offers. nil means no choice, and then the step is skipped.
 	reasoning       []ReasoningChoice
 	reasoningModels []string
+	// keys and settings
+	canSaveKeys     bool
+	savedKeys       []modelCall
+	saveKeyErr      error
+	forgotKeys      []string
+	forgetKeyErr    error
+	savedSettings   []Defaults
+	saveSettingsErr error
+}
+
+func (backend *fakeBackend) KeysCanBeSaved() bool { return backend.canSaveKeys }
+
+func (backend *fakeBackend) SaveKey(ctx context.Context, providerID, key string) error {
+	backend.savedKeys = append(backend.savedKeys, modelCall{providerID, key})
+
+	return backend.saveKeyErr
+}
+
+func (backend *fakeBackend) ForgetKey(providerID string) error {
+	backend.forgotKeys = append(backend.forgotKeys, providerID)
+	if backend.forgetKeyErr == nil {
+		for index := range backend.choices {
+			if backend.choices[index].ID == providerID {
+				backend.choices[index].KeySaved = false
+			}
+		}
+	}
+
+	return backend.forgetKeyErr
+}
+
+func (backend *fakeBackend) SaveSettings(defaults Defaults) error {
+	backend.savedSettings = append(backend.savedSettings, defaults)
+
+	return backend.saveSettingsErr
 }
 
 func (backend *fakeBackend) ReasoningChoices(providerID, model string) []ReasoningChoice {
@@ -147,6 +220,7 @@ func (backend *fakeBackend) Prepare(setup Setup) (Plan, error) {
 
 	return Plan{
 		ConsentText: consent,
+		Summary:     backend.summary,
 		Preview:     backend.preview,
 		Confirm:     func() { backend.confirmed++ },
 		Run:         backend.runner,
@@ -168,7 +242,19 @@ func newModel(target string, runner Runner) Model {
 func beginRun(t testing.TB, model Model) (Model, tea.Cmd) {
 	t.Helper()
 
-	return pressAll(t, model, "enter", "enter", "enter", "enter")
+	var command tea.Cmd
+	for range 6 {
+		model, command = press(t, model, "enter")
+		if model.modelsLoading {
+			model, command = settle(model, command), nil
+		}
+		if model.screen == runScreen {
+			return model, command
+		}
+	}
+
+	// Some tests ask for a setup that cannot start a run, for example an empty target.
+	return model, nil
 }
 
 func startedRun(t testing.TB, runner Runner) (Model, tea.Cmd) {
@@ -177,7 +263,7 @@ func startedRun(t testing.TB, runner Runner) (Model, tea.Cmd) {
 	return beginRun(t, newModel("/work/project", runner))
 }
 
-func TestHomeMenuMovesAndStaysInsideTheMenu(t *testing.T) {
+func TestHomeMenuMovesAndGoesAroundTheEnds(t *testing.T) {
 	testCases := []struct {
 		name       string
 		keys       []string
@@ -185,8 +271,11 @@ func TestHomeMenuMovesAndStaysInsideTheMenu(t *testing.T) {
 	}{
 		{"start", nil, 0},
 		{"down", []string{"down"}, 1},
-		{"down to the end and past it", []string{"down", "down", "down", "down"}, 2},
-		{"up at the top", []string{"up"}, 0},
+		{"down to the end", []string{"down", "down", "down"}, 3},
+		{"down past the end goes to the top", []string{"down", "down", "down", "down"}, 0},
+		{"down around once and a bit more", []string{"down", "down", "down", "down", "down"}, 1},
+		{"up at the top goes to the bottom", []string{"up"}, 3},
+		{"up twice from the top", []string{"up", "up"}, 2},
 		{"down then up", []string{"down", "down", "up"}, 1},
 		{"other keys do nothing", []string{"b", "pgup", "esc"}, 0},
 	}
@@ -233,7 +322,7 @@ func TestHomeChoices(t *testing.T) {
 		t.Error("the notice stayed after moving")
 	}
 
-	_, quitCommand := pressAll(t, model, "down", "down", "enter")
+	_, quitCommand := pressAll(t, model, "down", "down", "down", "enter")
 	if !isQuit(quitCommand) {
 		t.Error("Quit in the menu does not quit")
 	}
@@ -255,7 +344,7 @@ func TestNoTargetOrNoBackendStartsNothing(t *testing.T) {
 	}
 }
 
-func TestACompleteRunEndsOnTheResultsScreen(t *testing.T) {
+func TestACompleteRunPrintsItsStepsAndResultsAndOffersTheMenu(t *testing.T) {
 	model, command := startedRun(t, finishedRunner("# Report\nfinding one", true, "Scanning", "Reading files"))
 	if model.screen != runScreen || !model.running {
 		t.Fatalf("screen = %d, running = %v, want the run screen", model.screen, model.running)
@@ -263,14 +352,17 @@ func TestACompleteRunEndsOnTheResultsScreen(t *testing.T) {
 
 	model = settle(model, command)
 
-	view := model.View()
-	for _, want := range []string{"Results: Task A, complete", "# Report", "finding one", "Timeline", "- Scanning", "- Reading files"} {
-		if !strings.Contains(view, want) {
-			t.Errorf("the results screen has no %q:\n%s", want, view)
+	printed := strings.Join(model.transcript, "\n")
+	for _, want := range []string{"⎿ Scanning", "⎿ Reading files", "● Results: Task A, complete", "# Report", "finding one"} {
+		if !strings.Contains(printed, want) {
+			t.Errorf("the printed text has no %q:\n%s", want, printed)
 		}
 	}
-	if model.screen != resultsScreen || model.running {
-		t.Errorf("screen = %d, running = %v", model.screen, model.running)
+	if strings.Index(printed, "Reading files") > strings.Index(printed, "Results: Task A") {
+		t.Errorf("a step is printed after the results:\n%s", printed)
+	}
+	if model.screen != runScreen || model.running || !strings.Contains(model.View(), "enter: back to the menu") {
+		t.Errorf("screen = %d, running = %v:\n%s", model.screen, model.running, model.View())
 	}
 }
 
@@ -291,11 +383,11 @@ func TestAnIncompleteOrFailedRunIsLabelledIncomplete(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			model, command := startedRun(t, testCase.runner)
-			view := settle(model, command).View()
+			printed := strings.Join(settle(model, command).transcript, "\n")
 
 			for _, want := range testCase.want {
-				if !strings.Contains(view, want) {
-					t.Errorf("the view has no %q:\n%s", want, view)
+				if !strings.Contains(printed, want) {
+					t.Errorf("the printed text has no %q:\n%s", want, printed)
 				}
 			}
 		})
@@ -310,10 +402,10 @@ func TestEscCancelsTheRunAndKeepsThePartialResult(t *testing.T) {
 		return Result{Report: "partial report", Complete: false}, nil
 	}
 	model, command := startedRun(t, waiting)
-	batch := command().(tea.BatchMsg)
+	batch := batchOf(t, command)
 
-	finished := make(chan tea.Msg, 1)
-	go func() { finished <- batch[0]() }()
+	finished := make(chan struct{})
+	go func() { batch[0](); close(finished) }()
 
 	model, _ = press(t, model, "esc")
 	if !strings.Contains(model.View(), "Cancelling") {
@@ -321,15 +413,15 @@ func TestEscCancelsTheRunAndKeepsThePartialResult(t *testing.T) {
 	}
 
 	select {
-	case message := <-finished:
-		updated, _ := model.Update(message)
-		model = updated.(Model)
+	case <-finished:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the run did not stop after esc")
 	}
+	model = settle(model, batch[1])
 
-	if model.screen != resultsScreen || !strings.Contains(model.View(), "incomplete") || !strings.Contains(model.View(), "partial report") {
-		t.Errorf("after cancel the view is:\n%s", model.View())
+	printed := strings.Join(model.transcript, "\n")
+	if model.screen != runScreen || model.running || !strings.Contains(printed, "incomplete") || !strings.Contains(printed, "partial report") || !strings.Contains(printed, "⎿ Working") {
+		t.Errorf("after cancel the printed text is:\n%s", printed)
 	}
 }
 
@@ -346,7 +438,7 @@ func TestQuitWorksOnEveryScreenAndStopsARunningTask(t *testing.T) {
 		"home": func() Model { return newModel("/work/project", waiting) },
 		"run": func() Model {
 			model, command := startedRun(t, waiting)
-			batch := command().(tea.BatchMsg)
+			batch := batchOf(t, command)
 			go batch[0]()
 			for runContext == nil {
 				time.Sleep(time.Millisecond)
@@ -380,8 +472,7 @@ func TestQuitWorksOnEveryScreenAndStopsARunningTask(t *testing.T) {
 
 func TestEveryScreenShowsItsKeysOnTheLastLine(t *testing.T) {
 	home := newModel("/work/project", finishedRunner("r", true))
-	running, command := startedRun(t, finishedRunner("r", true))
-	results := settle(running, command)
+	running, _ := startedRun(t, finishedRunner("r", true))
 
 	testCases := []struct {
 		name  string
@@ -390,7 +481,6 @@ func TestEveryScreenShowsItsKeysOnTheLastLine(t *testing.T) {
 	}{
 		{"home", home, []string{"up/down", "enter", "q: quit"}},
 		{"run", running, []string{"esc: cancel", "q: quit"}},
-		{"results", results, []string{"up/down", "b: back", "q: quit"}},
 	}
 
 	for _, testCase := range testCases {
@@ -406,74 +496,26 @@ func TestEveryScreenShowsItsKeysOnTheLastLine(t *testing.T) {
 	}
 }
 
-func TestBackToHomeAndRunAgain(t *testing.T) {
+func TestARunCanBeStartedAgainAfterTheResults(t *testing.T) {
 	model, command := startedRun(t, finishedRunner("first", true, "step"))
 	model = settle(model, command)
 
-	for _, key := range []string{"b", "esc"} {
-		back, _ := press(t, model, key)
-		if back.screen != homeScreen {
-			t.Errorf("%q did not go back home", key)
-		}
-	}
-
-	home, _ := press(t, model, "b")
+	home, _ := press(t, model, "enter")
 	again, command := beginRun(t, home)
-	if again.screen != runScreen || len(again.steps) != 0 || again.report != "" || again.runID != 2 {
+	if again.screen != runScreen || len(again.steps) != 0 || again.runID != 2 {
 		t.Errorf("a new run starts with old data: %+v", again)
 	}
-	if !strings.Contains(settle(again, command).View(), "first") {
-		t.Error("the second run did not finish")
-	}
-}
-
-func TestResultsScroll(t *testing.T) {
-	var lines []string
-	for number := 1; number <= 40; number++ {
-		lines = append(lines, fmt.Sprintf("line %d", number))
-	}
-	model, command := startedRun(t, finishedRunner(strings.Join(lines, "\n"), true))
-	model = settle(model, command)
-	updated, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
-	model = updated.(Model)
-
-	if view := model.View(); !strings.Contains(view, "line 1\n") || strings.Contains(view, "line 7\n") {
-		t.Fatalf("the first window is wrong:\n%s", view)
-	}
-	if strings.Count(model.View(), "\n")+1 != 10 {
-		t.Errorf("the screen has %d lines, want 10", strings.Count(model.View(), "\n")+1)
-	}
-
-	model, _ = press(t, model, "down")
-	if model.scroll != 1 {
-		t.Errorf("scroll = %d after down", model.scroll)
-	}
-	model, _ = press(t, model, "pgdown")
-	if model.scroll != 1+model.viewHeight() {
-		t.Errorf("scroll = %d after pgdown", model.scroll)
-	}
-
-	for step := 0; step < 100; step++ {
-		model, _ = press(t, model, "down")
-	}
-	if model.scroll != model.maxScroll() || !strings.Contains(model.View(), "(no steps)") {
-		t.Errorf("scroll = %d, max = %d; the end of the text is not shown:\n%s", model.scroll, model.maxScroll(), model.View())
-	}
-
-	for step := 0; step < 100; step++ {
-		model, _ = press(t, model, "up")
-	}
-	model, _ = press(t, model, "pgup")
-	if model.scroll != 0 {
-		t.Errorf("scroll = %d at the top", model.scroll)
+	finished := settle(again, command)
+	if strings.Count(strings.Join(finished.transcript, "\n"), "● Results: Task A, complete") != 2 || finished.screen != runScreen || finished.running {
+		t.Errorf("the second run did not finish: %q", finished.transcript)
 	}
 }
 
 func TestAnOldRunCannotChangeANewRun(t *testing.T) {
 	model, command := startedRun(t, finishedRunner("first", true))
 	model = settle(model, command)
-	model, _ = press(t, model, "b")
 	model, _ = beginRun(t, model)
+	printedBefore := len(model.transcript)
 
 	for _, message := range []tea.Msg{
 		stepMsg{run: 1, text: "from the old run"},
@@ -483,7 +525,7 @@ func TestAnOldRunCannotChangeANewRun(t *testing.T) {
 		model = updated.(Model)
 	}
 
-	if !model.running || model.screen != runScreen || len(model.steps) != 0 || model.report != "" {
+	if !model.running || model.screen != runScreen || len(model.steps) != 0 || len(model.transcript) != printedBefore {
 		t.Errorf("an old message changed the new run: %+v", model)
 	}
 }
@@ -492,7 +534,7 @@ func TestUntrustedTextIsCleanedBeforeItIsShown(t *testing.T) {
 	hostile := "a\x1b[31mred\x1b]0;title\x07 b\u202eevil\u200b c\x00d\re\tf\xffg"
 	runner := func(ctx context.Context, step func(string)) (Result, error) {
 		step(hostile)
-		return Result{Report: hostile, Complete: true}, nil
+		return Result{Report: hostile, Complete: true, SavedTo: hostile}, nil
 	}
 
 	home := newModel(hostile, runner)
@@ -504,23 +546,24 @@ func TestUntrustedTextIsCleanedBeforeItIsShown(t *testing.T) {
 	failed = settle(failed, failCommand)
 
 	for name, model := range map[string]Model{"home": home, "run": running, "results": results, "error": failed} {
-		for _, character := range model.View() {
-			if character != '\n' && (unicode.IsControl(character) || unicode.Is(unicode.Cf, character)) {
-				t.Errorf("%s: the view holds the character %U", name, character)
+		for _, character := range model.View() + strings.Join(model.transcript, "\n") {
+			if character != '\n' && character != '\x1b' && (unicode.IsControl(character) || unicode.Is(unicode.Cf, character)) {
+				t.Errorf("%s: the text holds the character %U", name, character)
 			}
 		}
 	}
 }
 
-func TestLongLinesAreCutToTheWidth(t *testing.T) {
+func TestLongReportLinesArePrintedWholeAndTheLiveAreaIsCutToTheWidth(t *testing.T) {
 	model, command := startedRun(t, finishedRunner(strings.Repeat("x", 200), true))
-	model = settle(model, command)
-	updated, _ := model.Update(tea.WindowSizeMsg{Width: 20, Height: 12})
-	model = updated.(Model)
+	model = sized(settle(model, command), 20, 12)
 
+	if !strings.Contains(strings.Join(model.transcript, "\n"), strings.Repeat("x", 200)) {
+		t.Error("a long report line was cut, but the terminal wraps it and it can be copied whole")
+	}
 	for _, line := range strings.Split(model.View(), "\n") {
 		if len([]rune(line)) > 20 {
-			t.Errorf("the line %q is longer than the width", line)
+			t.Errorf("the live area line %q is longer than the width", line)
 		}
 	}
 }
@@ -569,11 +612,11 @@ func FuzzView(f *testing.F) {
 		updated, _ := model.Update(tea.WindowSizeMsg{Width: width % 500, Height: height % 200})
 		model = settle(updated.(Model), command)
 
-		for _, key := range []string{"down", "pgdown", "pgup", "up"} {
+		for _, key := range []string{"down", "up", "enter", "esc"} {
 			model, _ = press(t, model, key)
 		}
 		for _, shown := range []Model{model, newModel(target, runner)} {
-			for _, character := range styleCodes.ReplaceAllString(shown.View(), "") {
+			for _, character := range styleCodes.ReplaceAllString(shown.View()+strings.Join(shown.transcript, "\n"), "") {
 				if character != '\n' && (unicode.IsControl(character) || unicode.Is(unicode.Cf, character)) {
 					t.Fatalf("the view holds the character %U", character)
 				}

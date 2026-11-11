@@ -22,6 +22,7 @@ var styleCodes = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 func TestMain(m *testing.M) {
 	lipgloss.SetColorProfile(termenv.Ascii)
 	lipgloss.SetHasDarkBackground(true)
+	spinnerInterval = 0
 
 	os.Exit(m.Run())
 }
@@ -40,16 +41,15 @@ func sized(model Model, width, height int) Model {
 	return updated.(Model)
 }
 
-func TestEveryLineFitsTheWindow(t *testing.T) {
+func TestEveryLineOfTheLiveAreaFitsTheWindow(t *testing.T) {
 	for _, profile := range []termenv.Profile{termenv.Ascii, termenv.TrueColor} {
 		withProfile(t, profile)
 
 		for _, size := range [][2]int{{80, 30}, {40, 30}, {20, 12}, {200, 50}, {100, 60}, {60, 50}} {
 			home := sized(newModel("/very/long/folder/name/that/goes/on/and/on", finishedRunner("r", true)), size[0], size[1])
-			running, command := beginRun(t, home)
-			results := sized(settle(running, command), size[0], size[1])
+			running, _ := beginRun(t, home)
 
-			for name, model := range map[string]Model{"home": home, "run": sized(running, size[0], size[1]), "results": results} {
+			for name, model := range map[string]Model{"home": home, "run": sized(running, size[0], size[1])} {
 				for _, line := range strings.Split(styleCodes.ReplaceAllString(model.View(), ""), "\n") {
 					if runewidth.StringWidth(line) > size[0] {
 						t.Errorf("profile %v, %dx%d, %s: the line %q is wider than the window", profile, size[0], size[1], name, line)
@@ -61,9 +61,8 @@ func TestEveryLineFitsTheWindow(t *testing.T) {
 }
 
 func TestJapaneseTextIsCutByDisplayWidth(t *testing.T) {
-	report := strings.Repeat("日本語のファイル名", 10)
-	model, command := startedRun(t, finishedRunner(report, true))
-	model = sized(settle(model, command), 30, 12)
+	target := strings.Repeat("日本語のファイル名", 10)
+	model := sized(newModel(target, nil), 30, 12)
 
 	for _, line := range strings.Split(model.View(), "\n") {
 		if runewidth.StringWidth(line) > 30 {
@@ -83,7 +82,7 @@ func TestColorsDependOnTheContent(t *testing.T) {
 		"plain line",
 	}, "\n")
 	model, command := startedRun(t, finishedRunner(report, true))
-	view := settle(model, command).View()
+	view := strings.Join(settle(model, command).transcript, "\n")
 
 	lineWith := func(text string) string {
 		for _, line := range strings.Split(view, "\n") {
@@ -114,8 +113,10 @@ func TestColorsDependOnTheContent(t *testing.T) {
 	}
 
 	incomplete, command := startedRun(t, finishedRunner("partial", false))
-	if line := strings.Split(settle(incomplete, command).View(), "\n")[0]; !strings.Contains(line, "38;2;245;176;65") {
-		t.Errorf("an incomplete result is not amber: %q", line)
+	for _, line := range strings.Split(strings.Join(settle(incomplete, command).transcript, "\n"), "\n") {
+		if strings.Contains(line, "Results: Task A, incomplete") && !strings.Contains(line, "38;2;245;176;65") {
+			t.Errorf("an incomplete result is not amber: %q", line)
+		}
 	}
 }
 
@@ -136,7 +137,7 @@ func TestOnlyOurStylingMakesEscapeCodes(t *testing.T) {
 	failed = settle(failed, failCommand)
 
 	for name, model := range map[string]Model{"home": home, "run": running, "results": results, "error": failed} {
-		view := model.View()
+		view := model.View() + strings.Join(model.transcript, "\n")
 
 		if strings.Contains(view, "\x1b[999m") || strings.Contains(view, "\x1b]") {
 			t.Errorf("%s: an escape code from the input got through", name)
@@ -227,7 +228,7 @@ func TestSmallWindowsGetAOneLineHeader(t *testing.T) {
 	}
 	withNotice, _ := pressAll(t, exact, "down", "enter")
 	if lines := strings.Count(withNotice.View(), "\n") + 1; lines > minWordmarkHeight || !strings.Contains(withNotice.View(), "not built yet") {
-		t.Errorf("with a notice the home screen has %d lines in a window of %d", lines, minWordmarkHeight)
+		t.Errorf("with a notice the menu has %d lines in a window of %d", lines, minWordmarkHeight)
 	}
 }
 
