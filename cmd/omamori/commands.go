@@ -37,6 +37,8 @@ Commands:
   ui <folder>         open the home screen, where you choose a task
   replay <recording> [folder or log file]
                       play back the recorded answers of an earlier run. Nothing is sent
+  peek <report> <project>
+                      show what a report matched, on your screen only (add --reveal for full values)
   eval --yes          run the fixed live tests on the fake fixtures and score them (costs tokens)
   providers           list the AI providers and say whether their key is set
   models <provider>   list the models that a provider offers for your key
@@ -123,6 +125,8 @@ func run(args []string, env environment) int {
 		return runReplay(rest, env)
 	case "eval":
 		return runEval(rest, env)
+	case "peek":
+		return runPeek(rest, env)
 	}
 
 	fmt.Fprintf(env.stderr, "omamori: %q is not a command. Run omamori help to see the commands.\n", command)

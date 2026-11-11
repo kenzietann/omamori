@@ -109,6 +109,31 @@ numbers changed between runs.
 - Passwords written inside web or database addresses (`scheme://user:password@host`)
 - マイナンバー (a valid check digit gives "possible identifier" only) and Japanese phone numbers
 
+A phone-like number in a generated file (build output, a cache, a test report, `.map` and
+`.min.js` files) gets severity `low`, because it is nearly always code and not a person.
+A secret in the same file stays `high`.
+
+A key in an env file (`.env`) that a `.gitignore` file keeps out of git is the normal setup.
+It is listed in its own section, "Kept out of git", and is not counted as a finding. If the
+file is not ignored, the key is `high`.
+
+Matches in libraries (`deps`, `.angular`, `site-packages`, ...) and phone-like numbers in build
+output (`dist`, `.map`, `.min.js`, test reports) are listed in their own section, one line per
+file line, and are not counted as findings. A secret in your own build output still counts.
+
+### Looking at the matches
+
+A report holds places and placeholders only. To tell a false alarm from a real leak, look at
+the matches on your own screen:
+
+```
+omamori peek ~/omamori-output/run-... ./your-project           # the middle of each value is hidden
+omamori peek --reveal ~/omamori-output/run-... ./your-project  # full values
+```
+
+It finds each match again in the file and prints the value and the text around it. Nothing is
+saved and nothing is sent to the AI. A private key block is never shown, only its first line.
+
 Every detector has a test table with fake values, a list of look-alikes that must not match,
 and a fuzz test.
 
