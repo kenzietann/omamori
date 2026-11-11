@@ -633,3 +633,173 @@ func TestListModelsWorksWithoutAKeyOnThisComputer(t *testing.T) {
 		t.Errorf("got %q, err %v", gotIDs, err)
 	}
 }
+
+func TestARejectedRequestReportsTheStatusAndCodeOnly(t *testing.T) {
+	server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(404)
+		fmt.Fprint(writer, `{"error":{"message":"The model `+"`secret-model-name`"+` does not exist","type":"invalid_request_error","code":"model_not_found"}}`)
+	})
+	client := newTestClient(t, server, "")
+
+	_, err := client.Send(context.Background(), wire.Request{Messages: []wire.Message{{Role: "user", Text: "hello"}}})
+
+	var rejection *wire.Rejection
+	if !errors.Is(err, wire.ErrRejected) || !errors.As(err, &rejection) || rejection.Detail() != "status 404, code model_not_found" {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(err.Error(), "secret-model-name") {
+		t.Error("the message of the provider is shown")
+	}
+}
+
+func TestListModelsDropsModelsThatCannotChatOrCallTools(t *testing.T) {
+	server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, `{"data":[
+			{"id":"good","capabilities":{"completion_chat":true,"function_calling":true}},
+			{"id":"no-tools","capabilities":{"completion_chat":true,"function_calling":false}},
+			{"id":"no-chat","capabilities":{"completion_chat":false,"function_calling":true}},
+			{"id":"unknown-abilities"},
+			{"id":"partial","capabilities":{"vision":true}}]}`)
+	})
+
+	gotIDs, err := ListModels(context.Background(), server.URL+"/v1", fakeKey, time.Second)
+
+	if err != nil || !slices.Equal(gotIDs, []string{"good", "partial", "unknown-abilities"}) {
+		t.Errorf("got %q, err %v", gotIDs, err)
+	}
+}
+
+func rejectReasoning(writer http.ResponseWriter) {
+	writer.WriteHeader(400)
+	fmt.Fprint(writer, `{"error":{"message":"Function tools with reasoning_effort are not supported","type":"invalid_request_error","param":"reasoning_effort","code":null}}`)
+}
+
+func clientWithFallback(t testing.TB, server *fakeServer, fallback string) *Client {
+	t.Helper()
+
+	client, err := New(Config{BaseURL: server.URL + "/v1", APIKey: fakeKey, Model: "test-model", ReasoningFallback: fallback})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return client
+}
+
+func sentEffort(t testing.TB, body []byte) (string, bool) {
+	t.Helper()
+
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	effort, present := decoded["reasoning_effort"].(string)
+
+	return effort, present
+}
+
+func TestReasoningFallbackRetriesOnceAndIsRemembered(t *testing.T) {
+	var server *fakeServer
+	server = newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		captured := server.requests()
+		if _, present := sentEffort(t, captured[len(captured)-1].body); !present {
+			rejectReasoning(writer)
+			return
+		}
+		fmt.Fprint(writer, `{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`)
+	})
+	client := clientWithFallback(t, server, "none")
+	request := wire.Request{Messages: []wire.Message{{Role: "user", Text: "hello"}}}
+
+	for attempt := range 2 {
+		if response, err := client.Send(context.Background(), request); err != nil || response.Text != "ok" {
+			t.Fatalf("send %d: %+v, %v", attempt, response, err)
+		}
+	}
+
+	sent := server.requests()
+	if len(sent) != 3 {
+		t.Fatalf("%d requests, want 3: one rejected, one retried, one that already has the setting", len(sent))
+	}
+	if _, present := sentEffort(t, sent[0].body); present {
+		t.Error("the first request already had the setting")
+	}
+	for _, later := range sent[1:] {
+		if effort, _ := sentEffort(t, later.body); effort != "none" {
+			t.Errorf("effort = %q, want none", effort)
+		}
+	}
+}
+
+func TestReasoningFallbackDoesNotLoopOrApplyToOtherProblems(t *testing.T) {
+	testCases := []struct {
+		name         string
+		fallback     string
+		reply        func(http.ResponseWriter)
+		wantRequests int
+	}{
+		{"no fallback is set", "", rejectReasoning, 1},
+		{"the retry fails too", "none", rejectReasoning, 2},
+		{"another field is the cause", "none", func(writer http.ResponseWriter) {
+			writer.WriteHeader(400)
+			fmt.Fprint(writer, `{"error":{"param":"tools","type":"invalid_request_error"}}`)
+		}, 1},
+		{"a server error", "none", func(writer http.ResponseWriter) { writer.WriteHeader(500) }, 1},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) { testCase.reply(writer) })
+			client := clientWithFallback(t, server, testCase.fallback)
+
+			_, err := client.Send(context.Background(), wire.Request{Messages: []wire.Message{{Role: "user", Text: "hello"}}})
+
+			if err == nil || len(server.requests()) != testCase.wantRequests {
+				t.Errorf("err = %v, requests = %d, want %d", err, len(server.requests()), testCase.wantRequests)
+			}
+		})
+	}
+}
+
+func TestAChosenReasoningLevelIsSentOnEveryRequestAndNeverReplacedByTheFallback(t *testing.T) {
+	server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, `{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}]}`)
+	})
+	client, err := New(Config{BaseURL: server.URL + "/v1", APIKey: fakeKey, Model: "m", Reasoning: "high", ReasoningFallback: "none"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for range 2 {
+		if _, err := client.Send(context.Background(), wire.Request{Messages: []wire.Message{{Role: "user", Text: "hi"}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, sent := range server.requests() {
+		if effort, _ := sentEffort(t, sent.body); effort != "high" {
+			t.Errorf("effort = %q, want high", effort)
+		}
+	}
+}
+
+func TestAChosenReasoningLevelThatTheProviderRejectsIsNotRetried(t *testing.T) {
+	server := newFakeServer(t, func(writer http.ResponseWriter, request *http.Request) { rejectReasoning(writer) })
+	client, err := New(Config{BaseURL: server.URL + "/v1", APIKey: fakeKey, Model: "m", Reasoning: "high", ReasoningFallback: "none"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, sendErr := client.Send(context.Background(), wire.Request{Messages: []wire.Message{{Role: "user", Text: "hi"}}})
+
+	if !errors.Is(sendErr, wire.ErrRejected) || len(server.requests()) != 1 {
+		t.Errorf("err = %v, requests = %d: the user's choice must not be changed silently", sendErr, len(server.requests()))
+	}
+}
+
+func TestAReasoningLevelWithOddCharactersIsRefused(t *testing.T) {
+	for _, level := range []string{"HIGH", "high\n", "a b", "x", "toolongvalue1", `high","model":"x`, "none;"} {
+		if _, err := New(Config{BaseURL: "https://example.com/v1", APIKey: fakeKey, Model: "m", Reasoning: level}); !errors.Is(err, wire.ErrBadConfig) {
+			t.Errorf("%q: err = %v", level, err)
+		}
+	}
+}

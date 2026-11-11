@@ -46,8 +46,23 @@ var (
 )
 
 type Client struct {
-	api   anthropic.Client
-	model string
+	api    anthropic.Client
+	model  string
+	effort anthropic.OutputConfigEffort
+}
+
+// SetEffort sets the effort level. An empty text keeps the default.
+func (client *Client) SetEffort(effort string) error {
+	switch level := anthropic.OutputConfigEffort(effort); level {
+	case "":
+		client.effort = ""
+	case anthropic.OutputConfigEffortLow, anthropic.OutputConfigEffortMedium, anthropic.OutputConfigEffortHigh, anthropic.OutputConfigEffortXhigh, anthropic.OutputConfigEffortMax:
+		client.effort = level
+	default:
+		return ErrBadConfig
+	}
+
+	return nil
 }
 
 func New(apiKey, model, baseURL string) (*Client, error) {
@@ -93,6 +108,9 @@ func (client *Client) Send(ctx context.Context, request Request) (Response, erro
 	if err != nil {
 		return Response{}, err
 	}
+	if client.effort != "" {
+		params.OutputConfig.Effort = client.effort
+	}
 
 	message, err := client.api.Messages.New(ctx, params)
 	if err != nil {
@@ -105,7 +123,11 @@ func (client *Client) Send(ctx context.Context, request Request) (Response, erro
 func classify(err error) error {
 	var apiError *anthropic.Error
 	if errors.As(err, &apiError) {
-		return wire.StatusError(apiError.StatusCode)
+		if status := wire.StatusError(apiError.StatusCode); status != wire.ErrRejected {
+			return status
+		}
+
+		return &wire.Rejection{Status: apiError.StatusCode}
 	}
 	if errors.Is(err, context.Canceled) {
 		return context.Canceled

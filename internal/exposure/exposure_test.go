@@ -209,6 +209,9 @@ func TestReportHasAllFourPartsAndTheExpectedPlaceholders(t *testing.T) {
 			t.Errorf("the report has no %q", part)
 		}
 	}
+	if !strings.Contains(result.report, "The .git folder (the history of the project) is not scanned.") {
+		t.Error("the limits do not say that the .git folder is not scanned")
+	}
 	for _, expected := range loadExpected(t) {
 		wantLocation := fmt.Sprintf("%s:%d %s", expected.File, expected.Line, expected.Placeholder)
 		if !strings.Contains(result.report, wantLocation) {

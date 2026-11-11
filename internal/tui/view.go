@@ -83,6 +83,8 @@ func (model Model) homeLines() []string {
 		}
 
 		return model.modelLines()
+	case stepReasoning:
+		return model.reasoningLines()
 	case stepConsent:
 		return model.consentLines()
 	}
@@ -181,6 +183,29 @@ func (model Model) modelLines() []string {
 		lines = append(lines, style.Render(model.truncate(marker+entries[index], 0)))
 	}
 
+	if model.setupError != "" {
+		lines = append(lines, "", styleWarn.Render(model.truncate(safeText(model.setupError), 0)))
+	}
+
+	return append(lines, "", model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
+}
+
+func (model Model) reasoningLines() []string {
+	chosen := model.choices[model.providerCursor]
+	lines := []string{model.oneLineHeader(), "",
+		styleAccent.Render(model.truncate("Provider: "+safeText(chosen.Name), 0)),
+		styleAccent.Render(model.truncate("Model: "+safeText(string(model.modelInput)), 0)), "",
+		styleBody.Render("Choose how much the AI reasons:")}
+
+	for index, choice := range model.reasonChoices {
+		marker, style := "  ", styleBody
+		if index == model.reasonCursor {
+			marker, style = "> ", styleSelected
+		}
+		lines = append(lines, style.Render(model.truncate(marker+safeText(choice.Label), 0)))
+	}
+
+	lines = append(lines, "", styleDim.Render(model.truncate("Not every model supports every level. The default is the safest choice.", 0)))
 	if model.setupError != "" {
 		lines = append(lines, "", styleWarn.Render(model.truncate(safeText(model.setupError), 0)))
 	}

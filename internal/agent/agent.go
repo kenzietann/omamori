@@ -121,7 +121,7 @@ func (agent *Agent) Run(ctx context.Context, instruction string) Outcome {
 		response, err := agent.sender.Send(ctx, outbound.Request{System: systemPrompt, Messages: history, Tools: agent.specs})
 		outcome.Steps = agent.sender.Attempts() - firstAttempt
 		if err != nil {
-			return agent.finish(outcome, reasonForSendError(err))
+			return agent.finish(outcome, reasonForSendError(err), outbound.DetailOf(err))
 		}
 
 		outcome.Tokens += response.TokensUsed
@@ -248,10 +248,14 @@ func (outcome Outcome) stoppedBecause(reason string) Outcome {
 	return outcome
 }
 
-func (agent *Agent) finish(outcome Outcome, reason string) Outcome {
+func (agent *Agent) finish(outcome Outcome, reason string, details ...string) Outcome {
 	outcome.Reason = reason
 
-	if err := agent.recorder.Record("run_end", "", outcome.Status == Complete, reason, ""); err != nil && outcome.Status == Complete {
+	note := ""
+	if len(details) > 0 {
+		note = details[0]
+	}
+	if err := agent.recorder.Record("run_end", "", outcome.Status == Complete, reason, note); err != nil && outcome.Status == Complete {
 		outcome.Status = Incomplete
 		outcome.Reason = "log failed"
 	}

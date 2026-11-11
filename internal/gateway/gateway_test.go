@@ -339,3 +339,68 @@ func TestSpecsDescribeExactlyTheAllowedTools(t *testing.T) {
 		t.Error("the specs changed between two calls")
 	}
 }
+
+func gitProject(t *testing.T) *Gateway {
+	t.Helper()
+
+	project := filepath.Join(t.TempDir(), "project")
+	writeFile(t, filepath.Join(project, "app.txt"), "ok "+fakeAWSKey+"\n")
+	writeFile(t, filepath.Join(project, ".git", "logs", "HEAD"), "commit "+fakeMyNumber+"\n")
+	writeFile(t, filepath.Join(project, "vendor", ".git", "config"), "id "+fakeMyNumber+"\n")
+	writeFile(t, filepath.Join(project, "worktree", ".git"), "gitdir: "+fakeMyNumber+"\n")
+	writeFile(t, filepath.Join(project, "worktree", "next.txt"), "phone "+fakePhoneNumber+"\n")
+	writeFile(t, filepath.Join(project, ".github", "workflow.txt"), "phone "+fakePhoneNumber+"\n")
+	writeFile(t, filepath.Join(project, ".gitignore"), "id "+fakeMyNumber+"\n")
+	writeFile(t, filepath.Join(project, "my.git", "file.txt"), "id "+fakeMyNumber+"\n")
+
+	root, err := pathguard.NewRoot(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	limits := testLimits
+	limits.MaxResults = 50
+
+	return New(root, limits)
+}
+
+func TestTheGitFolderIsNotScanned(t *testing.T) {
+	gateway := gitProject(t)
+
+	detected, err := gateway.Call(context.Background(), "run_detectors", map[string]any{"path": "."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantText := ".git/logs/HEAD"
+	for _, notScanned := range []string{wantText, "vendor/.git/config", "worktree/.git:"} {
+		if strings.Contains(detected.Text, notScanned) {
+			t.Errorf("run_detectors looked into %s:\n%s", notScanned, detected.Text)
+		}
+	}
+	for _, scanned := range []string{"app.txt", "worktree/next.txt", ".github/workflow.txt", ".gitignore", "my.git/file.txt"} {
+		if !strings.Contains(detected.Text, scanned) {
+			t.Errorf("run_detectors skipped %s, which is not a .git folder:\n%s", scanned, detected.Text)
+		}
+	}
+
+	searched, err := gateway.Call(context.Background(), "search_text", map[string]any{"query": "commit"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(searched.Text, ".git/logs") {
+		t.Errorf("search_text looked into .git:\n%s", searched.Text)
+	}
+}
+
+func TestAPathThatIsTheGitFolderItselfIsStillScanned(t *testing.T) {
+	gateway := gitProject(t)
+
+	detected, err := gateway.Call(context.Background(), "run_detectors", map[string]any{"path": ".git"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(detected.Text, "logs/HEAD") {
+		t.Errorf("a scan of the .git folder by name found nothing:\n%s", detected.Text)
+	}
+}

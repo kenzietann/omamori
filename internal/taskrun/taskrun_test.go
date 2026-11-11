@@ -67,7 +67,7 @@ func answerText(text string) reply {
 }
 
 type factoryCall struct {
-	id, key, model string
+	id, key, model, reasoning string
 }
 
 type testSetup struct {
@@ -105,8 +105,8 @@ func newSetup(t testing.TB, replies ...reply) testSetup {
 			Limits:     agent.Limits{MaxSteps: 10, MaxTokens: 100000},
 			LookupEnv:  func(name string) string { return environment[name] },
 			Now:        func() time.Time { return time.Date(2026, 11, 12, 9, 30, 0, 0, time.UTC) },
-			NewProvider: func(id, key, model string) (outbound.Provider, error) {
-				*calls = append(*calls, factoryCall{id, key, model})
+			NewProvider: func(id, key, model, reasoning string) (outbound.Provider, error) {
+				*calls = append(*calls, factoryCall{id, key, model, reasoning})
 				return provider, nil
 			},
 		},
@@ -211,27 +211,29 @@ func TestPrepareChecksTheSetup(t *testing.T) {
 		setup     Setup
 		env       map[string]string
 		target    string
-		factory   func(id, key, model string) (outbound.Provider, error)
+		factory   func(id, key, model, reasoning string) (outbound.Provider, error)
 		wantErr   error
 		wantCall  factoryCall
 		wantCalls int
 	}{
-		{"a key that is typed", Setup{ProviderID: "anthropic", Key: testKey}, nil, "", nil, nil, factoryCall{"anthropic", testKey, "claude-opus-5-5"}, 1},
-		{"a key from the environment", Setup{ProviderID: "anthropic"}, map[string]string{"ANTHROPIC_API_KEY": testKey}, "", nil, nil, factoryCall{"anthropic", testKey, "claude-opus-5-5"}, 1},
-		{"a typed key beats the environment", Setup{ProviderID: "anthropic", Key: testKey}, map[string]string{"ANTHROPIC_API_KEY": "sk-other"}, "", nil, nil, factoryCall{"anthropic", testKey, "claude-opus-5-5"}, 1},
-		{"white space around the key is removed", Setup{ProviderID: "anthropic", Key: "  " + testKey + "\n"}, nil, "", nil, nil, factoryCall{"anthropic", testKey, "claude-opus-5-5"}, 1},
-		{"a chosen model beats the default", Setup{ProviderID: "anthropic", Key: testKey, Model: " claude-sonnet-5-5 "}, nil, "", nil, nil, factoryCall{"anthropic", testKey, "claude-sonnet-5-5"}, 1},
+		{"a key that is typed", Setup{ProviderID: "anthropic", Key: testKey}, nil, "", nil, nil, factoryCall{"anthropic", testKey, "claude-opus-5-5", ""}, 1},
+		{"a key from the environment", Setup{ProviderID: "anthropic"}, map[string]string{"ANTHROPIC_API_KEY": testKey}, "", nil, nil, factoryCall{"anthropic", testKey, "claude-opus-5-5", ""}, 1},
+		{"a typed key beats the environment", Setup{ProviderID: "anthropic", Key: testKey}, map[string]string{"ANTHROPIC_API_KEY": "sk-other"}, "", nil, nil, factoryCall{"anthropic", testKey, "claude-opus-5-5", ""}, 1},
+		{"white space around the key is removed", Setup{ProviderID: "anthropic", Key: "  " + testKey + "\n"}, nil, "", nil, nil, factoryCall{"anthropic", testKey, "claude-opus-5-5", ""}, 1},
+		{"a chosen model beats the default", Setup{ProviderID: "anthropic", Key: testKey, Model: " claude-sonnet-5-5 "}, nil, "", nil, nil, factoryCall{"anthropic", testKey, "claude-sonnet-5-5", ""}, 1},
 		{"no key", Setup{ProviderID: "anthropic"}, nil, "", nil, ErrNeedsKey, factoryCall{}, 0},
 		{"a key of only spaces", Setup{ProviderID: "anthropic", Key: "   "}, nil, "", nil, ErrNeedsKey, factoryCall{}, 0},
 		{"a provider without a default model", Setup{ProviderID: "openai", Key: testKey}, nil, "", nil, ErrNeedsModel, factoryCall{}, 0},
-		{"a provider with a model", Setup{ProviderID: "openai", Key: testKey, Model: "a-model"}, nil, "", nil, nil, factoryCall{"openai", testKey, "a-model"}, 1},
-		{"a local provider needs no key and ignores one", Setup{ProviderID: "ollama", Model: "llama", Key: testKey}, nil, "", nil, nil, factoryCall{"ollama", "", "llama"}, 1},
+		{"a provider with a model", Setup{ProviderID: "openai", Key: testKey, Model: "a-model"}, nil, "", nil, nil, factoryCall{"openai", testKey, "a-model", ""}, 1},
+		{"a local provider needs no key and ignores one", Setup{ProviderID: "ollama", Model: "llama", Key: testKey}, nil, "", nil, nil, factoryCall{"ollama", "", "llama", ""}, 1},
 		{"a local provider still needs a model", Setup{ProviderID: "ollama"}, nil, "", nil, ErrNeedsModel, factoryCall{}, 0},
 		{"an unknown provider", Setup{ProviderID: "nope", Key: testKey, Model: "m"}, nil, "", nil, ErrUnknownProvider, factoryCall{}, 0},
 		{"no provider", Setup{Key: testKey, Model: "m"}, nil, "", nil, ErrUnknownProvider, factoryCall{}, 0},
 		{"a folder that is not there", Setup{ProviderID: "anthropic", Key: testKey}, nil, "/no/such/folder/anywhere", nil, ErrTarget, factoryCall{}, 0},
 		{"a provider that cannot be built", Setup{ProviderID: "anthropic", Key: testKey}, nil, "",
-			func(id, key, model string) (outbound.Provider, error) { return nil, errors.New("boom " + key) }, ErrSetup, factoryCall{}, 0},
+			func(id, key, model, reasoning string) (outbound.Provider, error) {
+				return nil, errors.New("boom " + key)
+			}, ErrSetup, factoryCall{}, 0},
 	}
 
 	for _, testCase := range testCases {
@@ -782,5 +784,105 @@ func TestModelsKeepsACancel(t *testing.T) {
 
 	if _, err := config.Models(context.Background(), "ollama", ""); !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestARejectedRequestShowsItsSafeDetailInTheTimelineAndTheLog(t *testing.T) {
+	setup := newSetup(t, reply{err: &outbound.ProviderError{Detail: "status 404, code model_not_found"}})
+	session := setup.session(t)
+	session.Confirm()
+
+	var steps []string
+	result, err := session.Run(context.Background(), func(text string) { steps = append(steps, text) })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Complete || !slices.Contains(steps, "run finished: provider failed (status 404, code model_not_found)") {
+		t.Errorf("complete = %v, steps = %q", result.Complete, steps)
+	}
+	log, err := os.ReadFile(filepath.Join(result.SavedTo, "events.jsonl"))
+	if err != nil || !strings.Contains(string(log), `"reason":"provider failed","note":"status 404, code model_not_found"`) {
+		t.Errorf("the event log does not hold the detail (err %v):\n%s", err, log)
+	}
+}
+
+func TestAProviderFailureWithoutDetailStaysPlain(t *testing.T) {
+	setup := newSetup(t, reply{err: outbound.ErrProviderFailed})
+	session := setup.session(t)
+	session.Confirm()
+
+	var steps []string
+	if _, err := session.Run(context.Background(), func(text string) { steps = append(steps, text) }); err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(steps, "run finished: provider failed") {
+		t.Errorf("steps = %q", steps)
+	}
+}
+
+func TestPrepareChecksTheReasoningLevel(t *testing.T) {
+	testCases := []struct {
+		name        string
+		setup       Setup
+		wantErr     error
+		wantFactory int
+		wantLevel   string
+	}{
+		{"a documented level", Setup{ProviderID: "anthropic", Key: testKey, Reasoning: "max"}, nil, 1, "max"},
+		{"the default", Setup{ProviderID: "anthropic", Key: testKey}, nil, 1, ""},
+		{"a level the model does not have", Setup{ProviderID: "anthropic", Key: testKey, Model: "claude-sonnet-4-6", Reasoning: "xhigh"}, ErrReasoning, 0, ""},
+		{"a level for a provider without any", Setup{ProviderID: "openai", Key: testKey, Model: "gpt-5.5", Reasoning: "high"}, ErrReasoning, 0, ""},
+		{"a made-up level", Setup{ProviderID: "anthropic", Key: testKey, Reasoning: "x\", \"model\": \"y"}, ErrReasoning, 0, ""},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			setup := newSetup(t)
+
+			_, err := Prepare(setup.config, testCase.setup)
+
+			if !errors.Is(err, testCase.wantErr) || len(*setup.calls) != testCase.wantFactory {
+				t.Fatalf("err = %v, factory calls = %d", err, len(*setup.calls))
+			}
+			if testCase.wantFactory == 1 && (*setup.calls)[0].reasoning != testCase.wantLevel {
+				t.Errorf("the provider got %q, want %q", (*setup.calls)[0].reasoning, testCase.wantLevel)
+			}
+			if err != nil && err != ErrReasoning {
+				t.Errorf("the error is not the fixed one: %v", err)
+			}
+		})
+	}
+}
+
+func TestThePreviewNamesAChosenReasoningLevelOnly(t *testing.T) {
+	setup := newSetup(t)
+
+	chosen, err := Prepare(setup.config, Setup{ProviderID: "anthropic", Key: testKey, Reasoning: "high"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err := Prepare(setup.config, Setup{ProviderID: "anthropic", Key: testKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	withLevel, _ := chosen.Preview()
+	without, _ := plain.Preview()
+
+	if !strings.Contains(withLevel, "Reasoning level: high\n") || strings.Contains(without, "Reasoning level") {
+		t.Errorf("with:\n%s\nwithout:\n%s", withLevel, without)
+	}
+}
+
+func TestReasoningChoicesStartWithTheDefault(t *testing.T) {
+	choices := ReasoningChoices("anthropic", " claude-opus-5-5 ")
+
+	if len(choices) < 2 || choices[0].Value != "" || choices[0].Label == "" {
+		t.Errorf("choices = %+v", choices)
+	}
+	if got := ReasoningChoices("openai", "gpt-5.5"); len(got) != 0 {
+		t.Errorf("openai: %+v", got)
 	}
 }

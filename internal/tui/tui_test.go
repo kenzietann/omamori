@@ -109,6 +109,15 @@ type fakeBackend struct {
 	models     []string
 	modelsErr  error
 	modelCalls []modelCall
+	// reasoning is what the model offers. nil means no choice, and then the step is skipped.
+	reasoning       []ReasoningChoice
+	reasoningModels []string
+}
+
+func (backend *fakeBackend) ReasoningChoices(providerID, model string) []ReasoningChoice {
+	backend.reasoningModels = append(backend.reasoningModels, model)
+
+	return backend.reasoning
 }
 
 func (backend *fakeBackend) Providers() []Choice { return backend.choices }

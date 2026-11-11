@@ -46,7 +46,7 @@ func newTestBackend(t testing.TB) (backend, *fakeProvider, string) {
 		Target: project, OutputBase: output, Limits: agent.Limits{MaxSteps: 10, MaxTokens: 100000},
 		LookupEnv:   func(name string) string { return map[string]string{"OPENAI_API_KEY": "sk-from-environment"}[name] },
 		Now:         func() time.Time { return time.Date(2026, 11, 12, 9, 30, 0, 0, time.UTC) },
-		NewProvider: func(id, key, model string) (outbound.Provider, error) { return provider, nil },
+		NewProvider: func(id, key, model, reasoning string) (outbound.Provider, error) { return provider, nil },
 	}}, provider, output
 }
 
@@ -145,5 +145,37 @@ func TestTheAdapterListsModelsWithTheTypedKeyOrTheEnvironmentKey(t *testing.T) {
 	}
 	if _, err := adapter.Models(context.Background(), "anthropic", ""); !errors.Is(err, taskrun.ErrNeedsKey) {
 		t.Errorf("err = %v, want a missing key", err)
+	}
+}
+
+func TestTheAdapterPassesTheReasoningLevelOn(t *testing.T) {
+	adapter, _, _ := newTestBackend(t)
+	var gotReasoning []string
+	adapter.config.NewProvider = func(id, key, model, reasoning string) (outbound.Provider, error) {
+		gotReasoning = append(gotReasoning, reasoning)
+		return &fakeProvider{}, nil
+	}
+
+	for _, level := range []string{"", "high"} {
+		if _, err := adapter.Prepare(tui.Setup{ProviderID: "anthropic", Key: adapterKey, Reasoning: level}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if len(gotReasoning) != 2 || gotReasoning[0] != "" || gotReasoning[1] != "high" {
+		t.Errorf("the provider got %q", gotReasoning)
+	}
+}
+
+func TestTheAdapterListsTheReasoningChoicesOfTheCore(t *testing.T) {
+	adapter, _, _ := newTestBackend(t)
+
+	choices := adapter.ReasoningChoices("anthropic", "claude-opus-5-5")
+
+	if len(choices) < 2 || choices[0].Value != "" || choices[len(choices)-1].Value != "max" {
+		t.Errorf("choices = %+v", choices)
+	}
+	if got := adapter.ReasoningChoices("openai", "gpt-5.5"); len(got) != 0 {
+		t.Errorf("openai: %+v", got)
 	}
 }

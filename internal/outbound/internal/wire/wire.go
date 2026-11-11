@@ -5,9 +5,11 @@ package wire
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -76,6 +78,74 @@ func StatusError(status int) error {
 	}
 
 	return ErrRejected
+}
+
+// Rejection is a refusal that the provider gave for the request itself, for example an unknown model.
+// It holds the HTTP status and a short code and never the text of the provider's message,
+// because that text could repeat part of the request.
+type Rejection struct {
+	Status int
+	Code   string
+	// Param names the field of the request that the provider did not accept, for example "model".
+	Param string
+}
+
+func (rejection *Rejection) Error() string {
+	return ErrRejected.Error() + " (" + rejection.Detail() + ")"
+}
+func (rejection *Rejection) Unwrap() error { return ErrRejected }
+
+func (rejection *Rejection) Detail() string {
+	detail := fmt.Sprintf("status %d", rejection.Status)
+	if rejection.Code != "" {
+		detail += ", code " + rejection.Code
+	}
+	if rejection.Param != "" {
+		detail += ", field " + rejection.Param
+	}
+
+	return detail
+}
+
+var (
+	codePattern  = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
+	paramPattern = regexp.MustCompile(`^[A-Za-z0-9_.\[\]-]{1,64}$`)
+)
+
+// StatusErrorWithBody is StatusError for a failed answer. For a rejection it adds the error code
+// from the body, but only when the code looks like a code.
+func StatusErrorWithBody(status int, body []byte) error {
+	err := StatusError(status)
+	if err != ErrRejected {
+		return err
+	}
+
+	var decoded struct {
+		Error struct {
+			Code   any    `json:"code"`
+			Type   string `json:"type"`
+			Status string `json:"status"`
+			Param  any    `json:"param"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(body, &decoded)
+
+	candidates := []string{decoded.Error.Type, decoded.Error.Status}
+	if code, isText := decoded.Error.Code.(string); isText {
+		candidates = []string{code, decoded.Error.Type, decoded.Error.Status}
+	}
+	rejection := &Rejection{Status: status}
+	for _, candidate := range candidates {
+		if codePattern.MatchString(candidate) {
+			rejection.Code = candidate
+			break
+		}
+	}
+	if param, isText := decoded.Error.Param.(string); isText && paramPattern.MatchString(param) {
+		rejection.Param = param
+	}
+
+	return rejection
 }
 
 // SafeBaseURL accepts https, and plain http only to the same machine.

@@ -25,14 +25,16 @@ type descriptor struct {
 	keyEnv         string
 	baseURL        string
 	maxTokensField string
-	defaultModel   string
-	kind           clientKind
-	local          bool
+	// reasoningFallback is explained at openaicompat.Config.
+	reasoningFallback string
+	defaultModel      string
+	kind              clientKind
+	local             bool
 }
 
 var descriptors = []descriptor{
 	{id: "anthropic", name: "Anthropic", keyEnv: "ANTHROPIC_API_KEY", baseURL: anthropicclient.DefaultBaseURL, defaultModel: anthropicclient.DefaultModel, kind: kindAnthropic},
-	{id: "openai", name: "OpenAI", keyEnv: "OPENAI_API_KEY", baseURL: "https://api.openai.com/v1", maxTokensField: "max_completion_tokens", kind: kindChatCompletions},
+	{id: "openai", name: "OpenAI", keyEnv: "OPENAI_API_KEY", baseURL: "https://api.openai.com/v1", maxTokensField: "max_completion_tokens", reasoningFallback: "none", kind: kindChatCompletions},
 	{id: "gemini", name: "Google Gemini", keyEnv: "GEMINI_API_KEY", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", kind: kindChatCompletions},
 	{id: "mistral", name: "Mistral", keyEnv: "MISTRAL_API_KEY", baseURL: "https://api.mistral.ai/v1", kind: kindChatCompletions},
 	{id: "groq", name: "Groq", keyEnv: "GROQ_API_KEY", baseURL: "https://api.groq.com/openai/v1", kind: kindChatCompletions},
@@ -66,8 +68,9 @@ func Providers() []Info {
 
 // NewProvider builds the provider with this ID. A model is required when the provider has no default,
 // and a key is required unless the provider runs on this computer. The clients enforce both.
-func NewProvider(id, apiKey, model string) (Provider, error) {
-	return newAt(id, apiKey, model, "")
+// A reasoning level must be one that ReasoningOptions names for this model, or empty.
+func NewProvider(id, apiKey, model, reasoning string) (Provider, error) {
+	return newWith(id, apiKey, model, "", reasoning)
 }
 
 const listTimeout = 20 * time.Second
@@ -107,7 +110,7 @@ func listAt(ctx context.Context, id, apiKey, baseURL string) ([]string, error) {
 }
 
 func NewAnthropic(apiKey, model string) (Provider, error) {
-	return NewProvider("anthropic", apiKey, model)
+	return NewProvider("anthropic", apiKey, model, "")
 }
 
 func newAnthropicAt(apiKey, model, baseURL string) (Provider, error) {
@@ -116,6 +119,10 @@ func newAnthropicAt(apiKey, model, baseURL string) (Provider, error) {
 
 // newAt lets a test point a provider at a fake server. Only the tests pass a base URL.
 func newAt(id, apiKey, model, baseURL string) (Provider, error) {
+	return newWith(id, apiKey, model, baseURL, "")
+}
+
+func newWith(id, apiKey, model, baseURL, reasoning string) (Provider, error) {
 	var chosen *descriptor
 	for index := range descriptors {
 		if descriptors[index].id == id {
@@ -129,19 +136,22 @@ func newAt(id, apiKey, model, baseURL string) (Provider, error) {
 	if model == "" {
 		model = chosen.defaultModel
 	}
+	if !ValidReasoning(id, model, reasoning) {
+		return nil, ErrInvalidSetup
+	}
 	if baseURL == "" {
 		baseURL = chosen.baseURL
 	}
 	switch chosen.kind {
 	case kindAnthropic:
 		client, err := anthropicclient.New(apiKey, model, baseURL)
-		if err != nil {
+		if err != nil || client.SetEffort(reasoning) != nil {
 			return nil, ErrInvalidSetup
 		}
 
 		return &wireProvider{name: chosen.name, send: client.Send}, nil
 	default:
-		client, err := openaicompat.New(openaicompat.Config{BaseURL: baseURL, APIKey: apiKey, Model: model, MaxTokensField: chosen.maxTokensField})
+		client, err := openaicompat.New(openaicompat.Config{BaseURL: baseURL, APIKey: apiKey, Model: model, MaxTokensField: chosen.maxTokensField, ReasoningFallback: chosen.reasoningFallback, Reasoning: reasoning})
 		if err != nil {
 			return nil, ErrInvalidSetup
 		}
@@ -175,7 +185,32 @@ func (provider *wireProvider) Send(ctx context.Context, safe SafeRequest) (Respo
 	return converted, nil
 }
 
+// ProviderError is ErrProviderFailed with a safe detail, such as "status 404, code model_not_found".
+type ProviderError struct {
+	Detail string
+}
+
+func (providerError *ProviderError) Error() string {
+	return ErrProviderFailed.Error() + " (" + providerError.Detail + ")"
+}
+func (providerError *ProviderError) Unwrap() error { return ErrProviderFailed }
+
+// DetailOf returns the safe detail of a failed call, or an empty text.
+func DetailOf(err error) string {
+	var providerError *ProviderError
+	if errors.As(err, &providerError) {
+		return providerError.Detail
+	}
+
+	return ""
+}
+
 func fromWireError(err error) error {
+	var rejection *wire.Rejection
+	if errors.As(err, &rejection) {
+		return &ProviderError{Detail: rejection.Detail()}
+	}
+
 	switch {
 	case errors.Is(err, wire.ErrRetryable):
 		return ErrTemporary

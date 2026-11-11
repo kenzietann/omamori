@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,7 +21,10 @@ import (
 const (
 	maxOutputTokens = 16000
 	requestTimeout  = 5 * time.Minute
+	maxFailureBytes = 64 << 10
 )
+
+var levelPattern = regexp.MustCompile(`^[a-z]{3,10}$`)
 
 type Config struct {
 	BaseURL string
@@ -29,7 +33,13 @@ type Config struct {
 	// MaxTokensField is the name of the output limit. Newer OpenAI models want
 	// max_completion_tokens, and most other providers still want max_tokens.
 	MaxTokensField string
-	Timeout        time.Duration
+	// ReasoningFallback is a value for reasoning_effort. It is used only when the provider rejects
+	// a request and names reasoning_effort as the cause. Some OpenAI models reason by default and
+	// then refuse tools on this protocol, unless reasoning is turned off.
+	ReasoningFallback string
+	// Reasoning is a level the user chose. It is sent as reasoning_effort on every request.
+	Reasoning string
+	Timeout   time.Duration
 }
 
 type Client struct {
@@ -37,7 +47,10 @@ type Client struct {
 	apiKey         string
 	model          string
 	maxTokensField string
-	http           *http.Client
+	fallbackEffort string
+	// effort is set after the fallback worked, so later requests do not fail first.
+	effort string
+	http   *http.Client
 }
 
 func New(config Config) (*Client, error) {
@@ -55,6 +68,9 @@ func New(config Config) (*Client, error) {
 	if config.MaxTokensField == "" {
 		config.MaxTokensField = "max_tokens"
 	}
+	if config.Reasoning != "" && !levelPattern.MatchString(config.Reasoning) {
+		return nil, wire.ErrBadConfig
+	}
 	if config.Timeout == 0 {
 		config.Timeout = requestTimeout
 	}
@@ -64,6 +80,8 @@ func New(config Config) (*Client, error) {
 		apiKey:         config.APIKey,
 		model:          config.Model,
 		maxTokensField: config.MaxTokensField,
+		fallbackEffort: config.ReasoningFallback,
+		effort:         config.Reasoning,
 		http:           wire.NewHTTPClient(config.Timeout),
 	}, nil
 }
@@ -104,6 +122,24 @@ type chatResponse struct {
 }
 
 func (client *Client) Send(ctx context.Context, request wire.Request) (wire.Response, error) {
+	response, err := client.exchange(ctx, request)
+
+	var rejection *wire.Rejection
+	if client.fallbackEffort == "" || client.effort != "" || !errors.As(err, &rejection) || rejection.Param != "reasoning_effort" {
+		return response, err
+	}
+
+	// The same cleaned request is sent again, with one setting added.
+	client.effort = client.fallbackEffort
+	response, err = client.exchange(ctx, request)
+	if err != nil {
+		client.effort = ""
+	}
+
+	return response, err
+}
+
+func (client *Client) exchange(ctx context.Context, request wire.Request) (wire.Response, error) {
 	body, err := client.buildBody(request)
 	if err != nil {
 		return wire.Response{}, err
@@ -131,7 +167,9 @@ func (client *Client) Send(ctx context.Context, request wire.Request) (wire.Resp
 	defer httpResponse.Body.Close()
 
 	if httpResponse.StatusCode < 200 || httpResponse.StatusCode > 299 {
-		return wire.Response{}, wire.StatusError(httpResponse.StatusCode)
+		failure, _ := io.ReadAll(io.LimitReader(httpResponse.Body, maxFailureBytes))
+
+		return wire.Response{}, wire.StatusErrorWithBody(httpResponse.StatusCode, failure)
 	}
 
 	answer, err := io.ReadAll(io.LimitReader(httpResponse.Body, wire.MaxResponseBytes+1))
@@ -158,6 +196,9 @@ func (client *Client) buildBody(request wire.Request) ([]byte, error) {
 	}
 	if tools := buildTools(request.Tools); len(tools) > 0 {
 		body["tools"] = tools
+	}
+	if client.effort != "" {
+		body["reasoning_effort"] = client.effort
 	}
 
 	return json.Marshal(body)
@@ -315,6 +356,9 @@ func ListModels(ctx context.Context, baseURL, apiKey string, timeout time.Durati
 	var decoded struct {
 		Data []struct {
 			ID string `json:"id"`
+			// Some providers (Mistral) say what each model can do. A model that cannot chat or
+			// cannot call tools is no use here, because the agent needs both.
+			Capabilities map[string]any `json:"capabilities"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(answer, &decoded); err != nil {
@@ -323,6 +367,9 @@ func ListModels(ctx context.Context, baseURL, apiKey string, timeout time.Durati
 
 	ids := make([]string, 0, len(decoded.Data))
 	for _, entry := range decoded.Data {
+		if entry.Capabilities["completion_chat"] == false || entry.Capabilities["function_calling"] == false {
+			continue
+		}
 		ids = append(ids, entry.ID)
 	}
 

@@ -34,12 +34,13 @@ var (
 	ErrNeedsModel      = errors.New("this provider needs a model name")
 	ErrNeedsKey        = errors.New("this provider needs an API key")
 	ErrSetup           = errors.New("the provider could not be set up")
+	ErrReasoning       = errors.New("this reasoning level is not available for this model")
 	ErrModelList       = errors.New("the list of models could not be loaded")
 	ErrNotConfirmed    = errors.New("the user has not confirmed the run")
 	ErrOutput          = errors.New("the output folder cannot be used: it must be outside the project and new files must be possible")
 )
 
-type ProviderFactory func(id, apiKey, model string) (outbound.Provider, error)
+type ProviderFactory func(id, apiKey, model, reasoning string) (outbound.Provider, error)
 
 type ModelLister func(ctx context.Context, id, apiKey string) ([]string, error)
 
@@ -67,6 +68,24 @@ type Setup struct {
 	ProviderID string
 	Model      string
 	Key        string
+	// Reasoning is empty for the provider's default.
+	Reasoning string
+}
+
+// ReasoningChoice is one level for the user to pick. The first choice is always the default.
+type ReasoningChoice struct {
+	Value string
+	Label string
+}
+
+// ReasoningChoices lists the documented levels for this model. It is empty when the model has none.
+func ReasoningChoices(providerID, model string) []ReasoningChoice {
+	var choices []ReasoningChoice
+	for _, option := range outbound.ReasoningOptions(providerID, strings.TrimSpace(model)) {
+		choices = append(choices, ReasoningChoice{Value: option.Value, Label: option.Label})
+	}
+
+	return choices
 }
 
 type Result struct {
@@ -158,6 +177,7 @@ func (config Config) Providers() []Choice {
 
 type Session struct {
 	providerName string
+	reasoning    string
 	config       Config
 	gateway      *gateway.Gateway
 	sender       *outbound.Sender
@@ -201,7 +221,11 @@ func Prepare(config Config, setup Setup) (*Session, error) {
 		}
 	}
 
-	provider, err := config.factory()(chosen.ID, key, model)
+	if !outbound.ValidReasoning(chosen.ID, model, setup.Reasoning) {
+		return nil, ErrReasoning
+	}
+
+	provider, err := config.factory()(chosen.ID, key, model, setup.Reasoning)
 	if err != nil {
 		return nil, ErrSetup
 	}
@@ -212,7 +236,7 @@ func Prepare(config Config, setup Setup) (*Session, error) {
 
 	toolGateway := gateway.New(root, gateway.DefaultLimits)
 
-	return &Session{providerName: provider.Name(), config: config, gateway: toolGateway, sender: sender, specs: agent.SpecsFromGateway(toolGateway.Specs())}, nil
+	return &Session{providerName: provider.Name(), reasoning: setup.Reasoning, config: config, gateway: toolGateway, sender: sender, specs: agent.SpecsFromGateway(toolGateway.Specs())}, nil
 }
 
 // ConsentText is what the user confirms. It is made from the same provider name that the sender uses.
@@ -231,6 +255,9 @@ func (session *Session) Preview() (string, error) {
 	var preview strings.Builder
 	fmt.Fprintf(&preview, "This is the first request, as it would be sent.\n")
 	fmt.Fprintf(&preview, "Limits for this run: up to %d requests and %d tokens.\n", session.config.Limits.MaxSteps, session.config.Limits.MaxTokens)
+	if session.reasoning != "" {
+		fmt.Fprintf(&preview, "Reasoning level: %s\n", session.reasoning)
+	}
 	fmt.Fprintf(&preview, "Later requests also hold the files that the AI chooses to read. They are cleaned the same way, and every request is saved in the event log.\n\n")
 	fmt.Fprintf(&preview, "System prompt:\n%s\n\n", cleaned.System)
 	for _, message := range cleaned.Messages {
@@ -265,6 +292,9 @@ func (recorder *stepRecorder) Record(kind, tool string, allowed bool, reason, no
 	case "provider_response":
 		recorder.step("answer received (" + note + ")")
 	case "run_end":
+		if note != "" {
+			reason += " (" + note + ")"
+		}
 		recorder.step("run finished: " + reason)
 	}
 

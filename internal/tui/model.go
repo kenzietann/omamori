@@ -26,6 +26,7 @@ const (
 	stepProvider
 	stepModel
 	stepKey
+	stepReasoning
 	stepConsent
 )
 
@@ -69,6 +70,14 @@ type Setup struct {
 	ProviderID string
 	Model      string
 	Key        string
+	// Reasoning is empty for the provider's default.
+	Reasoning string
+}
+
+// ReasoningChoice is one level of reasoning. The first choice of a list is the default, with an empty Value.
+type ReasoningChoice struct {
+	Value string
+	Label string
 }
 
 // A Plan is what the user is asked to confirm. Nothing has been sent when a Plan exists.
@@ -84,6 +93,8 @@ type Plan struct {
 type Backend interface {
 	Providers() []Choice
 	Models(ctx context.Context, providerID, key string) ([]string, error)
+	// ReasoningChoices is empty when the model has no documented choice. Then the step is skipped.
+	ReasoningChoices(providerID, model string) []ReasoningChoice
 	Prepare(setup Setup) (Plan, error)
 }
 
@@ -128,6 +139,9 @@ type Model struct {
 	modelTyping    bool
 	modelsNotice   string
 	fetchID        int
+	reasonChoices  []ReasoningChoice
+	reasonCursor   int
+	reasoning      string
 	keyInput       []rune
 	setupError     string
 	plan           *Plan
@@ -241,6 +255,8 @@ func (model Model) handleHomeKey(key string) (tea.Model, tea.Cmd) {
 		return model.handleProviderKey(key)
 	case stepModel:
 		return model.handleModelListKey(key)
+	case stepReasoning:
+		return model.handleReasoningKey(key)
 	case stepConsent:
 		return model.handleConsentKey(key)
 	}
@@ -423,7 +439,7 @@ func (model Model) handleModelListKey(key string) (Model, tea.Cmd) {
 		}
 		model.modelInput = []rune(model.models[model.modelCursor])
 
-		return model.prepare(), nil
+		return model.afterModel(), nil
 	}
 
 	return model, nil
@@ -480,6 +496,12 @@ func (model Model) goBack() Model {
 	model.fetchID++
 	model.modelsLoading = false
 
+	if model.step == stepReasoning {
+		model.step = stepModel
+
+		return model
+	}
+
 	if model.step == stepModel && model.modelTyping && len(model.models) > 0 {
 		model.modelTyping = false
 
@@ -515,14 +537,52 @@ func (model Model) submitEntry() (Model, tea.Cmd) {
 		return model, nil
 	}
 
-	return model.prepare(), nil
+	return model.afterModel(), nil
+}
+
+// afterModel shows the reasoning step when the model has documented levels, and goes on otherwise.
+func (model Model) afterModel() Model {
+	chosen := model.choices[model.providerCursor]
+	model.reasoning = ""
+	model.reasonCursor = 0
+	model.reasonChoices = nil
+
+	choices := model.backend.ReasoningChoices(chosen.ID, strings.TrimSpace(string(model.modelInput)))
+	if len(choices) < 2 {
+		return model.prepare()
+	}
+
+	model.reasonChoices = choices
+	model.setupError = ""
+	model.step = stepReasoning
+
+	return model
+}
+
+func (model Model) handleReasoningKey(key string) (Model, tea.Cmd) {
+	last := len(model.reasonChoices) - 1
+
+	switch key {
+	case "esc":
+		return model.goBack(), nil
+	case "up":
+		model.reasonCursor = max(model.reasonCursor-1, 0)
+	case "down":
+		model.reasonCursor = min(model.reasonCursor+1, last)
+	case "enter":
+		model.reasoning = model.reasonChoices[min(model.reasonCursor, last)].Value
+
+		return model.prepare(), nil
+	}
+
+	return model, nil
 }
 
 // prepare asks the backend for the plan. The key is passed on and wiped from this model once the plan exists.
 func (model Model) prepare() Model {
 	chosen := model.choices[model.providerCursor]
 
-	plan, err := model.backend.Prepare(Setup{ProviderID: chosen.ID, Model: string(model.modelInput), Key: string(model.keyInput)})
+	plan, err := model.backend.Prepare(Setup{ProviderID: chosen.ID, Model: string(model.modelInput), Key: string(model.keyInput), Reasoning: model.reasoning})
 	if err != nil {
 		model.setupError = err.Error()
 		return model

@@ -27,8 +27,17 @@ func (backend backend) Models(ctx context.Context, providerID, key string) ([]st
 	return backend.config.Models(ctx, providerID, key)
 }
 
+func (backend backend) ReasoningChoices(providerID, model string) []tui.ReasoningChoice {
+	var choices []tui.ReasoningChoice
+	for _, choice := range taskrun.ReasoningChoices(providerID, model) {
+		choices = append(choices, tui.ReasoningChoice{Value: choice.Value, Label: choice.Label})
+	}
+
+	return choices
+}
+
 func (backend backend) Prepare(setup tui.Setup) (tui.Plan, error) {
-	session, err := taskrun.Prepare(backend.config, taskrun.Setup{ProviderID: setup.ProviderID, Model: setup.Model, Key: setup.Key})
+	session, err := taskrun.Prepare(backend.config, taskrun.Setup{ProviderID: setup.ProviderID, Model: setup.Model, Key: setup.Key, Reasoning: setup.Reasoning})
 	if err != nil {
 		return tui.Plan{}, err
 	}

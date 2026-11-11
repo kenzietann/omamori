@@ -600,3 +600,48 @@ func TestListModelsErrors(t *testing.T) {
 		t.Errorf("a wrong key: err = %v", err)
 	}
 }
+
+func TestTheChosenEffortIsSentAndTheDefaultStaysMedium(t *testing.T) {
+	testCases := []struct {
+		name       string
+		effort     string
+		wantEffort string
+	}{
+		{"nothing chosen", "", "medium"},
+		{"low", "low", "low"},
+		{"max", "max", "max"},
+		{"xhigh", "xhigh", "xhigh"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			server := newFakeServer(t, answer(`{"type":"text","text":"ok"}`, "end_turn", 1, 1, 0, 0))
+			client := newTestClient(t, server)
+			if err := client.SetEffort(testCase.effort); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := client.Send(context.Background(), Request{Messages: []Message{{Role: "user", Text: "hi"}}}); err != nil {
+				t.Fatal(err)
+			}
+
+			body := decode(t, server.requests()[0].body)
+			if effort := body["output_config"].(map[string]any)["effort"]; effort != testCase.wantEffort {
+				t.Errorf("effort = %v, want %s", effort, testCase.wantEffort)
+			}
+		})
+	}
+}
+
+func TestAnEffortThatIsNotKnownIsRefused(t *testing.T) {
+	client := newTestClient(t, newFakeServer(t, func(http.ResponseWriter, *http.Request) {}))
+
+	for _, effort := range []string{"HIGH", "extreme", "high\n", "none", " "} {
+		if err := client.SetEffort(effort); !errors.Is(err, ErrBadConfig) {
+			t.Errorf("%q: err = %v", effort, err)
+		}
+	}
+	if client.effort != "" {
+		t.Error("a refused value was kept")
+	}
+}

@@ -185,3 +185,43 @@ func FuzzCleanModelIDs(f *testing.F) {
 		}
 	})
 }
+
+func TestStatusErrorWithBody(t *testing.T) {
+	testCases := []struct {
+		name       string
+		status     int
+		body       string
+		wantDetail string
+		wantKind   error
+	}{
+		{"a code from the provider", 404, `{"error":{"message":"The model gpt-x does not exist","type":"invalid_request_error","code":"model_not_found"}}`, "status 404, code model_not_found", ErrRejected},
+		{"a null code falls back to the type", 400, `{"error":{"message":"m","type":"invalid_request_error","code":null}}`, "status 400, code invalid_request_error", ErrRejected},
+		{"a status text is used when there is nothing else", 400, `{"error":{"code":400,"message":"m","status":"INVALID_ARGUMENT"}}`, "status 400, code INVALID_ARGUMENT", ErrRejected},
+		{"the field is added", 400, `{"error":{"message":"m","type":"invalid_request_error","param":"tools","code":null}}`, "status 400, code invalid_request_error, field tools", ErrRejected},
+		{"a nested field name is shown", 400, `{"error":{"code":"unsupported_parameter","param":"tools[0].function.name"}}`, "status 400, code unsupported_parameter, field tools[0].function.name", ErrRejected},
+		{"a field with odd characters is not shown", 400, `{"error":{"code":"x","param":"a b\u001b sk-SECRET"}}`, "status 400, code x", ErrRejected},
+		{"a code with odd characters is not shown", 400, `{"error":{"code":"bad code \u001b[2J sk-SECRET","type":"x y"}}`, "status 400", ErrRejected},
+		{"a code that is too long is not shown", 400, `{"error":{"code":"` + strings.Repeat("a", 65) + `"}}`, "status 400", ErrRejected},
+		{"a body that is not JSON", 422, `<html>sk-SECRET</html>`, "status 422", ErrRejected},
+		{"an empty body", 400, ``, "status 400", ErrRejected},
+		{"a wrong key keeps its own kind", 401, `{"error":{"code":"invalid_api_key"}}`, "", ErrAuth},
+		{"a busy server keeps its own kind", 429, `{"error":{"code":"rate_limit"}}`, "", ErrRetryable},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := StatusErrorWithBody(testCase.status, []byte(testCase.body))
+
+			if !errors.Is(err, testCase.wantKind) {
+				t.Fatalf("err = %v, want kind %v", err, testCase.wantKind)
+			}
+			var rejection *Rejection
+			if errors.As(err, &rejection) != (testCase.wantDetail != "") || rejection != nil && rejection.Detail() != testCase.wantDetail {
+				t.Errorf("err = %v, want detail %q", err, testCase.wantDetail)
+			}
+			if strings.Contains(err.Error(), "SECRET") || strings.Contains(err.Error(), "does not exist") {
+				t.Errorf("the error shows text of the provider: %v", err)
+			}
+		})
+	}
+}

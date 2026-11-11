@@ -214,7 +214,7 @@ func TestSetupIsCheckedForEveryProvider(t *testing.T) {
 
 func TestEveryProviderNameIsTheNameOnTheConsentScreen(t *testing.T) {
 	for _, current := range descriptors {
-		provider, err := NewProvider(current.id, "any-key", "any-model")
+		provider, err := NewProvider(current.id, "any-key", "any-model", "")
 		if err != nil {
 			t.Fatalf("%s: %v", current.id, err)
 		}
@@ -232,7 +232,7 @@ func TestEveryProviderNameIsTheNameOnTheConsentScreen(t *testing.T) {
 
 func TestNoProviderShowsItsKey(t *testing.T) {
 	for _, current := range descriptors {
-		provider, err := NewProvider(current.id, apiTestKey, "any-model")
+		provider, err := NewProvider(current.id, apiTestKey, "any-model", "")
 		if err != nil {
 			t.Fatalf("%s: %v", current.id, err)
 		}
@@ -374,5 +374,42 @@ func TestListModelsChecksTheProviderAndReturnsCleanNames(t *testing.T) {
 	}
 	if _, err := ListModels(context.Background(), "openai", ""); err == nil {
 		t.Error("a remote provider without a key was asked")
+	}
+}
+
+func TestOnlyOpenAIHasAReasoningFallback(t *testing.T) {
+	for _, current := range descriptors {
+		if (current.reasoningFallback != "") != (current.id == "openai") {
+			t.Errorf("%s has the fallback %q", current.id, current.reasoningFallback)
+		}
+	}
+}
+
+func TestAChosenReasoningLevelReachesTheRequestOfAChatProvider(t *testing.T) {
+	var bodies []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, _ := io.ReadAll(request.Body)
+		bodies = append(bodies, string(body))
+		fmt.Fprint(writer, `{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}]}`)
+	}))
+	t.Cleanup(server.Close)
+
+	for _, level := range []string{"", "high"} {
+		provider, err := newWith("mistral", apiTestKey, "mistral-large-4-0", server.URL, level)
+		if err != nil {
+			t.Fatal(err)
+		}
+		safe, err := New(provider, t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		safe.Authorize()
+		if _, err := safe.Send(context.Background(), Request{Messages: []Message{{Role: "user", Text: "hi"}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if len(bodies) != 2 || strings.Contains(bodies[0], "reasoning_effort") || !strings.Contains(bodies[1], `"reasoning_effort":"high"`) {
+		t.Errorf("bodies = %q", bodies)
 	}
 }

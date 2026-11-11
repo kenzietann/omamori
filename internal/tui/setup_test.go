@@ -706,9 +706,10 @@ func FuzzSetup(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, name, modelText, keyText, note string, width, height int) {
 		backend := &fakeBackend{
-			choices: []Choice{{ID: "a", Name: name, KeyEnv: name, DefaultModel: note}},
-			models:  []string{"m-" + modelText, note},
-			preview: note, runner: finishedRunner(note, true, note), prepareErr: errors.New(note),
+			choices:   []Choice{{ID: "a", Name: name, KeyEnv: name, DefaultModel: note}},
+			models:    []string{"m-" + modelText, note},
+			reasoning: []ReasoningChoice{{"", note}, {"high", name}},
+			preview:   note, runner: finishedRunner(note, true, note), prepareErr: errors.New(note),
 		}
 		secret := "KEY-" + keyText
 		model := sized(newModelWith(note, backend, Defaults{}), width%300, height%100)
@@ -719,6 +720,8 @@ func FuzzSetup(f *testing.F) {
 			func(m Model) Model { m, _ = press(t, m, "enter"); return m },
 			func(m Model) Model { return pasteText(t, m, secret) },
 			func(m Model) Model { views = append(views, m.View()); m, _ = pressAll(t, m, "enter"); return m },
+			func(m Model) Model { m, _ = press(t, m, "down"); return m },
+			func(m Model) Model { m, _ = press(t, m, "enter"); return m },
 			func(m Model) Model { m, _ = press(t, m, "down"); return m },
 			func(m Model) Model { m, _ = press(t, m, "enter"); return m },
 			func(m Model) Model { backend.prepareErr = nil; m, _ = press(t, m, "enter"); return m },
@@ -786,5 +789,172 @@ func TestGoingBackFromTheModelListForgetsTheKey(t *testing.T) {
 
 	if back.step != stepProvider || back.keyInput != nil {
 		t.Errorf("step = %d, key = %q", back.step, string(back.keyInput))
+	}
+}
+
+var testLevels = []ReasoningChoice{{"", "default (medium)"}, {"low", "low"}, {"high", "high"}}
+
+func TestTheReasoningStepComesAfterTheModelAndNothingIsSentBeforeIt(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, reasoning: testLevels, preview: "p", runner: finishedRunner("r", true)}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter", "enter")
+
+	if model.step != stepReasoning || len(backend.setups) != 0 {
+		t.Fatalf("step = %d, setups = %+v: the backend must not be asked before the level is chosen", model.step, backend.setups)
+	}
+	view := model.View()
+	for _, want := range []string{"Provider: FakeAI", "Model: m", "Choose how much the AI reasons:", "> default (medium)", "  low", "  high", "Not every model supports every level"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the reasoning step has no %q:\n%s", want, view)
+		}
+	}
+	if footer := lastLine(view); !strings.Contains(footer, "enter: choose") || !strings.Contains(footer, "esc: back") {
+		t.Errorf("the footer is %q", footer)
+	}
+	if backend.reasoningModels[0] != "m" {
+		t.Errorf("the choices were asked for the model %q", backend.reasoningModels[0])
+	}
+
+	model, _ = pressAll(t, model, "down", "down", "down", "up", "enter")
+	if model.step != stepConsent || len(backend.setups) != 1 || backend.setups[0] != (Setup{ProviderID: "fake", Model: "m", Reasoning: "low"}) {
+		t.Errorf("step = %d, setups = %+v, want the level low", model.step, backend.setups)
+	}
+}
+
+func TestTheDefaultReasoningLevelSendsNothingExtra(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, reasoning: testLevels, preview: "p"}
+
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter", "enter", "enter")
+
+	if model.step != stepConsent || backend.setups[0].Reasoning != "" {
+		t.Errorf("step = %d, setups = %+v", model.step, backend.setups)
+	}
+}
+
+func TestTheReasoningStepIsSkippedWhenThereIsNoChoice(t *testing.T) {
+	for name, choices := range map[string][]ReasoningChoice{
+		"none":         nil,
+		"only default": {{"", "provider default"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			backend := &fakeBackend{choices: []Choice{localChoice}, reasoning: choices, preview: "p"}
+
+			model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter", "enter")
+
+			if model.step != stepConsent || backend.setups[0].Reasoning != "" {
+				t.Errorf("step = %d, setups = %+v", model.step, backend.setups)
+			}
+		})
+	}
+}
+
+func TestEscapeFromTheReasoningStepGoesBackToTheModelAndKeepsTheKey(t *testing.T) {
+	const key = "sk-SECRET-key-123456"
+	backend := &fakeBackend{choices: []Choice{keyedChoice}, models: []string{"alpha", "claude-test"}, reasoning: testLevels, preview: "p"}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter")
+	model = typeText(t, model, key)
+	model, _ = pressAll(t, model, "enter", "enter")
+	if model.step != stepReasoning {
+		t.Fatalf("step = %d", model.step)
+	}
+
+	model, _ = press(t, model, "esc")
+
+	if model.step != stepModel || model.modelTyping || model.models[model.modelCursor] != "claude-test" || string(model.keyInput) != key {
+		t.Errorf("step = %d, typing = %v, key kept = %v", model.step, model.modelTyping, string(model.keyInput) == key)
+	}
+	if len(backend.modelCalls) != 1 {
+		t.Error("going back asked the provider for the list again")
+	}
+
+	model, _ = pressAll(t, model, "up", "enter", "down", "enter")
+	if model.step != stepConsent || backend.setups[0] != (Setup{ProviderID: "anthropic", Model: "alpha", Key: key, Reasoning: "low"}) {
+		t.Errorf("step = %d, setups = %+v", model.step, backend.setups)
+	}
+}
+
+func TestEscapeFromTheReasoningStepReturnsToATypedModel(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, modelsErr: errors.New("no list"), reasoning: testLevels, preview: "p"}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter", "enter")
+
+	model, _ = press(t, model, "esc")
+
+	if model.step != stepModel || !model.modelTyping || string(model.modelInput) != "m" {
+		t.Errorf("step = %d, typing = %v, input = %q", model.step, model.modelTyping, string(model.modelInput))
+	}
+}
+
+func TestTheModelNameForTheChoicesIsTrimmedAndTyped(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, modelsErr: errors.New("no list"), reasoning: testLevels}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter")
+	for range 5 {
+		model, _ = press(t, model, "backspace")
+	}
+	model = typeText(t, model, "  typed-model  ")
+
+	model, _ = press(t, model, "enter")
+
+	if model.step != stepReasoning || backend.reasoningModels[0] != "typed-model" {
+		t.Errorf("step = %d, asked for %q", model.step, backend.reasoningModels)
+	}
+}
+
+func TestAnOldReasoningChoiceDoesNotFollowADifferentModel(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, models: []string{"has-levels", "plain"}, reasoning: testLevels, prepareErr: errors.New("fail"), preview: "p"}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{ProviderID: "fake", Model: "has-levels"}), "enter", "enter", "enter", "down", "down", "enter")
+	if model.setupError == "" || backend.setups[0].Reasoning != "high" {
+		t.Fatalf("setups = %+v, error %q", backend.setups, model.setupError)
+	}
+
+	backend.prepareErr = nil
+	backend.reasoning = nil
+	model, _ = pressAll(t, model, "esc", "down", "enter")
+
+	last := backend.setups[len(backend.setups)-1]
+	if model.step != stepConsent || last.Model != "plain" || last.Reasoning != "" {
+		t.Errorf("step = %d, last setup = %+v: the level high must not follow a model without levels", model.step, last)
+	}
+}
+
+func TestASetupErrorOnTheReasoningStepIsShownAndCanBeRetried(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, reasoning: testLevels, prepareErr: errors.New("this reasoning level is not available for this model"), preview: "p"}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter", "enter", "down", "enter")
+
+	if model.step != stepReasoning || !strings.Contains(model.View(), "this reasoning level is not available for this model") {
+		t.Fatalf("step = %d:\n%s", model.step, model.View())
+	}
+
+	backend.prepareErr = nil
+	if model, _ = press(t, model, "enter"); model.step != stepConsent || len(backend.setups) != 2 {
+		t.Errorf("a second try failed: step %d", model.step)
+	}
+}
+
+func TestReasoningLabelsFromTheBackendAreShownSafelyAndFit(t *testing.T) {
+	hostile := "level\x1b[2J\u202e" + strings.Repeat("w", 200)
+	backend := &fakeBackend{choices: []Choice{localChoice}, reasoning: []ReasoningChoice{{"", hostile}, {"high", "high"}}, preview: "p"}
+	model := sized(newModelWith("/work/project", backend, Defaults{}), 40, 20)
+	model, _ = pressAll(t, model, "enter", "enter", "enter")
+
+	if character, ok := hasNoUnsafeCharacters(model.View()); !ok {
+		t.Errorf("the view has the character %U", character)
+	}
+	for _, line := range strings.Split(model.View(), "\n") {
+		if runewidth.StringWidth(line) > 40 {
+			t.Errorf("the line %q is wider than the window", line)
+		}
+	}
+}
+
+func TestQuitWorksOnTheReasoningStep(t *testing.T) {
+	backend := &fakeBackend{choices: []Choice{localChoice}, reasoning: testLevels}
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "enter", "enter", "enter")
+
+	for _, key := range []string{"q", "ctrl+c"} {
+		if _, command := press(t, model, key); !isQuit(command) {
+			t.Errorf("%s does not quit", key)
+		}
+	}
+	if len(backend.setups) != 0 {
+		t.Error("quitting asked the backend")
 	}
 }

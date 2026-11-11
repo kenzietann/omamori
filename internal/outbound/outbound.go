@@ -191,6 +191,10 @@ func (sender *Sender) Send(ctx context.Context, request Request) (Response, erro
 		case errors.Is(err, ErrAuth):
 			return Response{}, ErrAuth
 		case !errors.Is(err, ErrTemporary):
+			if DetailOf(err) != "" {
+				return Response{}, err
+			}
+
 			return Response{}, ErrProviderFailed
 		}
 	}
