@@ -1,0 +1,52 @@
+{"text": "Tel: 090-1234-5678", "expected": ["090-1234-5678"]}
+{"text": "連絡先は09012345678です", "expected": ["09012345678"]}
+{"text": "phone=090 1234 5678", "expected": ["090 1234 5678"]}
+{"text": "\"phone\": \"080-1111-2222\"", "expected": ["080-1111-2222"]}
+{"text": "070-9999-0000,Tanaka,Tokyo", "expected": ["070-9999-0000"]}
+{"text": "call 050-1234-5678 today", "expected": ["050-1234-5678"]}
+{"text": "From: 03-1234-5678 (mobile)", "expected": ["03-1234-5678"]}
+{"text": "[2026-11-12 09:30:00] caller 06-1111-2222 connected", "expected": ["06-1111-2222"]}
+{"text": "お問い合わせ：045-123-4567（平日9時から）", "expected": ["045-123-4567"]}
+{"text": "Tel: 0422-12-3456", "expected": ["0422-12-3456"]}
+{"text": "連絡先は011-222-3333です", "expected": ["011-222-3333"]}
+{"text": "phone=0120-123-456", "expected": ["0120-123-456"]}
+{"text": "\"phone\": \"0800-123-4567\"", "expected": ["0800-123-4567"]}
+{"text": "0570-123-456,Tanaka,Tokyo", "expected": ["0570-123-456"]}
+{"text": "call (03) 1234-5678 today", "expected": ["(03) 1234-5678"]}
+{"text": "From: (045)123-4567 (mobile)", "expected": ["(045)123-4567"]}
+{"text": "[2026-11-12 09:30:00] caller +81-90-1234-5678 connected", "expected": ["+81-90-1234-5678"]}
+{"text": "お問い合わせ：+81 90 1234 5678（平日9時から）", "expected": ["+81 90 1234 5678"]}
+{"text": "Tel: +819012345678", "expected": ["+819012345678"]}
+{"text": "連絡先は+81 (0)3-1234-5678です", "expected": ["+81 (0)3-1234-5678"]}
+{"text": "phone=090.1234.5678", "expected": ["090.1234.5678"]}
+{"text": "\"phone\": \"０９０－１２３４－５６７８\"", "expected": ["０９０－１２３４－５６７８"]}
+{"text": "０３－１２３４－５６７８,Tanaka,Tokyo", "expected": ["０３－１２３４－５６７８"]}
+{"text": "call 090ー1234ー5678 today", "expected": ["090ー1234ー5678"]}
+{"text": "From: 090　1234　5678 (mobile)", "expected": ["090　1234　5678"]}
+{"text": "[2026-11-12 09:30:00] caller 0312345678 connected", "expected": ["0312345678"]}
+{"text": "お問い合わせ：01234-5-6789（平日9時から）", "expected": ["01234-5-6789"]}
+{"text": "two numbers 090-1234-5678 / 03-1234-5678", "expected": ["090-1234-5678", "03-1234-5678"]}
+{"text": "Release 2026-11-12 is out", "expected": []}
+{"text": "Build 1.2.3-rc4", "expected": []}
+{"text": "Server 192.168.0.1:8080", "expected": []}
+{"text": "Postal 〒100-0001 東京都千代田区", "expected": []}
+{"text": "Total 1,234,567 yen", "expected": []}
+{"text": "ts=1700000000", "expected": []}
+{"text": "id=1234567890", "expected": []}
+{"text": "uuid 123e4567-e89b-12d3-a456-426614174000", "expected": []}
+{"text": "color #0a0b0c", "expected": []}
+{"text": "sha256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "expected": []}
+{"text": "ISBN 978-4-00-310101-8", "expected": []}
+{"text": "card 4111 1111 1111 1111", "expected": []}
+{"text": "time 09:30:00", "expected": []}
+{"text": "version 0.12.3456", "expected": []}
+{"text": "order 20261112093000", "expected": []}
+{"text": "US number +1 415 555 0132", "expected": []}
+{"text": "lat 35.6812, lon 139.7671", "expected": []}
+{"text": "range 0-1000000", "expected": []}
+{"text": "12 digits 012345678901", "expected": []}
+{"text": "too short 090-1234-567", "expected": []}
+{"text": "mixed separators 090-1234 5678", "expected": []}
+{"text": "digit before 1090-1234-5678", "expected": []}
+{"text": "account no. 0123456789", "expected": []}
+{"text": "serial 0001234567", "expected": []}

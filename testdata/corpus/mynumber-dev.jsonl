@@ -1,0 +1,45 @@
+{"text": "マイナンバー: 123456789018", "expected": ["123456789018"]}
+{"text": "個人番号は9999 9999 9996です", "expected": ["9999 9999 9996"]}
+{"text": "my_number=1111-1111-1118", "expected": ["1111-1111-1118"]}
+{"text": "\"mynumber\": \"２２２２２２２２２２２５\"", "expected": ["２２２２２２２２２２２５"]}
+{"text": "３３３３ ３３３３ ３３３２,田中太郎,東京都", "expected": ["３３３３ ３３３３ ３３３２"]}
+{"text": "申請者 444444444440 の確認が必要", "expected": ["444444444440"]}
+{"text": "id 5555 5555 5557 ok", "expected": ["5555 5555 5557"]}
+{"text": "[2026-11-12 09:30:00] form submitted number 6666-6666-6664", "expected": ["6666-6666-6664"]}
+{"text": "number: ７７７７７７７７７７７１\nname: Test User", "expected": ["７７７７７７７７７７７１"]}
+{"text": "提出書類に８８８８ ８８８８ ８８８９と書かれていた", "expected": ["８８８８ ８８８８ ８８８９"]}
+{"text": "マイナンバー: 012345678903", "expected": ["012345678903"]}
+{"text": "個人番号は9876 5432 1093です", "expected": ["9876 5432 1093"]}
+{"text": "my_number=1020-3040-5061", "expected": ["1020-3040-5061"]}
+{"text": "\"mynumber\": \"１２１２１２１２１２１７\"", "expected": ["１２１２１２１２１２１７"]}
+{"text": "１３５７ ９１３５ ７９１０,田中太郎,東京都", "expected": ["１３５７ ９１３５ ７９１０"]}
+{"text": "申請者 246802468023 の確認が必要", "expected": ["246802468023"]}
+{"text": "id 0000 0000 0019 ok", "expected": ["0000 0000 0019"]}
+{"text": "[2026-11-12 09:30:00] form submitted number 1000-0000-0005", "expected": ["1000-0000-0005"]}
+{"text": "number: ２０００００００００００\nname: Test User", "expected": ["２０００００００００００"]}
+{"text": "提出書類に３１４１ ５９２６ ５３５２と書かれていた", "expected": ["３１４１ ５９２６ ５３５２"]}
+{"text": "bad check digit 123456789019", "expected": []}
+{"text": "申請番号 999999999997 を確認", "expected": []}
+{"text": "order=111111111119", "expected": []}
+{"text": "ref 2222 2222 2226", "expected": []}
+{"text": "tracking 3333333333339", "expected": []}
+{"text": "11 digits 12345678901", "expected": []}
+{"text": "13 digits 9999999999960", "expected": []}
+{"text": "timestamp ms 1700000000123", "expected": []}
+{"text": "phone 09012345678", "expected": []}
+{"text": "uuid 123e4567-e89b-12d3-a456-426614174000", "expected": []}
+{"text": "sha1 a94a8fe5ccb19ba61c4c0873d391e987982fbbd3", "expected": []}
+{"text": "amount 123,456,789,012 yen", "expected": []}
+{"text": "date 2026-11-12 09:30:00", "expected": []}
+{"text": "version 1.2.3-rc4 build 20261112", "expected": []}
+{"text": "mixed separators 1234 5678-9018", "expected": []}
+{"text": "invoice no. 003133386951", "expected": []}
+{"text": "invoice no. 004177849268", "expected": []}
+{"text": "invoice no. 005222311585", "expected": []}
+{"text": "invoice no. 006266773902", "expected": []}
+{"text": "invoice no. 007311236219", "expected": []}
+{"text": "invoice no. 008355698536", "expected": []}
+{"text": "invoice no. 009400160853", "expected": []}
+{"text": "invoice no. 010444623170", "expected": []}
+{"text": "invoice no. 011489085487", "expected": []}
+{"text": "invoice no. 012533547804", "expected": []}

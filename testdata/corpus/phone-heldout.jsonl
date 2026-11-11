@@ -1,0 +1,16 @@
+{"text": "お客様センター 0120-555-123 受付時間 9:00-18:00", "expected": ["0120-555-123"]}
+{"text": "INFO sms.send to=090-7777-8888 template=welcome", "expected": ["090-7777-8888"]}
+{"text": "担当: 山田 / 携帯 080-3333-4444 / 固定 03-5555-6666", "expected": ["080-3333-4444", "03-5555-6666"]}
+{"text": "TEL（06）6789-0123 FAX（06）6789-0124", "expected": ["（06）6789-0123", "（06）6789-0124"]}
+{"text": "contact: +81 3-5555-6666", "expected": ["+81 3-5555-6666"]}
+{"text": "電話番号：０７０－２２２２－３３３３　まで", "expected": ["０７０－２２２２－３３３３"]}
+{"text": "customers.csv:42: Suzuki,0312345678,suzuki@example.test", "expected": ["0312345678"]}
+{"text": "curl -d 'phone=09011112222' https://api.example.test/v1/users", "expected": ["09011112222"]}
+{"text": "Order #1234567890 shipped on 2026-11-11", "expected": []}
+{"text": "coordinates 35.6586,139.7454 elevation 333", "expected": []}
+{"text": "RFC 3339 timestamp 2026-11-12T09:30:00+09:00", "expected": []}
+{"text": "version 10.15.7 build 19H2026", "expected": []}
+{"text": "MAC 00:1A:2B:3C:4D:5E", "expected": []}
+{"text": "price list: 1,000 / 20,000 / 300,000", "expected": []}
+{"text": "+44 20 7946 0958 is a UK number", "expected": []}
+{"text": "part number 12-3456-7890", "expected": []}
