@@ -10,7 +10,10 @@ import (
 	"github.com/kenzietann/omamori/internal/pathguard"
 )
 
-const maxContentBytes = 5 << 20
+const (
+	maxContentBytes = 5 << 20
+	maxLogBytes     = 50 << 20
+)
 
 var (
 	ErrInvalidName  = errors.New("the report name is not valid")
@@ -24,6 +27,12 @@ var validName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
 
 type Writer struct {
 	directory string
+}
+
+type Appender struct {
+	file    *os.File
+	written int
+	limit   int
 }
 
 func New(sourceDirectory, outputDirectory string) (*Writer, error) {
@@ -47,27 +56,67 @@ func New(sourceDirectory, outputDirectory string) (*Writer, error) {
 	return &Writer{directory: resolved}, nil
 }
 
-func (writer *Writer) Write(name, content string) error {
+// createFile makes O_EXCL do the work: the system refuses an existing file, and a
+// symlink that stands in the place of the file, so nothing is ever overwritten.
+func (writer *Writer) createFile(name string, extraFlags int) (*os.File, error) {
 	if !validName.MatchString(name) {
-		return ErrInvalidName
+		return nil, ErrInvalidName
 	}
+
+	file, err := os.OpenFile(filepath.Join(writer.directory, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL|extraFlags, 0o600)
+	if err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return nil, ErrExists
+		}
+		return nil, ErrWriteFailed
+	}
+
+	return file, nil
+}
+
+func (writer *Writer) Write(name, content string) error {
 	if len(content) > maxContentBytes {
 		return ErrTooLarge
 	}
 
-	// O_EXCL makes the system refuse an existing file, and a symlink that
-	// stands in the place of the file, so nothing is ever overwritten.
-	file, err := os.OpenFile(filepath.Join(writer.directory, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	file, err := writer.createFile(name, 0)
 	if err != nil {
-		if errors.Is(err, fs.ErrExist) {
-			return ErrExists
-		}
-		return ErrWriteFailed
+		return err
 	}
 
 	_, writeErr := file.WriteString(content)
 	closeErr := file.Close()
 	if writeErr != nil || closeErr != nil {
+		return ErrWriteFailed
+	}
+
+	return nil
+}
+
+func (writer *Writer) Open(name string) (*Appender, error) {
+	file, err := writer.createFile(name, os.O_APPEND)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Appender{file: file, limit: maxLogBytes}, nil
+}
+
+func (appender *Appender) Append(text string) error {
+	if len(text) > maxContentBytes || appender.written+len(text) > appender.limit {
+		return ErrTooLarge
+	}
+
+	if _, err := appender.file.WriteString(text); err != nil {
+		return ErrWriteFailed
+	}
+	appender.written += len(text)
+
+	return nil
+}
+
+func (appender *Appender) Close() error {
+	if err := appender.file.Close(); err != nil {
 		return ErrWriteFailed
 	}
 

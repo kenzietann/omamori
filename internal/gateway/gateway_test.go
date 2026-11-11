@@ -225,6 +225,37 @@ func TestEventsNeverHoldArguments(t *testing.T) {
 	}
 }
 
+func TestObserverSeesEveryEvent(t *testing.T) {
+	gateway := makeGateway(t, testLimits)
+	var seen []Event
+	gateway.Observe(func(event Event) error {
+		seen = append(seen, event)
+		return nil
+	})
+
+	gateway.Call(context.Background(), "read_file", map[string]any{"path": "notes.txt"})
+	gateway.Call(context.Background(), "read_file", map[string]any{"path": "../outside/secret.txt"})
+	gateway.Call(context.Background(), "delete_file", nil)
+
+	if len(seen) != 3 || !seen[0].Allowed || seen[1].Allowed || seen[2].Allowed {
+		t.Errorf("the observer saw %v, want three events: allowed, refused, refused", seen)
+	}
+}
+
+func TestFailedObserverStopsTheResult(t *testing.T) {
+	gateway := makeGateway(t, testLimits)
+	gateway.Observe(func(Event) error { return errors.New("disk full") })
+
+	gotResult, err := gateway.Call(context.Background(), "read_file", map[string]any{"path": "notes.txt"})
+
+	if !errors.Is(err, ErrLogFailed) {
+		t.Errorf("Call error = %v, want %v", err, ErrLogFailed)
+	}
+	if gotResult != (Result{}) {
+		t.Errorf("a call that could not be logged returned data: %+v", gotResult)
+	}
+}
+
 func TestCancelledContext(t *testing.T) {
 	gateway := makeGateway(t, testLimits)
 	ctx, cancel := context.WithCancel(context.Background())

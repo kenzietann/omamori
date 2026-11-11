@@ -17,6 +17,7 @@ var (
 	ErrPathNotAllowed   = errors.New("path not allowed")
 	ErrToolFailed       = errors.New("tool failed")
 	ErrCancelled        = errors.New("cancelled")
+	ErrLogFailed        = errors.New("the event could not be logged")
 )
 
 type Limits struct {
@@ -64,6 +65,7 @@ type Gateway struct {
 	sanitizer sanitizer.Sanitizer
 	tools     map[string]tool
 	events    []Event
+	observer  func(Event) error
 }
 
 func New(root *pathguard.Root, limits Limits) *Gateway {
@@ -83,40 +85,50 @@ func (gateway *Gateway) Events() []Event {
 	return append([]Event(nil), gateway.events...)
 }
 
+// Observe sets the function that sees every event. If it fails, the call fails too,
+// so no result leaves the gateway without a log entry.
+func (gateway *Gateway) Observe(observer func(Event) error) {
+	gateway.observer = observer
+}
+
 func (gateway *Gateway) Call(ctx context.Context, toolName string, arguments map[string]any) (Result, error) {
 	selected, known := gateway.tools[toolName]
 	if !known {
-		gateway.record("", ErrUnknownTool)
-		return Result{}, ErrUnknownTool
+		return gateway.finish("", Result{}, ErrUnknownTool)
 	}
 
 	if ctx.Err() != nil {
-		gateway.record(toolName, ErrCancelled)
-		return Result{}, ErrCancelled
+		return gateway.finish(toolName, Result{}, ErrCancelled)
 	}
 
 	validated, err := gateway.validate(selected.arguments, arguments)
 	if err != nil {
-		gateway.record(toolName, err)
-		return Result{}, err
+		return gateway.finish(toolName, Result{}, err)
 	}
 
 	result, err := selected.run(ctx, gateway, validated)
-	gateway.record(toolName, err)
-	if err != nil {
-		return Result{}, err
-	}
-
-	return result, nil
+	return gateway.finish(toolName, result, err)
 }
 
-func (gateway *Gateway) record(toolName string, err error) {
+func (gateway *Gateway) finish(toolName string, result Result, err error) (Result, error) {
 	reason := "allowed"
 	if err != nil {
 		reason = err.Error()
 	}
 
-	gateway.events = append(gateway.events, Event{Tool: toolName, Allowed: err == nil, Reason: reason})
+	event := Event{Tool: toolName, Allowed: err == nil, Reason: reason}
+	gateway.events = append(gateway.events, event)
+
+	if gateway.observer != nil {
+		if observeErr := gateway.observer(event); observeErr != nil {
+			return Result{}, ErrLogFailed
+		}
+	}
+	if err != nil {
+		return Result{}, err
+	}
+
+	return result, nil
 }
 
 func (gateway *Gateway) validate(specs []argumentSpec, arguments map[string]any) (map[string]string, error) {
