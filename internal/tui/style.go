@@ -7,13 +7,12 @@ import (
 )
 
 var (
-	colorBody     = lipgloss.AdaptiveColor{Light: "#0d1115", Dark: "#e7edf6"}
-	colorAccent   = lipgloss.AdaptiveColor{Light: "#1d4ed8", Dark: "#6ea8ff"}
-	colorDim      = lipgloss.AdaptiveColor{Light: "#4b5563", Dark: "#9aa4b5"}
-	colorGood     = lipgloss.AdaptiveColor{Light: "#166534", Dark: "#4ade80"}
-	colorWarn     = lipgloss.AdaptiveColor{Light: "#92400e", Dark: "#f5b041"}
-	colorBad      = lipgloss.AdaptiveColor{Light: "#b91c1c", Dark: "#ff7b7b"}
-	colorLogoBlue = lipgloss.Color("#3a7ff6")
+	colorBody   = lipgloss.AdaptiveColor{Light: "#0d1115", Dark: "#e7edf6"}
+	colorAccent = lipgloss.AdaptiveColor{Light: "#1d4ed8", Dark: "#6ea8ff"}
+	colorDim    = lipgloss.AdaptiveColor{Light: "#4b5563", Dark: "#9aa4b5"}
+	colorGood   = lipgloss.AdaptiveColor{Light: "#166534", Dark: "#4ade80"}
+	colorWarn   = lipgloss.AdaptiveColor{Light: "#92400e", Dark: "#f5b041"}
+	colorBad    = lipgloss.AdaptiveColor{Light: "#b91c1c", Dark: "#ff7b7b"}
 )
 
 var (

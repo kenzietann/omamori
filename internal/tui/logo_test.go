@@ -5,9 +5,11 @@ import (
 	"errors"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -38,138 +40,11 @@ func sized(model Model, width, height int) Model {
 	return updated.(Model)
 }
 
-func reverse(text string) string {
-	runes := []rune(text)
-	for from, to := 0, len(runes)-1; from < to; from, to = from+1, to-1 {
-		runes[from], runes[to] = runes[to], runes[from]
-	}
-
-	return string(runes)
-}
-
-func TestIconAndWordmarkAreWellFormed(t *testing.T) {
-	if len(iconPixels) != 28 {
-		t.Errorf("the icon has %d pixel rows, want 28", len(iconPixels))
-	}
-	hasBlue := false
-	for index, row := range iconPixels {
-		if len(row) != 26 {
-			t.Errorf("icon row %d is %d wide, want 26", index, len(row))
-		}
-		if row != reverse(row) {
-			t.Errorf("icon row %d is not symmetric: %q", index, row)
-		}
-		if strings.Trim(row, ".LB") != "" {
-			t.Errorf("icon row %d has an unknown pixel: %q", index, row)
-		}
-		hasBlue = hasBlue || strings.Contains(row, "B")
-	}
-	if !hasBlue {
-		t.Error("the icon has no blue diamond")
-	}
-
-	for letter, rows := range glyphs {
-		if len(rows) != 7 {
-			t.Errorf("the letter %c has %d rows, want 7", letter, len(rows))
-		}
-		for _, row := range rows {
-			if len(row) != len(rows[0]) || strings.Trim(row, ".#") != "" {
-				t.Errorf("the letter %c has a bad row %q", letter, row)
-			}
-		}
-	}
-
-	wantWordmarkWidth := 6 // one gap between each pair of the 7 letters
-	for _, letter := range "OMAMORI" {
-		wantWordmarkWidth += len(glyphs[letter][0])
-	}
-	if len(wordmarkPixels) != 7 || len(wordmarkPixels[0]) != wantWordmarkWidth {
-		t.Errorf("the wordmark is %d rows and %d wide", len(wordmarkPixels), len(wordmarkPixels[0]))
-	}
-	if logoWidth() > 80 {
-		t.Errorf("the full logo is %d wide, it must fit 80 columns", logoWidth())
-	}
-}
-
-func TestWithoutColorTheLogoIsPlainASCII(t *testing.T) {
-	view := New("/work/project", nil).View()
-
-	for _, character := range view {
-		if character > unicode.MaxASCII {
-			t.Errorf("the plain view holds %q", character)
-		}
-	}
-	if strings.Contains(view, "\x1b") {
-		t.Error("the plain view holds an escape code")
-	}
-	if !strings.Contains(view, "*") || !strings.Contains(view, "#") {
-		t.Errorf("the ASCII logo is missing:\n%s", view)
-	}
-	if !strings.Contains(view, "a blue team helper with a guard") {
-		t.Error("the tagline is missing")
-	}
-}
-
-func TestWithoutColorTheWordmarkKeepsEveryPixelRow(t *testing.T) {
-	view := New("/work/project", nil).View()
-
-	toText := strings.NewReplacer("L", "#", ".", " ")
-	for index, row := range wordmarkPixels {
-		if !strings.Contains(view, strings.TrimRight(toText.Replace(row), " ")) {
-			t.Errorf("the plain wordmark has no row for pixel row %d:\n%s", index, view)
-		}
-	}
-}
-
-func TestWithColorTheLogoUsesTheBrandColors(t *testing.T) {
-	withProfile(t, termenv.TrueColor)
-
-	view := New("/work/project", nil).View()
-
-	for name, want := range map[string]string{
-		"the blue diamond": "38;2;58;127;246",
-		"the light body":   "38;2;231;237;246",
-		"half blocks":      "▀",
-		"full blocks":      "█",
-	} {
-		if !strings.Contains(view, want) {
-			t.Errorf("%s: the view has no %q", name, want)
-		}
-	}
-}
-
-func TestSmallWindowsGetAOneLineHeader(t *testing.T) {
-	testCases := []struct {
-		name   string
-		width  int
-		height int
-	}{
-		{"narrow", 60, 40},
-		{"short", 100, 20},
-		{"both", 50, 18},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			view := sized(New("/work/project", nil), testCase.width, testCase.height).View()
-
-			if strings.ContainsAny(view, "#*") || !strings.Contains(view, "Omamori") {
-				t.Errorf("the header is not the small one:\n%s", view)
-			}
-		})
-	}
-
-	large := sized(New("/work/project", nil), logoWidth(), minLogoHeight).View()
-	if !strings.Contains(large, "#") {
-		t.Error("a window that is exactly big enough did not get the full logo")
-	}
-}
-
 func TestEveryLineFitsTheWindow(t *testing.T) {
 	for _, profile := range []termenv.Profile{termenv.Ascii, termenv.TrueColor} {
 		withProfile(t, profile)
 
-		for _, size := range [][2]int{{80, 30}, {40, 30}, {20, 12}, {200, 50}} {
+		for _, size := range [][2]int{{80, 30}, {40, 30}, {20, 12}, {200, 50}, {100, 60}, {60, 50}} {
 			home := sized(New("/very/long/folder/name/that/goes/on/and/on", finishedRunner("r", true)), size[0], size[1])
 			running, command := press(t, home, "enter")
 			results := sized(settle(running, command), size[0], size[1])
@@ -271,5 +146,258 @@ func TestOnlyOurStylingMakesEscapeCodes(t *testing.T) {
 				t.Errorf("%s: the view holds the character %U", name, character)
 			}
 		}
+	}
+}
+func TestWordmarkIsWellFormed(t *testing.T) {
+	if len(wordmarkRows) != 6 || wordmarkWidth() != 59 {
+		t.Errorf("the wordmark is %d rows and %d wide, want 6 and 59", len(wordmarkRows), wordmarkWidth())
+	}
+	for index, row := range wordmarkRows {
+		if utf8.RuneCountInString(row) != wordmarkWidth() {
+			t.Errorf("row %d is %d wide, every row must be %d wide (a lost space breaks the letters)", index, utf8.RuneCountInString(row), wordmarkWidth())
+		}
+		if strings.Trim(row, " █╗╔╝╚═║") != "" {
+			t.Errorf("row %d has an unexpected character: %q", index, row)
+		}
+	}
+	if wordmarkWidth() > 80 {
+		t.Error("the wordmark does not fit 80 columns")
+	}
+}
+
+func TestWordmarkMatchesTheArt(t *testing.T) {
+	want := []string{
+		" ██████╗ ███╗   ███╗ █████╗ ███╗   ███╗ ██████╗ ██████╗ ██╗",
+		"██╔═══██╗████╗ ████║██╔══██╗████╗ ████║██╔═══██╗██╔══██╗██║",
+		"██║   ██║██╔████╔██║███████║██╔████╔██║██║   ██║██████╔╝██║",
+		"██║   ██║██║╚██╔╝██║██╔══██║██║╚██╔╝██║██║   ██║██╔══██╗██║",
+		"╚██████╔╝██║ ╚═╝ ██║██║  ██║██║ ╚═╝ ██║╚██████╔╝██║  ██║██║",
+		" ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝",
+	}
+	if len(wordmarkRows) != len(want) {
+		t.Fatalf("the wordmark has %d rows, want %d", len(wordmarkRows), len(want))
+	}
+	for index := range want {
+		if wordmarkRows[index] != want[index] {
+			t.Errorf("row %d:\n got  %q\n want %q", index, wordmarkRows[index], want[index])
+		}
+	}
+}
+
+func TestWithoutColorTheWordmarkIsPlain(t *testing.T) {
+	view := New("/work/project", nil).View()
+
+	if strings.Contains(view, "\x1b") {
+		t.Error("the plain view holds an escape code")
+	}
+	for index, row := range wordmarkRows {
+		if !strings.Contains(view, row) {
+			t.Errorf("the view has no wordmark row %d: %q", index, row)
+		}
+	}
+	if !strings.Contains(view, "a blue team helper with a guard") {
+		t.Error("the tagline is missing")
+	}
+}
+
+func TestSmallWindowsGetAOneLineHeader(t *testing.T) {
+	testCases := []struct {
+		name   string
+		width  int
+		height int
+	}{
+		{"narrow", wordmarkWidth() - 1, 40},
+		{"short", 100, minWordmarkHeight - 1},
+		{"both", 40, 10},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			view := sized(New("/work/project", nil), testCase.width, testCase.height).View()
+
+			if strings.ContainsAny(view, "█╗╔╝╚║") || !strings.Contains(view, "OMAMORI") {
+				t.Errorf("the header is not the small one:\n%s", view)
+			}
+		})
+	}
+
+	exact := sized(New("/work/project", nil), wordmarkWidth(), minWordmarkHeight)
+	if !strings.Contains(exact.View(), wordmarkRows[1]) {
+		t.Error("a window that is exactly big enough did not get the wordmark")
+	}
+	withNotice, _ := pressAll(t, exact, "down", "enter")
+	if lines := strings.Count(withNotice.View(), "\n") + 1; lines > minWordmarkHeight || !strings.Contains(withNotice.View(), "not built yet") {
+		t.Errorf("with a notice the home screen has %d lines in a window of %d", lines, minWordmarkHeight)
+	}
+}
+
+var colorCode = regexp.MustCompile(`38;2;(\d+);(\d+);(\d+)m`)
+
+func colorsIn(t testing.TB, line string) []rgb {
+	t.Helper()
+
+	var colors []rgb
+	for _, match := range colorCode.FindAllStringSubmatch(line, -1) {
+		red, _ := strconv.Atoi(match[1])
+		green, _ := strconv.Atoi(match[2])
+		blue, _ := strconv.Atoi(match[3])
+		colors = append(colors, rgb{red, green, blue})
+	}
+
+	return colors
+}
+
+// The color library turns a hex color into numbers and may be one off from ours.
+func nearColor(first, second rgb) bool {
+	close := func(a, b int) bool { return a-b <= 1 && b-a <= 1 }
+
+	return close(first.red, second.red) && close(first.green, second.green) && close(first.blue, second.blue)
+}
+
+func TestGradientColors(t *testing.T) {
+	testCases := []struct {
+		name     string
+		position float64
+		want     rgb
+	}{
+		{"left end", 0, rgb{56, 189, 248}},
+		{"middle is the brand blue", 0.5, rgb{58, 127, 246}},
+		{"right end", 1, rgb{155, 107, 255}},
+		{"below the range is the left end", -3, rgb{56, 189, 248}},
+		{"above the range is the right end", 7, rgb{155, 107, 255}},
+		{"a quarter of the way", 0.25, rgb{57, 158, 247}},
+	}
+	for _, testCase := range testCases {
+		if got := gradientColor(testCase.position); got != testCase.want {
+			t.Errorf("%s: gradientColor(%v) = %+v, want %+v", testCase.name, testCase.position, got, testCase.want)
+		}
+	}
+
+	previous := gradientColor(0)
+	for column := 1; column < 59; column++ {
+		current := gradientColor(float64(column) / 58)
+		for name, change := range map[string]int{"red": current.red - previous.red, "green": current.green - previous.green, "blue": current.blue - previous.blue} {
+			if change > 8 || change < -8 {
+				t.Errorf("column %d: the %s channel jumps by %d, the gradient is not smooth", column, name, change)
+			}
+		}
+		previous = current
+	}
+
+	if got := darken(rgb{100, 200, 250}, 0.5); got != (rgb{50, 100, 125}) {
+		t.Errorf("darken = %+v, want {50 100 125}", got)
+	}
+	if got := darken(rgb{250, 250, 250}, 9); got != (rgb{255, 255, 255}) {
+		t.Errorf("darken does not stop at 255: %+v", got)
+	}
+	if got := gradientColor(0).hex(); got != "#38bdf8" {
+		t.Errorf("hex = %q, want #38bdf8", got)
+	}
+}
+
+func TestWithColorTheWordmarkIsAGradientWithShadows(t *testing.T) {
+	withProfile(t, termenv.TrueColor)
+
+	lines := strings.Split(New("/work/project", nil).View(), "\n")
+	for index, wantRow := range wordmarkRows {
+		line := lines[index]
+
+		if got := styleCodes.ReplaceAllString(line, ""); got != wantRow {
+			t.Errorf("row %d: colors changed the text: %q, want %q", index, got, wantRow)
+		}
+		if distinct := len(map[rgb]bool(distinctColors(colorsIn(t, line)))); distinct < 10 {
+			t.Errorf("row %d has only %d different colors, want a gradient", index, distinct)
+		}
+	}
+
+	left := colorsIn(t, lines[1])[0]
+	if !nearColor(left, gradientColor(0)) {
+		t.Errorf("the first block is %+v, want the left end %+v", left, gradientColor(0))
+	}
+	rightColors := colorsIn(t, lines[1])
+	right := rightColors[len(rightColors)-1]
+	if !nearColor(right, darken(gradientColor(1), shadowStrength)) {
+		t.Errorf("the last shadow is %+v, want the dark right end %+v", right, darken(gradientColor(1), shadowStrength))
+	}
+
+	// Row 2 has a block and a shadow side by side at columns 1 and 2: "██║". The shadow is darker.
+	row2 := colorsIn(t, lines[2])
+	block, shadow := row2[1], row2[2]
+	if shadow.red >= block.red && shadow.green >= block.green && shadow.blue >= block.blue {
+		t.Errorf("the shadow %+v is not darker than the block %+v", shadow, block)
+	}
+
+	taglineLines := 0
+	for _, line := range lines {
+		if strings.Contains(styleCodes.ReplaceAllString(line, ""), "a blue team helper") {
+			taglineLines++
+			if len(distinctColors(colorsIn(t, line))) != 1 {
+				t.Errorf("the tagline is not one gray color: %q", line)
+			}
+		}
+	}
+	if taglineLines != 1 {
+		t.Errorf("found the tagline on %d lines, want 1", taglineLines)
+	}
+}
+
+var coloredCharacter = regexp.MustCompile(`\x1b\[38;2;(\d+);(\d+);(\d+)m(.)\x1b\[0m`)
+
+func TestEveryCharacterHasTheColorOfItsColumn(t *testing.T) {
+	withProfile(t, termenv.TrueColor)
+
+	lines := strings.Split(New("/work/project", nil).View(), "\n")
+	checked := 0
+	for rowIndex := range wordmarkRows {
+		line := lines[rowIndex]
+
+		for _, match := range coloredCharacter.FindAllStringSubmatchIndex(line, -1) {
+			column := utf8.RuneCountInString(styleCodes.ReplaceAllString(line[:match[0]], ""))
+			character := line[match[8]:match[9]]
+			got := colorsIn(t, line[match[0]:match[1]])[0]
+
+			want := gradientColor(float64(column) / float64(wordmarkWidth()-1))
+			if character != "█" {
+				want = darken(want, shadowStrength)
+			}
+			if !nearColor(got, want) {
+				t.Errorf("row %d column %d (%s): color %+v, want %+v", rowIndex, column, character, got, want)
+			}
+			if brightest := max(got.red, got.green, got.blue); brightest < 100 {
+				t.Errorf("row %d column %d: color %+v is too dark to see on a dark terminal", rowIndex, column, got)
+			}
+			checked++
+		}
+	}
+
+	wantCharacters := 0
+	for _, row := range wordmarkRows {
+		wantCharacters += utf8.RuneCountInString(strings.ReplaceAll(row, " ", ""))
+	}
+	if checked != wantCharacters {
+		t.Errorf("checked %d colored characters, want %d", checked, wantCharacters)
+	}
+}
+
+func distinctColors(colors []rgb) map[rgb]bool {
+	seen := make(map[rgb]bool)
+	for _, color := range colors {
+		seen[color] = true
+	}
+
+	return seen
+}
+
+func TestTheGradientWorksWithFewerColors(t *testing.T) {
+	withProfile(t, termenv.ANSI256)
+
+	lines := strings.Split(New("/work/project", nil).View(), "\n")
+	for index, wantRow := range wordmarkRows {
+		if got := styleCodes.ReplaceAllString(lines[index], ""); got != wantRow {
+			t.Errorf("row %d: the text changed: %q", index, got)
+		}
+	}
+	if !strings.Contains(lines[1], "38;5;") {
+		t.Errorf("the 256-color codes are missing: %q", lines[1])
 	}
 }
