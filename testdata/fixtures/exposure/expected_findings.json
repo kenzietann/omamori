@@ -1,0 +1,7 @@
+[
+  {"severity": "high", "type": "aws-access-key", "file": "app/config.py", "line": 3, "placeholder": "[SECRET:aws-access-key:001]"},
+  {"severity": "high", "type": "github-token", "file": "app/deploy.sh", "line": 5, "placeholder": "[SECRET:github-token:001]"},
+  {"severity": "high", "type": "mynumber", "file": "data/customers.csv", "line": 3, "placeholder": "[MYNUMBER:001]"},
+  {"severity": "medium", "type": "phone", "file": "data/customers.csv", "line": 2, "placeholder": "[PHONE:001]"},
+  {"severity": "medium", "type": "phone", "file": "notes/[SECRET:aws-access-key:002].txt", "line": 2, "placeholder": "[PHONE:002]"}
+]
