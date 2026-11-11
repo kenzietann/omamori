@@ -2,16 +2,14 @@ package anthropicclient
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"net"
-	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
+
+	"github.com/kenzietann/omamori/internal/outbound/internal/wire"
 )
 
 const (
@@ -23,52 +21,29 @@ const (
 )
 
 var (
-	ErrNoKey       = errors.New("no API key")
-	ErrBadConfig   = errors.New("the client settings are not valid")
-	ErrBadRequest  = errors.New("the request cannot be sent in this form")
-	ErrRetryable   = errors.New("temporary provider problem")
-	ErrAuth        = errors.New("the provider rejected the API key")
-	ErrRejected    = errors.New("the provider rejected the request")
-	ErrRefused     = errors.New("the provider declined the request")
-	ErrBadResponse = errors.New("the provider answer cannot be used")
+	ErrNoKey       = wire.ErrNoKey
+	ErrBadConfig   = wire.ErrBadConfig
+	ErrBadRequest  = wire.ErrBadRequest
+	ErrRetryable   = wire.ErrRetryable
+	ErrAuth        = wire.ErrAuth
+	ErrRejected    = wire.ErrRejected
+	ErrRefused     = wire.ErrRefused
+	ErrBadResponse = wire.ErrBadResponse
 )
 
-type ToolCall struct {
-	ID        string
-	Name      string
-	Arguments map[string]string
-}
+type (
+	ToolCall  = wire.ToolCall
+	Message   = wire.Message
+	Parameter = wire.Parameter
+	Tool      = wire.Tool
+	Request   = wire.Request
+	Response  = wire.Response
+)
 
-type Message struct {
-	Role       string
-	Text       string
-	ToolCalls  []ToolCall
-	ToolCallID string
-}
-
-type Parameter struct {
-	Name        string
-	Description string
-	Required    bool
-}
-
-type Tool struct {
-	Name        string
-	Description string
-	Parameters  []Parameter
-}
-
-type Request struct {
-	System   string
-	Messages []Message
-	Tools    []Tool
-}
-
-type Response struct {
-	Text       string
-	ToolCalls  []ToolCall
-	TokensUsed int
-}
+var (
+	nonEmpty       = wire.NonEmpty
+	parseArguments = wire.ParseArguments
+)
 
 type Client struct {
 	api   anthropic.Client
@@ -89,16 +64,11 @@ func newClient(apiKey, model, baseURL string, timeout time.Duration) (*Client, e
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}
-	if !safeBaseURL(baseURL) {
+	if !wire.SafeBaseURL(baseURL) {
 		return nil, ErrBadConfig
 	}
 
-	// A redirect would forward the x-api-key header to another host, because Go only
-	// removes the Authorization header. So no redirect is followed.
-	httpClient := &http.Client{
-		Timeout:       timeout,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
+	httpClient := wire.NewHTTPClient(timeout)
 
 	// WithoutEnvironmentDefaults keeps ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, the profile
 	// files and ANTHROPIC_CUSTOM_HEADERS from changing where the request goes.
@@ -112,23 +82,6 @@ func newClient(apiKey, model, baseURL string, timeout time.Duration) (*Client, e
 	)
 
 	return &Client{api: api, model: model}, nil
-}
-
-func safeBaseURL(raw string) bool {
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Host == "" || parsed.User != nil {
-		return false
-	}
-	if parsed.Scheme == "https" {
-		return true
-	}
-
-	host, _, splitErr := net.SplitHostPort(parsed.Host)
-	if splitErr != nil {
-		host = parsed.Hostname()
-	}
-
-	return parsed.Scheme == "http" && (host == "127.0.0.1" || host == "localhost" || host == "::1")
 }
 
 // String and GoString keep the key out of a log line, because they are what fmt uses.
@@ -152,14 +105,7 @@ func (client *Client) Send(ctx context.Context, request Request) (Response, erro
 func classify(err error) error {
 	var apiError *anthropic.Error
 	if errors.As(err, &apiError) {
-		switch status := apiError.StatusCode; {
-		case status == http.StatusUnauthorized || status == http.StatusForbidden:
-			return ErrAuth
-		case status == http.StatusRequestTimeout || status == http.StatusConflict || status == http.StatusTooManyRequests || status >= 500:
-			return ErrRetryable
-		}
-
-		return ErrRejected
+		return wire.StatusError(apiError.StatusCode)
 	}
 	if errors.Is(err, context.Canceled) {
 		return context.Canceled
@@ -191,14 +137,6 @@ func buildParams(model string, request Request) (anthropic.MessageNewParams, err
 	}
 
 	return params, nil
-}
-
-func nonEmpty(text string) string {
-	if text == "" {
-		return "(empty)"
-	}
-
-	return text
 }
 
 func buildMessages(messages []Message) ([]anthropic.MessageParam, error) {
@@ -310,24 +248,4 @@ func parseResponse(message *anthropic.Message) (Response, error) {
 	response.TokensUsed = int(message.Usage.InputTokens + message.Usage.OutputTokens + message.Usage.CacheCreationInputTokens + message.Usage.CacheReadInputTokens)
 
 	return response, nil
-}
-
-// The tools take only text arguments. A value of another type is kept as its JSON text,
-// so the gateway, which checks every argument, decides what to do with it.
-func parseArguments(raw string) map[string]string {
-	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-		return map[string]string{}
-	}
-
-	arguments := make(map[string]string, len(decoded))
-	for name, value := range decoded {
-		var text string
-		if err := json.Unmarshal(value, &text); err != nil {
-			text = string(value)
-		}
-		arguments[name] = text
-	}
-
-	return arguments
 }
