@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+const fakeGitHubToken = "ghp_EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLE1"
+
 func TestFindSecrets(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -20,6 +22,16 @@ func TestFindSecrets(t *testing.T) {
 		{"lowercase", "akiaiosfodnn7example", nil},
 		{"user ID prefix, not a key", "AIDAIOSFODNN7EXAMPLE", nil},
 		{"empty text", "", nil},
+		// The GitHub examples use a clearly fake token: 4 prefix characters and 36 more.
+		{"GitHub token alone", fakeGitHubToken, []Match{{0, 40, "github-token"}}},
+		{"GitHub token in a sentence", "token " + fakeGitHubToken + " ok", []Match{{6, 46, "github-token"}}},
+		{"GitHub token with lowercase letters", "ghp_exampleEXAMPLEexampleEXAMPLEexample1", []Match{{0, 40, "github-token"}}},
+		{"GitHub OAuth token prefix", "gho_" + fakeGitHubToken[4:], []Match{{0, 40, "github-token"}}},
+		{"35 characters after the GitHub prefix", fakeGitHubToken[:39], nil},
+		{"uppercase GitHub prefix", "GHP_" + fakeGitHubToken[4:], nil},
+		{"unknown GitHub prefix", "ghx_" + fakeGitHubToken[4:], nil},
+		// The GitHub rule is the second row of the table, so its match must still come first.
+		{"GitHub token before AWS key", fakeGitHubToken + " AKIAIOSFODNN7EXAMPLE", []Match{{0, 40, "github-token"}, {41, 61, "aws-access-key"}}},
 		// Open question: with 17 characters after the prefix we match the first 20.
 		// A false positive costs less than a missed key.
 		{"17 characters after the prefix", "AKIAIOSFODNN7EXAMPLEX", []Match{{0, 20, "aws-access-key"}}},
