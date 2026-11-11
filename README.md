@@ -44,12 +44,35 @@ omamori providers                       # which AI providers have a key
 omamori check ./some-project            # Task A
 omamori triage ./auth.log --year 2026   # Task B
 omamori replay ~/omamori-output/run-.../recording.json ./some-project
+omamori eval --yes --runs 3             # live test on the fake fixtures, with a token cap
 ```
 
 You can type the key in the screen. On macOS a key that works is saved in your
 Keychain (you can remove it in Settings). It is never printed or written to a
 file. Every live run saves a report, an event log and a `recording.json` in
 `~/omamori-output/`. Use `--help` for all flags.
+
+## Live test results
+
+`omamori eval` runs a fixed set of real-provider runs on the fake fixtures (Task A, and four
+logs for Task B) and scores them on correct findings and correct locations, not on wording.
+It stops at a token cap. The table is saved as `live-results-*.md`; paste the latest one here.
+
+Latest run (2026-11-11, `gpt-6-luna`, 3 runs per case, 43,220 tokens in all): **14 of 15 runs passed.**
+
+| Case | Passed | Avg requests | Avg tokens |
+|---|---|---|---|
+| Task A: exposure fixture | 3 of 3 | 2 | 1307 |
+| Task B: guessing.log | 3 of 3 | 3 | 3440 |
+| Task B: spraying.log | 3 of 3 | 3 | 3421 |
+| Task B: benign.log | 3 of 3 | 3 | 2992 |
+| Task B: malformed.log | 2 of 3 | 3 | 3246 |
+
+The one failure: the AI did not claim a finding that was in the log, so the checker listed it
+as "found by Omamori, not claimed by the AI". Nothing false was accepted. Three runs per case is a
+small sample, so the rates are rough. The first live run was 12 of 15: the AI read "invalid user
+admin" as a different user. The instruction was made clearer for that, which is why the
+numbers changed between runs.
 
 ## What it will do (v1)
 
