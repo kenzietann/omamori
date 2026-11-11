@@ -13,8 +13,9 @@ An AI helper for blue team work. It checks a project for exposure, looks through
 sshd logs, and can help write detection rules. It uses read-only tools, and a
 guard sits between the AI and your data.
 
-**Status: early work in progress.** Nothing runs yet. I am building it by hand,
-step by step, and I am learning Go while I do it.
+**Status: work in progress, Task A and Task B run.** Task A (exposure check), Task B
+(log triage), the guard, a terminal screen and replay mode work. Task C and the
+Should items are not done. I am learning Go while I build it.
 
 ## Why I am building this
 
@@ -35,6 +36,21 @@ writing detection rules. A small team with no security person can use it too.
 v1 runs on one computer. It reads local files and one log format. It is not a
 SIEM and not a hosted service.
 
+## Quick start
+
+```
+go install ./cmd/omamori
+omamori providers                       # which AI providers have a key
+omamori check ./some-project            # Task A
+omamori triage ./auth.log --year 2026   # Task B
+omamori replay ~/omamori-output/run-.../recording.json ./some-project
+```
+
+You can type the key in the screen. On macOS a key that works is saved in your
+Keychain (you can remove it in Settings). It is never printed or written to a
+file. Every live run saves a report, an event log and a `recording.json` in
+`~/omamori-output/`. Use `--help` for all flags.
+
 ## What it will do (v1)
 
 - **Task A: exposure check.** Look through a local project folder for leaked
@@ -44,7 +60,8 @@ SIEM and not a hosted service.
   program checks the AI's answer, so the AI cannot just make things up.
 - **Task C: detection rules (if I have time).** The AI proposes a rule. Omamori
   tests it on sample logs.
-- A very simple terminal screen set: Home, Run, Results.
+- A terminal screen: setup pages, then the run prints a live progress bar and the
+  report into the normal terminal, so you can select and scroll it.
 - **Replay mode.** Recorded AI answers play back through the real pipeline, so
   the demo works offline. It is always labeled REPLAY.
 
@@ -56,7 +73,8 @@ SIEM and not a hosted service.
 - The AI cannot change its own permissions.
 - Reports show the place, the type, and a placeholder. They never show the
   secret itself.
-- Your API key stays in memory. It is never written to a file or a log.
+- Your API key is never printed, logged, or written to a file. On macOS it can be
+  kept in the Keychain.
 
 ## What it cannot do
 
@@ -74,9 +92,9 @@ I want to be clear about the limits.
 
 ## How I use AI
 
-I write all the code by hand, to learn. I use an AI tool as a mentor and
-reviewer: it explains ideas and reviews code I paste. It does not write the
-code. Docs like this README were drafted with AI help and edited by me.
+I built the first parts by hand to learn. Later parts, the tests and the docs were
+written with an AI coding tool, and I review, run and commit them. The product's own
+AI is limited by the guard and can only use read-only tools.
 
 ## Docs
 
@@ -91,8 +109,10 @@ January (all must-have parts are done).
 
 ## Tech
 
-Go. Tests with `go test`, including fuzz tests. Terminal screen with Bubble Tea
-(not final yet).
+Go. Tests with `go test`, including fuzz tests. Terminal screen with Bubble Tea.
+Providers: Anthropic and any OpenAI-compatible API (OpenAI, Gemini, Mistral, Groq,
+Together, DeepSeek, xAI, OpenRouter, Ollama, LM Studio). Design choices are in
+[DECISIONS.md](DECISIONS.md).
 
 Code style: I use clear, full-word names (like `expectedCheckDigit`, not `x`). Commit
 messages follow Conventional Commits.
