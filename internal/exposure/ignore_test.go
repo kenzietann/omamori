@@ -9,6 +9,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/agent"
 	"github.com/kenzietann/omamori/internal/gateway"
+	"github.com/kenzietann/omamori/internal/githistory"
 	"github.com/kenzietann/omamori/internal/pathguard"
 )
 
@@ -182,7 +183,7 @@ func TestAKeyThatGitIgnoresIsNotAFindingAndHasItsOwnSection(t *testing.T) {
 		t.Errorf("the table must hold the phone number and not the ignored key:\n%s", table)
 	}
 	section := report[strings.Index(report, "## Kept out of git"):]
-	for _, want := range []string{"not counted as findings", "- backend/.env:1 [SECRET:ai-api-key:001] (ai-api-key)", "the normal setup for a key", "cannot see the git history", "git log --all --oneline -- the-file", "revoke it and create a new one"} {
+	for _, want := range []string{"not counted as findings", "- backend/.env:1 [SECRET:ai-api-key:001] (ai-api-key)", "the normal setup for a key", "could not ask git about the history", "git log --all --oneline -- the-file", "revoke it and create a new one"} {
 		if !strings.Contains(section, want) {
 			t.Errorf("the section has no %q:\n%s", want, section)
 		}
@@ -208,5 +209,87 @@ func TestWhenOnlyIgnoredKeysAreFoundTheReportSaysNoExposedData(t *testing.T) {
 	}
 	if strings.Contains(report, "| ID | Severity") || strings.Contains(report, "## Fixes") {
 		t.Errorf("the report has a table or fixes for a key that is kept out of git:\n%s", report)
+	}
+}
+
+type fakeHistory struct {
+	answers map[string]githistory.Answer
+	asked   []string
+}
+
+func (history *fakeHistory) Commits(ctx context.Context, path string) githistory.Answer {
+	history.asked = append(history.asked, path)
+
+	return history.answers[path]
+}
+
+func TestAnIgnoredEnvFileThatWasCommittedBeforeIsAFindingAndOneThatWasNeverIsNot(t *testing.T) {
+	collector, _ := scanProject(t, map[string]string{
+		".gitignore":   ".env\n",
+		"old/.env":     "K=" + fakeEnvKey + "\n",
+		"fresh/.env":   "K=" + fakeEnvKey + "\n",
+		"unknown/.env": "K=" + fakeEnvKey + "\n",
+		"app.py":       "x = 1\n",
+	})
+	history := &fakeHistory{answers: map[string]githistory.Answer{
+		"old/.env":   {Checked: true, Commits: []string{"8007644", "3c2786b"}},
+		"fresh/.env": {Checked: true},
+	}}
+	collector.SetHistory(history)
+
+	collector.CheckIgnore(context.Background())
+
+	old := findingIn(t, collector, "old/.env")
+	if old.Severity != "high" || !strings.Contains(old.Advice, "is ignored by .gitignore today, but git has it in its history (commits 8007644, 3c2786b)") || !strings.Contains(old.Advice, "revoke it and create a new one") {
+		t.Errorf("a file in the history: %+v", old)
+	}
+	if fresh := findingIn(t, collector, "fresh/.env"); fresh.Severity != SeverityKeptOut || fresh.History != "clean" {
+		t.Errorf("a file never committed: %+v", fresh)
+	}
+	if unknown := findingIn(t, collector, "unknown/.env"); unknown.Severity != SeverityKeptOut || unknown.History != "unchecked" {
+		t.Errorf("a file that git could not be asked about: %+v", unknown)
+	}
+	if len(history.asked) != 3 {
+		t.Errorf("git was asked about %v, want the three ignored env files", history.asked)
+	}
+
+	report, err := Render(collector.Findings(), collector.Stats(), agent.Outcome{Status: agent.Complete})
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := report[strings.Index(report, "## Findings"):strings.Index(report, "## Kept out of git")]
+	if !strings.Contains(table, "| high | ai-api-key | old/.env |") || strings.Contains(table, "fresh/.env") {
+		t.Errorf("the table:\n%s", table)
+	}
+	if !strings.Contains(report, "- ai-api-key in an env file that is in the git history (1): This env file is ignored by .gitignore today, but git has it in its history") {
+		t.Errorf("the fixes do not name the file in the history:\n%s", report)
+	}
+}
+
+func TestWhenGitSaysEveryIgnoredEnvFileWasNeverCommittedTheReportSaysSo(t *testing.T) {
+	collector, _ := scanProject(t, map[string]string{".gitignore": ".env\n", ".env": "K=" + fakeEnvKey + "\n"})
+	collector.SetHistory(&fakeHistory{answers: map[string]githistory.Answer{".env": {Checked: true}}})
+	collector.CheckIgnore(context.Background())
+
+	report, err := Render(collector.Findings(), collector.Stats(), agent.Outcome{Status: agent.Complete})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	section := report[strings.Index(report, "## Kept out of git"):]
+	if !strings.Contains(section, "Omamori asked git about the history of each file: none of them was ever committed.") || strings.Contains(section, "could not ask git") {
+		t.Errorf("the section:\n%s", section)
+	}
+}
+
+func TestGitIsNotAskedAboutFilesThatAreNotIgnoredEnvFiles(t *testing.T) {
+	collector, _ := scanProject(t, map[string]string{".env": "K=" + fakeEnvKey + "\n", "app.py": "K = '" + fakeEnvKey + "'\n"})
+	history := &fakeHistory{}
+	collector.SetHistory(history)
+
+	collector.CheckIgnore(context.Background())
+
+	if len(history.asked) != 0 {
+		t.Errorf("git was asked about %v", history.asked)
 	}
 }

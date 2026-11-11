@@ -9,13 +9,17 @@
 
 [日本語](README.jp.md)
 
-An AI helper for blue team work. It checks a project for exposure, looks through
-sshd logs, and can help write detection rules. It uses read-only tools, and a
-guard sits between the AI and your data.
+An AI blue-team tool for exposure checks, log detection and evidence-based alert
+review. It uses read-only tools, and a guard sits between the AI and your data.
+The CLI is available now. A dashboard running locally on `127.0.0.1` is planned
+and will use the same detection and analyst services.
 
-**Status: work in progress, Task A and Task B run.** Task A (exposure check), Task B
-(log triage), the guard, a terminal screen and replay mode work. Task C and the
-Should items are not done. I am learning Go while I build it.
+**Status: work in progress, Task A, Task B, local detection and the AI analyst run.** Task A
+(exposure check), Task B (AI log triage), the guard, a terminal screen and replay
+mode work. `detect` checks local logs with rules and `scenario` makes synthetic
+demo logs. `analyze` reviews detected alerts with the AI and verifies its claims.
+The local dashboard, AI rule generation (Task C) and the Should items are not
+done. I am learning Go while I build it.
 
 ## Why I am building this
 
@@ -33,7 +37,7 @@ Security engineers and developers, in companies of any size. A security team in
 a big company can use it for first-pass blue team work, like checking logs and
 writing detection rules. A small team with no security person can use it too.
 
-v1 runs on one computer. It reads local files and one log format. It is not a
+v1 runs on one computer. It reads local files and logs. It is not a
 SIEM and not a hosted service.
 
 ## Quick start
@@ -51,6 +55,63 @@ You can type the key in the screen. On macOS a key that works is saved in your
 Keychain (you can remove it in Settings). It is never printed or written to a
 file. Every live run saves a report (`report.md` and a static `report.html` with no script),
 an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all flags.
+
+### Local detection, without an AI provider
+
+`detect` reads sshd/Linux syslog, Apache/Nginx access logs, or JSON lines with a
+timestamp. It applies 17 built-in rules, including counts, distinct counts and
+ordered sequences such as password guessing followed by a successful login.
+It uses no API key and sends nothing over the network.
+
+Try it with made-up logs in a new folder:
+
+```sh
+omamori scenario --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-logs
+omamori detect ./demo-logs --year 2026 --timezone Asia/Tokyo --output ./demo-reports
+```
+
+This example produces 14 alerts, including one critical alert for a login after
+password guessing. Reports are saved in a new `detect-...` folder as `report.md`,
+`report.html` and `alerts.json`. Existing run folders are refused. The logs stay
+unchanged. `expected.json` describes the synthetic scenario; the report lists it
+as skipped because it is not a log.
+
+Use `scenario --benign` for a day without planted attacks, `detect --rules ./rules`
+to load your own YAML rules, or `--format syslog|web|json` to choose a parser.
+Custom rules replace the built-in set. The rule format is a documented subset of
+Sigma: unsupported conditions and modifiers are refused. Rules can include test
+events, and a rule set with failing tests is refused too.
+
+The tests cover 25 synthetic seeds, including ordinary logins, typos, web visits
+and scans. These checks measure the generated fixtures, not production accuracy.
+Slow password guessing below the configured thresholds is a known miss. Classic
+syslog has no year or time zone, so set `--year` and `--timezone` for the logs.
+
+### AI analyst over the alerts
+
+Use the same logs with `analyze`. It sends a bounded, sanitized evidence snapshot
+through the existing guard. The AI can review alerts, identify shared entities
+and suggest investigation steps. Code checks its citations, counts, times and
+relationships before constructing the displayed findings. It has no tools, and
+its suggestions are not executed.
+
+```sh
+omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo --dry-run
+omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo --yes
+```
+
+Select the provider and model using `--provider` and `--model`, the environment,
+or existing saved settings. Without `--yes`, the command shows a request preview
+and sends nothing. Runs save the detection report, checked analysis, coverage
+gaps and a replay recording when an answer can be recorded. Invalid AI claims
+never replace the rule alerts. The versioned `analysis.json` result and shared
+run service are also intended for the local dashboard.
+
+For a demo with no provider or key, use the [bundled scripted analyst replay](testdata/fixtures/analyst/README.md).
+It checks 14 alert reviews plus one shared-entity link, and is explicitly labeled
+as scripted. See the [analyst guide](docs/analyst.md) for the schema boundaries,
+replay behavior and integration APIs. Local fake-provider and replay tests verify
+the pipeline; live model quality has not been measured for this slice.
 
 ## Live test results
 
@@ -132,7 +193,9 @@ listed in its own section of the report:
 - example passwords in an address (`user:pass@`, `${PASSWORD}`, `<password>`)
 - library, cache and plugin folders (`deps`, `.angular`, `.agents/skills`, `.claude/plugins`, ...)
 - phone numbers and My Numbers in build output
-- a key in an env file that `.gitignore` keeps out of git
+- a key in an env file that `.gitignore` keeps out of git, and that git says was never committed.
+  If the file is in the history (committed once, ignored later), the key is a finding: it is still
+  readable by anyone who can read the repository
 - binary files (images, archives) are not scanned
 
 A real password in an address, a key in your own code, and a phone number in your own data are
@@ -176,6 +239,11 @@ AI is limited by the guard and can only use read-only tools.
 
 ## Docs
 
+- [Platform plan and decisions](docs/platform-plan.md): the detection pipeline,
+  supported rule subset, verification results and next slices.
+- [AI analyst](docs/analyst.md): checked alert reviews, replay and the shared
+  service for the future local dashboard.
+- [Local rules](docs/rules.md): supported detection and correlation YAML.
 - [My Number test table](docs/mynumber-test-table.md): my test cases for the
   first detector. All numbers are dummy numbers.
 

@@ -154,7 +154,11 @@ func Parse(data []byte) (Recording, error) {
 	var recording Recording
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&recording); err != nil || decoder.More() {
+	if err := decoder.Decode(&recording); err != nil {
+		return Recording{}, ErrBadRecording
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		return Recording{}, ErrBadRecording
 	}
 	if err := recording.Validate(); err != nil {

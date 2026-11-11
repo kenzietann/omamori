@@ -26,7 +26,7 @@ const (
 	exitFailed  = 1
 	exitUsage   = 2
 	modelsWait  = 30 * time.Second
-	helpMessage = `Omamori is an AI helper for blue team work, with a guard around it.
+	helpMessage = `Omamori is an AI blue-team tool, with a guard around its access to evidence.
 
 Usage:
   omamori <command> [flags] [arguments]
@@ -34,6 +34,9 @@ Usage:
 Commands:
   check <folder>      Task A: check a project for leaked data (opens the screen)
   triage <log file>   Task B: triage an sshd auth.log for guessing and password spraying
+  detect <logs>...    read log files or folders, run the detection rules, write a report (no AI, no network)
+  analyze <logs>...   detect, ask the AI to review alerts, and verify its claims against the evidence
+  scenario <folder>   write synthetic logs of one day with attacks into a new folder, for demos and tests
   ui <folder>         open the home screen, where you choose a task
   replay <recording> [folder or log file]
                       play back the recorded answers of an earlier run. Nothing is sent
@@ -56,6 +59,19 @@ Flags for the triage (Task B). The log lines have no year and no time zone:
   --year n            year of the log lines (default: this year)
   --timezone name     time zone of the log lines, for example Asia/Tokyo (default: this computer)
   --triage-config f   file with window_minutes, failure_threshold and spray_threshold
+
+Flags for detect:
+  --rules folder      use the rules of a folder in place of the built-in rules (Sigma format, see docs/rules.md)
+  --format name       syslog, web or json (default: look at the first lines of each file)
+  --year, --timezone  for syslog lines, which have no year and no time zone
+  --output folder     where the report folder is made (default ~/omamori-output)
+
+Flags for analyze (also accepts the detect flags):
+  --provider, --model, --reasoning  provider settings, or use saved settings
+  --yes               send the sanitized alert snapshot; without it, show a preview only
+  --dry-run           show the guarded request without sending or writing reports
+  --replay file       use recorded analyst answers offline, with the same logs and rules
+  --timeout duration  maximum run time (default 2m)
 
 Every live run saves recording.json next to its report. "omamori replay" plays it back through
 the same guard, tools and report. A replay is labeled REPLAY, and it makes no network call.
@@ -127,6 +143,12 @@ func run(args []string, env environment) int {
 		return runEval(rest, env)
 	case "peek":
 		return runPeek(rest, env)
+	case "detect":
+		return runDetect(rest, env)
+	case "analyze":
+		return runAnalyze(rest, env)
+	case "scenario":
+		return runScenario(rest, env)
 	}
 
 	fmt.Fprintf(env.stderr, "omamori: %q is not a command. Run omamori help to see the commands.\n", command)
@@ -311,6 +333,16 @@ func runReplay(args []string, env environment) int {
 	if err != nil {
 		fmt.Fprintln(env.stderr, "omamori:", err)
 		return exitFailed
+	}
+	if recording.Task == "analyst" {
+		arguments := []string{"--replay", chosen.recording, "--output", chosen.output}
+		if chosen.year != 0 {
+			arguments = append(arguments, "--year", fmt.Sprint(chosen.year))
+		}
+		if chosen.zone != "" {
+			arguments = append(arguments, "--timezone", chosen.zone)
+		}
+		return runAnalyze(append(arguments, "--", chosen.target), env)
 	}
 
 	target, log := chosen.target, ""

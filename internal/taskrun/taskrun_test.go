@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -1357,5 +1358,69 @@ func TestNoisyFoldersThatComeFirstNeverHideARealFindingInALaterFolder(t *testing
 	}
 	if strings.Contains(result.Report, "OMAMORITESTFAKEKEY") {
 		t.Error("the key is in the report")
+	}
+}
+
+func TestAnIgnoredEnvFileThatWasCommittedOnceIsReportedFromTheRealGitHistory(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	setup := newSetup(t, scanAll(), answerText("Done."))
+	project := filepath.Join(t.TempDir(), "project")
+	copyTree(t, setup.project, project)
+	setup.config.Target = project
+
+	runGit := func(arguments ...string) {
+		t.Helper()
+		command := exec.Command("git", arguments...)
+		command.Dir = project
+		command.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", arguments, err, output)
+		}
+	}
+	key := "AI_KEY=" + "sk-" + "proj-OMAMORITESTFAKEKEYOMAMORITESTFAKEKEY0001\n"
+	writeFile := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(project, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runGit("init", "-q")
+	writeFile(".env", key)
+	runGit("add", ".env")
+	runGit("commit", "-q", "-m", "add env files by mistake")
+	runGit("rm", "-q", "--cached", ".env")
+	runGit("commit", "-q", "-m", "delete env")
+	writeFile(".gitignore", ".env\n")
+	writeFile(".env.local", key)
+	runGit("add", ".gitignore")
+	runGit("commit", "-q", "-m", "ignore env")
+	writeFile(".gitignore", ".env\n.env.local\n")
+	session := setup.session(t)
+	session.Confirm()
+
+	result, err := session.Run(context.Background(), func(string) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table := result.Report[strings.Index(result.Report, "## Findings"):]
+	table = table[:strings.Index(table, "\n## ")]
+	if !strings.Contains(table, "| high | ai-api-key | .env |") {
+		t.Errorf("an ignored env file that is in the history must be a finding:\n%s", table)
+	}
+	if strings.Contains(table, ".env.local") {
+		t.Errorf("an ignored env file that was never committed must not be a finding:\n%s", table)
+	}
+	keptOut := result.Report[strings.Index(result.Report, "## Kept out of git"):]
+	keptOut = keptOut[:strings.Index(keptOut, "\n## ")]
+	if !strings.Contains(keptOut, ".env.local:1") || strings.Contains(keptOut, "- .env:1") {
+		t.Errorf("the kept out section:\n%s", keptOut)
+	}
+	for _, want := range []string{"is ignored by .gitignore today, but git has it in its history (commits ", "Deleting the file does not remove it from the history"} {
+		if !strings.Contains(result.Report, want) {
+			t.Errorf("the report has no %q:\n%s", want, result.Report)
+		}
 	}
 }

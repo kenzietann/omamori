@@ -1,0 +1,176 @@
+# Web server access logs (nginx and Apache, combined format). Fields: src_ip, method, url, status, user_agent.
+# The url is as it is written in the log, so patterns are given plain and percent-encoded.
+title: Request for a file that should not be public
+name: web_sensitive_path
+id: 6f3a2c10-0201-4a6e-9d7b-0a1b2c3d4e01
+description: One request for a path that scanners ask for. It is counted by other rules and gives no alert alone.
+level: low
+logsource: {category: webserver}
+detection:
+  selection:
+    url|contains: ['/.env', '/.git/', '/.aws/', '/.ssh/', '/wp-login.php', '/xmlrpc.php', '/phpmyadmin', '/server-status', '/actuator/', '/cgi-bin/', '/etc/passwd', '/.DS_Store', '/backup.sql', '/config.php.bak']
+  condition: selection
+tests:
+  - name: scanner paths match
+    events:
+      - {category: webserver, url: "/.env", status: 404, src_ip: 203.0.113.77}
+      - {category: webserver, url: "/site/.git/config", status: 404, src_ip: 203.0.113.77}
+    expect: {alerts: 2}
+  - name: ordinary paths do not match
+    events:
+      - {category: webserver, url: "/", status: 200, src_ip: 198.51.100.4}
+      - {category: webserver, url: "/blog/environment-tips", status: 200, src_ip: 198.51.100.4}
+      - {category: webserver, url: "/static/app.js?v=3", status: 200, src_ip: 198.51.100.4}
+    expect: {alerts: 0}
+---
+title: Web scan for files that should not be public
+name: web_sensitive_scan
+id: 6f3a2c10-0202-4a6e-9d7b-0a1b2c3d4e02
+description: One address asked for five or more different sensitive paths in five minutes.
+level: high
+tags: [attack.reconnaissance, attack.t1595.003]
+correlation:
+  type: value_count
+  rules: [web_sensitive_path]
+  group-by: [src_ip]
+  timespan: 5m
+  condition: {gte: 5, field: url}
+tests:
+  - name: five different paths are one alert
+    events:
+      - {category: webserver, url: "/.env", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/.git/config", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/wp-login.php", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/phpmyadmin/", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/.aws/credentials", src_ip: 203.0.113.77}
+    expect: {alerts: 1}
+  - name: the same path five times is no alert
+    events:
+      - {category: webserver, url: "/wp-login.php", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/wp-login.php", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/wp-login.php", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/wp-login.php", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/wp-login.php", src_ip: 198.51.100.4}
+    expect: {alerts: 0}
+---
+title: Request that was not found
+name: web_not_found
+id: 6f3a2c10-0203-4a6e-9d7b-0a1b2c3d4e03
+description: One request with status 404. It is counted by other rules and gives no alert alone.
+level: informational
+logsource: {category: webserver}
+detection:
+  selection: {status: 404}
+  condition: selection
+tests:
+  - name: 404 matches and 200 does not
+    events:
+      - {category: webserver, url: "/a", status: 404, src_ip: 203.0.113.77}
+      - {category: webserver, url: "/b", status: 200, src_ip: 203.0.113.77}
+    expect: {alerts: 1}
+---
+title: Web path enumeration
+name: web_path_enumeration
+id: 6f3a2c10-0204-4a6e-9d7b-0a1b2c3d4e04
+description: One address got "not found" for 30 or more different paths in five minutes.
+level: medium
+tags: [attack.reconnaissance, attack.t1595.003]
+correlation:
+  type: value_count
+  rules: [web_not_found]
+  group-by: [src_ip]
+  timespan: 5m
+  condition: {gte: 30, field: url}
+tests:
+  - name: two missing paths are no alert
+    events:
+      - {category: webserver, url: "/favicon.ico", status: 404, src_ip: 198.51.100.4}
+      - {category: webserver, url: "/apple-touch-icon.png", status: 404, src_ip: 198.51.100.4}
+    expect: {alerts: 0}
+---
+title: Request from a known scanning tool
+name: web_scanner_request
+id: 6f3a2c10-0205-4a6e-9d7b-0a1b2c3d4e05
+description: One request with the user agent of a scanning tool. It is counted by another rule and gives no alert alone.
+level: low
+logsource: {category: webserver}
+detection:
+  selection:
+    user_agent|contains: [sqlmap, nikto, nuclei, masscan, zgrab, gobuster, dirbuster, wpscan, feroxbuster, 'nmap scripting engine']
+  condition: selection
+tests:
+  - name: a tool matches without regard to case
+    events: [{category: webserver, url: "/", user_agent: "Mozilla/5.00 (Nikto/2.5.0)", src_ip: 203.0.113.77}]
+    expect: {alerts: 1}
+  - name: a browser does not match
+    events: [{category: webserver, url: "/", user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15", src_ip: 198.51.100.4}]
+    expect: {alerts: 0}
+---
+title: Scanning tool at the web server
+name: web_scanner_tool
+id: 6f3a2c10-0206-4a6e-9d7b-0a1b2c3d4e06
+description: An address sent requests with the user agent of a scanning tool. One alert for each burst.
+level: medium
+tags: [attack.reconnaissance, attack.t1595.002]
+correlation:
+  type: event_count
+  rules: [web_scanner_request]
+  group-by: [src_ip]
+  timespan: 5m
+  condition: {gte: 1}
+tests:
+  - name: many requests of one tool are one alert
+    events:
+      - {category: webserver, url: "/a", user_agent: "sqlmap/1.8", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/b", user_agent: "sqlmap/1.8", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/c", user_agent: "sqlmap/1.8", src_ip: 203.0.113.77}
+    expect: {alerts: 1}
+---
+title: Request with an SQL injection or path traversal pattern
+name: web_injection_request
+id: 6f3a2c10-0207-4a6e-9d7b-0a1b2c3d4e07
+description: One request whose address holds an attack pattern. It is counted by another rule and gives no alert alone.
+level: medium
+logsource: {category: webserver}
+detection:
+  sqli:
+    url|contains: ['information_schema', "' or '1'='1", '%27+or+', '%27%20or%20', 'sleep(', 'sleep%28', 'benchmark(', 'waitfor+delay', 'waitfor%20delay']
+  # "union select" as two whole words. A search for "student union selection" must not match.
+  union:
+    url|re|i: '(^|[^a-z])union(\+|%20| |/\*\*/)+(all(\+|%20| )+)?select([^a-z]|$)'
+  traversal:
+    url|contains: ['../..', '..%2f..', '%2e%2e%2f', '%2e%2e/', '..%5c..', '....//']
+  condition: sqli or union or traversal
+tests:
+  - name: injection and traversal match
+    events:
+      - {category: webserver, url: "/item?id=1+UNION+SELECT+user,pass+FROM+users", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/download?file=../../../../etc/shadow", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/img?f=..%2F..%2F..%2Fetc%2Fhosts", src_ip: 203.0.113.77}
+    expect: {alerts: 3}
+  - name: ordinary queries do not match
+    events:
+      - {category: webserver, url: "/search?q=student+union+selection+results", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/search?q=reunion+select+committee", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/docs/../index.html", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/blog/how-to-sleep-better", src_ip: 198.51.100.4}
+    expect: {alerts: 0}
+---
+title: Injection attempts at the web server
+name: web_injection_attempt
+id: 6f3a2c10-0208-4a6e-9d7b-0a1b2c3d4e08
+description: An address sent requests with SQL injection or path traversal patterns. One alert for each burst.
+level: high
+tags: [attack.initial_access, attack.t1190]
+correlation:
+  type: event_count
+  rules: [web_injection_request]
+  group-by: [src_ip]
+  timespan: 5m
+  condition: {gte: 1}
+tests:
+  - name: two attempts from one address are one alert
+    events:
+      - {category: webserver, url: "/item?id=1%27%20OR%20%271%27=%271", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/item?id=1;select+sleep(5)", src_ip: 203.0.113.77}
+    expect: {alerts: 1}

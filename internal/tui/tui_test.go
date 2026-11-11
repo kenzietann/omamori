@@ -450,8 +450,9 @@ func TestEscCancelsTheRunAndKeepsThePartialResult(t *testing.T) {
 
 func TestQuitWorksOnEveryScreenAndStopsARunningTask(t *testing.T) {
 	var runContext context.Context
+	started := make(chan context.Context, 1)
 	waiting := func(ctx context.Context, step func(string)) (Result, error) {
-		runContext = ctx
+		started <- ctx
 		<-ctx.Done()
 
 		return Result{}, nil
@@ -463,8 +464,11 @@ func TestQuitWorksOnEveryScreenAndStopsARunningTask(t *testing.T) {
 			model, command := startedRun(t, waiting)
 			batch := batchOf(t, command)
 			go batch[0]()
-			for runContext == nil {
-				time.Sleep(time.Millisecond)
+			select {
+			case runContext = <-started:
+			case <-time.After(5 * time.Second):
+				model.cancel()
+				t.Fatal("the run did not start")
 			}
 			return model
 		},

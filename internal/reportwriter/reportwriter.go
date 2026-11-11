@@ -56,6 +56,48 @@ func New(sourceDirectory, outputDirectory string) (*Writer, error) {
 	return &Writer{directory: resolved}, nil
 }
 
+// NewRun reserves a new folder for one run, away from every input path.
+// Creating the folder is exclusive, so simultaneous runs cannot share it.
+func NewRun(sourceDirectories []string, outputDirectory string) (*Writer, error) {
+	for _, source := range sourceDirectories {
+		if err := pathguard.CheckOutputFolder(source, outputDirectory); err != nil {
+			return nil, err
+		}
+	}
+	writer, err := NewFolder(outputDirectory)
+	if err != nil {
+		return nil, err
+	}
+	for _, source := range sourceDirectories {
+		if err := pathguard.CheckOutputFolder(source, writer.directory); err != nil {
+			return nil, err
+		}
+	}
+
+	return writer, nil
+}
+
+// NewFolder makes a writer for a folder that does not exist yet. It is for output that has no source folder
+// to stay away from. An existing folder is refused, so nothing in it can be written over.
+func NewFolder(outputDirectory string) (*Writer, error) {
+	if err := os.MkdirAll(filepath.Dir(outputDirectory), 0o700); err != nil {
+		return nil, ErrOutputFolder
+	}
+	if err := os.Mkdir(outputDirectory, 0o700); err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return nil, ErrExists
+		}
+
+		return nil, ErrOutputFolder
+	}
+	resolved, err := filepath.EvalSymlinks(outputDirectory)
+	if err != nil {
+		return nil, ErrOutputFolder
+	}
+
+	return &Writer{directory: resolved}, nil
+}
+
 // createFile makes O_EXCL do the work: the system refuses an existing file, and a
 // symlink that stands in the place of the file, so nothing is ever overwritten.
 func (writer *Writer) createFile(name string, extraFlags int) (*os.File, error) {

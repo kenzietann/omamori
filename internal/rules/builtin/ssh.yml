@@ -1,0 +1,236 @@
+# SSH logins. Fields come from the syslog parser: action, outcome, user, src_ip, auth_method.
+title: SSH login failed
+name: ssh_login_failure
+id: 6f3a2c10-0001-4a6e-9d7b-0a1b2c3d4e01
+description: One failed SSH login. It is counted by other rules and gives no alert alone.
+level: low
+logsource: {product: linux, service: sshd}
+detection:
+  selection: {action: login, outcome: failure}
+  condition: selection
+tests:
+  - name: a failure matches
+    events: [{service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}]
+    expect: {alerts: 1}
+  - name: a success and another service do not match
+    events:
+      - {service: sshd, product: linux, action: login, outcome: success, src_ip: 198.51.100.7, user: aiko}
+      - {service: sudo, product: linux, action: login, outcome: failure, user: aiko}
+    expect: {alerts: 0}
+---
+title: SSH login succeeded
+name: ssh_login_success
+id: 6f3a2c10-0002-4a6e-9d7b-0a1b2c3d4e02
+description: One successful SSH login. It is used by other rules and gives no alert alone.
+level: informational
+logsource: {product: linux, service: sshd}
+detection:
+  selection: {action: login, outcome: success}
+  condition: selection
+tests:
+  - name: a success matches
+    events: [{service: sshd, product: linux, action: login, outcome: success, src_ip: 198.51.100.7, user: aiko}]
+    expect: {alerts: 1}
+  - name: a failure does not match
+    events: [{service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}]
+    expect: {alerts: 0}
+---
+title: SSH password guessing from one address
+name: ssh_brute_force
+id: 6f3a2c10-0003-4a6e-9d7b-0a1b2c3d4e03
+description: Ten or more failed SSH logins from one address in ten minutes.
+level: medium
+tags: [attack.credential_access, attack.t1110.001]
+correlation:
+  type: event_count
+  rules: [ssh_login_failure]
+  group-by: [src_ip]
+  timespan: 10m
+  condition: {gte: 10}
+tests:
+  - name: ten failures in a row are one alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 1}
+  - name: nine failures are no alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 0}
+  - name: ten failures from ten addresses are no alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.1, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.2, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.3, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.4, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.5, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.6, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.7, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.8, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.10, user: root}
+    expect: {alerts: 0}
+  - name: ten failures spread over five hours are no alert
+    events:
+          - {time: "2026-03-01T00:00:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T00:30:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T01:00:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T01:30:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T02:00:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T02:30:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T03:00:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T03:30:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T04:00:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {time: "2026-03-01T04:30:00Z", service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 0}
+---
+title: SSH password spraying from one address
+name: ssh_password_spray
+id: 6f3a2c10-0004-4a6e-9d7b-0a1b2c3d4e04
+description: Failed SSH logins for five or more different users from one address in ten minutes.
+level: medium
+tags: [attack.credential_access, attack.t1110.003]
+correlation:
+  type: value_count
+  rules: [ssh_login_failure]
+  group-by: [src_ip]
+  timespan: 10m
+  condition: {gte: 5, field: user}
+tests:
+  - name: five users from one address are one alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.50, user: admin}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.50, user: deploy}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.50, user: git}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.50, user: oracle}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.50, user: postgres}
+    expect: {alerts: 1}
+  - name: many failures for one user are no alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 0}
+---
+title: SSH login succeeded after password guessing
+name: ssh_brute_force_success
+id: 6f3a2c10-0005-4a6e-9d7b-0a1b2c3d4e05
+description: An address guessed passwords and then logged in. Treat the account as taken over until it is checked.
+level: critical
+tags: [attack.initial_access, attack.t1078, attack.t1110]
+correlation:
+  type: temporal_ordered
+  rules: [ssh_brute_force, ssh_login_success]
+  group-by: [src_ip]
+  timespan: 10m
+tests:
+  - name: ten failures and then a success are one alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: success, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 1}
+  - name: a success before the failures is no alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: success, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 0}
+  - name: three wrong passwords and then a success are no alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: success, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 0}
+  - name: a success from another address is no alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: success, src_ip: 198.51.100.7, user: root}
+    expect: {alerts: 0}
+---
+title: SSH logins for one user fail from many addresses
+name: ssh_distributed_guessing
+id: 6f3a2c10-0006-4a6e-9d7b-0a1b2c3d4e06
+description: Failed SSH logins for one user from eight or more addresses in ten minutes.
+level: medium
+tags: [attack.credential_access, attack.t1110]
+correlation:
+  type: value_count
+  rules: [ssh_login_failure]
+  group-by: [user]
+  timespan: 10m
+  condition: {gte: 8, field: src_ip}
+tests:
+  - name: eight addresses for one user are one alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.1, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.2, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.3, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.4, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.5, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.6, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.7, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.8, user: root}
+    expect: {alerts: 1}
+  - name: one address is no alert
+    events:
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+          - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 0}

@@ -114,7 +114,7 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 
 	if len(keptOut) > 0 {
 		report.WriteString("## Kept out of git (not counted as findings)\n\n")
-		report.WriteString("These are keys in env files that a .gitignore file keeps out of git. This is the normal setup for a key, for what is in the file today. Omamori cannot see the git history. A file that was committed once and ignored later is still in the history, and so is its key. To check, run this in the repository for each file: git log --all --oneline -- the-file. If it prints a commit, treat the key as leaked: revoke it and create a new one. The AI did not see the .gitignore files, so if a note below calls one of these keys exposed, this section is the checked answer for today's files.\n\n")
+		report.WriteString(keptOutText(keptOut))
 		for _, finding := range keptOut {
 			fmt.Fprintf(&report, "- %s:%d %s (%s)\n", plainText(finding.File), finding.Line, plainText(finding.Placeholder), plainText(finding.Type))
 		}
@@ -157,6 +157,29 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 	return text, nil
 }
 
+// keptOutText explains the section. It says that the git history was checked only when it was, for all the files.
+func keptOutText(keptOut []Finding) string {
+	clean, unchecked := 0, 0
+	for _, finding := range keptOut {
+		switch finding.History {
+		case "clean":
+			clean++
+		default:
+			unchecked++
+		}
+	}
+
+	lead := "These are keys in env files that a .gitignore file keeps out of git. This is the normal setup for a key. "
+	switch {
+	case unchecked == 0 && clean > 0:
+		lead += "Omamori asked git about the history of each file: none of them was ever committed. "
+	default:
+		lead += "Omamori could not ask git about the history of every file, and a .gitignore file only helps for the future: a file that was committed once and ignored later is still in the history, and so is its key. To check, run this in the repository for each file: git log --all --oneline -- the-file. If it prints a commit, treat the key as leaked: revoke it and create a new one. "
+	}
+
+	return lead + "The AI did not see the .gitignore files or the git history, so if a note below calls one of these keys exposed, this section is the checked answer.\n\n"
+}
+
 // renderNotYours folds the matches of one type on one line into one bullet.
 func renderNotYours(findings []Finding) string {
 	var out strings.Builder
@@ -185,8 +208,11 @@ func renderFixes(findings []Finding) string {
 	counts := make(map[fix]int)
 	for _, finding := range findings {
 		label := finding.Type
-		if finding.Advice == adviceOpenEnv {
+		switch {
+		case finding.Advice == adviceOpenEnv:
 			label += " in an env file that git does not ignore"
+		case strings.HasPrefix(finding.Advice, adviceHistoryStart):
+			label += " in an env file that is in the git history"
 		}
 		counts[fix{label, finding.Advice}]++
 	}
@@ -214,7 +240,7 @@ func renderLimits(stats Stats) string {
 	limits.WriteString("- Omamori looks for: AWS access key IDs (AKIA, ASIA), GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_), AI provider keys (sk-), Google API keys (AIza), Slack tokens (xox), Stripe live keys, JWTs, private key blocks, passwords written inside web addresses, My Number, and Japanese phone numbers.\n")
 	limits.WriteString("- It does not find or hide other secret formats, passwords, email addresses, IP addresses, names, or street addresses.\n")
 	limits.WriteString("- A My Number with a valid check digit is a possible identifier, not proof.\n")
-	limits.WriteString("- For a key in an env file (.env), the .gitignore files inside the scanned folder are read. Omamori does not check git itself: a file that was committed before it was ignored is still in the git history.\n")
+	limits.WriteString("- For a key in an env file (.env), the .gitignore files inside the scanned folder are read, and git is asked if the file was ever committed. Old versions of files are not scanned: a secret that was committed in another file and deleted later is not found.\n")
 	limits.WriteString("- Findings come only from the files that the scans in this run covered. Anything else is not covered.\n")
 	limits.WriteString("- These are not scanned: the .git folder (the history of the project), dependency and library folders (node_modules, vendor, venv, .venv, __pycache__, Pods, SourcePackages, .angular, .gradle, and others), the skills and plugins of AI coding tools (.agents/skills, .claude/plugins, and the like), and lock files. A secret that was committed earlier and later removed is not found.\n")
 	limits.WriteString("- A placeholder in a file name stands for a secret found in the name. The real name is not shown. Placeholder numbers come from the scan and can change from run to run.\n")

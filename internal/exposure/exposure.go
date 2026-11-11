@@ -11,6 +11,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/agent"
 	"github.com/kenzietann/omamori/internal/gateway"
+	"github.com/kenzietann/omamori/internal/githistory"
 	"github.com/kenzietann/omamori/internal/gitignore"
 )
 
@@ -34,6 +35,9 @@ const SeverityNotYours = "not-yours"
 const SeverityDoubtful = "doubtful"
 
 type Finding struct {
+	// History is "clean" when git was asked and the file was never committed, "unchecked" when git could not be
+	// asked, and empty when the question was not asked. Only env files that .gitignore keeps out are asked.
+	History     string
 	Severity    string
 	Type        string
 	File        string
@@ -54,6 +58,17 @@ type Collector struct {
 	inner    agent.Tools
 	findings map[string]Finding
 	stats    Stats
+	history  HistoryReader
+}
+
+// HistoryReader tells which commits touched a file. The githistory package is the real one.
+type HistoryReader interface {
+	Commits(ctx context.Context, path string) githistory.Answer
+}
+
+// SetHistory lets the collector ask git about env files that .gitignore keeps out. Without it, it does not ask.
+func (collector *Collector) SetHistory(reader HistoryReader) {
+	collector.history = reader
 }
 
 func NewCollector(inner agent.Tools) *Collector {
@@ -324,10 +339,36 @@ func (collector *Collector) CheckIgnore(ctx context.Context) {
 
 		if gitignore.Ignored(chain, finding.File) {
 			finding.Severity, finding.Advice = SeverityKeptOut, adviceIgnoredEnv
+			collector.applyHistory(ctx, &finding)
 		} else {
 			finding.Severity, finding.Advice = "high", adviceOpenEnv
 		}
 		collector.findings[key] = finding
+	}
+}
+
+const adviceHistoryStart = "This env file is ignored by .gitignore today, but git has it in its history"
+
+// applyHistory asks git if an env file that .gitignore keeps out was ever committed. If it was, the key is in the
+// history, and anyone who can read the repository can read it: that is a finding.
+func (collector *Collector) applyHistory(ctx context.Context, finding *Finding) {
+	if collector.history == nil {
+		return
+	}
+
+	answer := collector.history.Commits(ctx, finding.File)
+	switch {
+	case !answer.Checked:
+		finding.History = "unchecked"
+	case len(answer.Commits) == 0:
+		finding.History = "clean"
+	default:
+		list := strings.Join(answer.Commits, ", ")
+		if answer.More {
+			list += " and more"
+		}
+		finding.Severity = "high"
+		finding.Advice = adviceHistoryStart + " (commits " + list + "). Anyone who can read the repository can read the old key. Treat the key as leaked: revoke it and create a new one. Deleting the file does not remove it from the history."
 	}
 }
 

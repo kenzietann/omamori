@@ -126,6 +126,9 @@ func TestParseRefusesUnknownFieldsAndExtraData(t *testing.T) {
 	for name, text := range map[string]string{
 		"an unknown field":  strings.Replace(good, `"task"`, `"extra": 1, "task"`, 1),
 		"a second document": good + good,
+		"a closing brace":   good + "}",
+		"a closing bracket": good + "]",
+		"a trailing scalar": good + "true",
 		"not JSON":          "hello",
 		"empty":             "",
 		"a list":            "[]",

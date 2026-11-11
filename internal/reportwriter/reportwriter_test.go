@@ -238,3 +238,77 @@ func TestNewRefusesOverlappingFolders(t *testing.T) {
 		t.Error("a refused output folder was still created inside the project")
 	}
 }
+
+func TestNewFolderMakesANewFolderAndRefusesAnOldOne(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "a", "b")
+	writer, err := NewFolder(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Write("x.txt", "content"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewFolder(directory); !errors.Is(err, ErrExists) {
+		t.Fatalf("an existing folder gave %v, want ErrExists", err)
+	}
+	if data, err := os.ReadFile(filepath.Join(directory, "x.txt")); err != nil || string(data) != "content" {
+		t.Fatal("the file of the first writer was changed")
+	}
+
+	// A link in the place of the folder is refused too, so nothing is written to where it points.
+	target, link := t.TempDir(), filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skip("links cannot be made here")
+	}
+	if _, err := NewFolder(link); !errors.Is(err, ErrExists) {
+		t.Fatalf("a link gave %v, want ErrExists", err)
+	}
+}
+
+func TestNewRunChecksEverySourceBeforeCreatingTheFolder(t *testing.T) {
+	base := t.TempDir()
+	first, second := filepath.Join(base, "first"), filepath.Join(base, "second")
+	for _, source := range []string{first, second} {
+		if err := os.Mkdir(source, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	directory := filepath.Join(second, "reports")
+	if _, err := NewRun([]string{first, second}, directory); !errors.Is(err, pathguard.ErrFoldersOverlap) {
+		t.Fatalf("overlapping second source gave %v", err)
+	}
+	if _, err := os.Stat(directory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("refused run left an output folder: %v", err)
+	}
+}
+
+func TestNewRunReservesTheFolderForOnlyOneWriter(t *testing.T) {
+	base := t.TempDir()
+	source, directory := filepath.Join(base, "logs"), filepath.Join(base, "run")
+	if err := os.Mkdir(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const contenders = 8
+	start := make(chan struct{})
+	results := make(chan error, contenders)
+	for range contenders {
+		go func() {
+			<-start
+			_, err := NewRun([]string{source}, directory)
+			results <- err
+		}()
+	}
+	close(start)
+	writers := 0
+	for range contenders {
+		err := <-results
+		if err == nil {
+			writers++
+		} else if !errors.Is(err, ErrExists) {
+			t.Errorf("reserving the run folder gave %v", err)
+		}
+	}
+	if writers != 1 {
+		t.Fatalf("%d writers reserved the same run folder, want 1", writers)
+	}
+}

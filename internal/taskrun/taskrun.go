@@ -18,6 +18,7 @@ import (
 	"github.com/kenzietann/omamori/internal/eventlog"
 	"github.com/kenzietann/omamori/internal/exposure"
 	"github.com/kenzietann/omamori/internal/gateway"
+	"github.com/kenzietann/omamori/internal/githistory"
 	"github.com/kenzietann/omamori/internal/htmlreport"
 	"github.com/kenzietann/omamori/internal/outbound"
 	"github.com/kenzietann/omamori/internal/pathguard"
@@ -323,32 +324,11 @@ func Prepare(config Config, setup Setup) (*Session, error) {
 		return nil, err
 	}
 
-	chosen := config.choice(setup.ProviderID)
-	if chosen == nil {
-		return nil, ErrUnknownProvider
-	}
-
-	model := strings.TrimSpace(setup.Model)
-	if model == "" {
-		model = chosen.DefaultModel
-	}
-	if model == "" {
-		return nil, ErrNeedsModel
-	}
-
-	key, err := config.resolveKey(context.Background(), chosen, setup.Key)
+	resolved, err := ResolveProvider(context.Background(), config, setup)
 	if err != nil {
 		return nil, err
 	}
-
-	if !outbound.ValidReasoning(chosen.ID, model, setup.Reasoning) {
-		return nil, ErrReasoning
-	}
-
-	provider, err := config.factory()(chosen.ID, key, model, setup.Reasoning)
-	if err != nil {
-		return nil, ErrSetup
-	}
+	provider, model := resolved.Provider, resolved.Model
 	// Every live run is recorded, so that it can be played back later without a network.
 	recorder := replay.NewRecorder(provider, string(task), model, log)
 	if task == TaskTriage {
@@ -648,6 +628,7 @@ func (session *Session) Run(ctx context.Context, step func(string)) (Result, err
 	var collector *exposure.Collector
 	if session.task == TaskExposure {
 		collector = exposure.NewCollector(session.gateway)
+		collector.SetHistory(githistory.New(session.config.Target))
 		tools = collector
 	}
 	runner, err := agent.New(session.sender, tools, &stepRecorder{log: log, step: step}, session.config.Limits, session.specs)
