@@ -81,7 +81,13 @@ These are the cheap kind of mistake: a harmless value is hidden. None of them is
 
 ## Speed
 
-The sanitizer reads about 1 MB per second. Almost all of that time is the phone
-number detector (about 1 MB/s). The secrets detector reads 45 to 30,000 MB/s, and the
+The phone number detector was the slow part (1.4 MB/s on log-like text). It now cuts
+the text into runs of digits and number symbols, and runs the big pattern only on runs
+with at least 10 digits. On the same log-like text it reads about 8 MB/s. A test checks
+that this gives the same matches as the old whole-text method, and the fuzz test checks
+it on random input.
+
+The worst case is unchanged: a text made only of digits, spaces and hyphens is one long
+run, so it is still about 1 MB/s. The secrets detector reads 45 to 30,000 MB/s, and the
 My Number detector reads over 110 MB/s, depending on the text. The speed budget is not
 decided yet.
