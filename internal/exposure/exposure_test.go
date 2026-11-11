@@ -209,7 +209,7 @@ func TestReportHasAllFourPartsAndTheExpectedPlaceholders(t *testing.T) {
 			t.Errorf("the report has no %q", part)
 		}
 	}
-	for _, skipped := range []string{"the .git folder (the history of the project)", "dependency folders (node_modules, vendor, venv, .venv, __pycache__)", "and lock files"} {
+	for _, skipped := range []string{"the .git folder (the history of the project)", "dependency and library folders (node_modules, vendor, venv, .venv, __pycache__", "and lock files"} {
 		if !strings.Contains(result.report, skipped) {
 			t.Errorf("the limits do not say that %q is not scanned", skipped)
 		}
@@ -695,5 +695,44 @@ func TestExampleAndLookalikeMatchesAreDoubtfulAndRealOnesStayHigh(t *testing.T) 
 	}
 	if finding, _ := parseDetectorLine("docs/readme.md:3: [EXAMPLE:url-credentials:001]"); finding.Type != "url-credentials (example)" {
 		t.Errorf("type = %q", finding.Type)
+	}
+}
+
+func TestTheLimitsSayHowManyBinaryFilesWereLeftOutApartFromFilesThatCouldNotBeRead(t *testing.T) {
+	report, err := Render(nil, Stats{Scans: 1, Binary: 18000, Skipped: 3}, agent.Outcome{Status: agent.Complete})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{"- 18000 binary files (images, archives, fonts and the like) were not scanned", "- 3 files were skipped because they were too large or could not be read."} {
+		if !strings.Contains(report, want) {
+			t.Errorf("the limits have no %q:\n%s", want, report)
+		}
+	}
+	none, _ := Render(nil, Stats{Scans: 1}, agent.Outcome{Status: agent.Complete})
+	if strings.Contains(none, "binary files") || strings.Contains(none, "were skipped") {
+		t.Errorf("the limits mention files that were not skipped:\n%s", none)
+	}
+}
+
+func TestTwoKeysWithDifferentAdviceAreTwoLinesAndTheUnignoredEnvFileIsNamed(t *testing.T) {
+	inEnv, _ := parseDetectorLine("backend/.env:2: [SECRET:ai-api-key:001]")
+	inEnv.Advice = adviceOpenEnv
+	inCode, _ := parseDetectorLine("backend/app.ts:10: [SECRET:ai-api-key:002]")
+
+	fixes := renderFixes([]Finding{inEnv, inCode})
+
+	for _, want := range []string{"- ai-api-key in an env file that git does not ignore (1): No .gitignore rule", "- ai-api-key (1): Revoke this AI provider key"} {
+		if !strings.Contains(fixes, want) {
+			t.Errorf("the fixes have no %q:\n%s", want, fixes)
+		}
+	}
+}
+
+func TestTheInstructionTellsTheAIWhatDoubtfulPlaceholdersMean(t *testing.T) {
+	for _, want := range []string{"NUMBERLIKE", "EXAMPLE", "probably not real", "suggest no fix"} {
+		if !strings.Contains(Instruction, want) {
+			t.Errorf("the instruction has no %q: %s", want, Instruction)
+		}
 	}
 }

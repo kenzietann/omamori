@@ -182,7 +182,7 @@ func TestAKeyThatGitIgnoresIsNotAFindingAndHasItsOwnSection(t *testing.T) {
 		t.Errorf("the table must hold the phone number and not the ignored key:\n%s", table)
 	}
 	section := report[strings.Index(report, "## Kept out of git"):]
-	for _, want := range []string{"not counted as findings", "- backend/.env:1 [SECRET:ai-api-key:001] (ai-api-key)", "the normal setup for a key"} {
+	for _, want := range []string{"not counted as findings", "- backend/.env:1 [SECRET:ai-api-key:001] (ai-api-key)", "the normal setup for a key", "cannot see the git history", "git log --all --oneline -- the-file", "revoke it and create a new one"} {
 		if !strings.Contains(section, want) {
 			t.Errorf("the section has no %q:\n%s", want, section)
 		}

@@ -281,7 +281,7 @@ func Run(ctx context.Context, runner Runner, collector *Collector) (string, agen
 }
 
 const (
-	adviceIgnoredEnv = "Your .gitignore keeps this file out of git, which is the right setup. Nothing to fix, if it was never committed (check with git log --all on the file). Keep the rights of the key small, and revoke the key if the file ever left your computer."
+	adviceIgnoredEnv = "Your .gitignore keeps this file out of git, which is the right setup. Nothing to fix today, but Omamori cannot see the git history: check with git log --all --oneline on the file, and if it prints a commit, the key is in the history, so revoke it. Keep the rights of the key small, and revoke the key if the file ever left your computer."
 	adviceOpenEnv    = "No .gitignore rule in the scanned folder keeps this file out of git. A commit would publish the key. Add the file to .gitignore, check that it was never committed, and revoke the key and create a new one if it was."
 )
 

@@ -1,6 +1,7 @@
 package exposure
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -77,14 +78,23 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 	notCounted := len(keptOut) + len(notYours) + len(doubtful)
 
 	report.WriteString("## Findings\n\n")
+	stopped := ""
+	if stats.Truncated {
+		stopped = "WARNING: a scan stopped at a limit, so some findings may be missing. Do not read this report as clean.\n\n"
+	}
 	switch {
 	case stats.Scans == 0:
 		report.WriteString("No scan ran, so nothing was checked. This report has no findings because nothing was looked at.\n\n")
+	case len(exposed) == 0 && notCounted > 0 && stats.Truncated:
+		report.WriteString("No exposed data was found in the part that was scanned. Matches that are not counted are listed below. " + stopped)
 	case len(exposed) == 0 && notCounted > 0:
 		report.WriteString("The scans that ran reported no exposed data. Matches that are not counted (a key that .gitignore keeps out of git, text in a library or a generated file, or digits inside a decimal number or a name) are listed below. This does not prove that the project is clean. See Limits.\n\n")
+	case len(exposed) == 0 && stats.Truncated:
+		report.WriteString("No findings in the part that was scanned. " + stopped)
 	case len(exposed) == 0:
 		report.WriteString("The scans that ran reported no findings. This does not prove that the project is clean. See Limits.\n\n")
 	default:
+		report.WriteString(stopped)
 		report.WriteString("| ID | Severity | Type | File | Line |\n|---|---|---|---|---|\n")
 		for _, finding := range exposed {
 			fmt.Fprintf(&report, "| %s | %s | %s | %s | %d |\n", plainText(finding.Placeholder), finding.Severity, plainText(finding.Type), plainText(finding.File), finding.Line)
@@ -104,7 +114,7 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 
 	if len(keptOut) > 0 {
 		report.WriteString("## Kept out of git (not counted as findings)\n\n")
-		report.WriteString("These are keys in env files that a .gitignore file keeps out of git. This is the normal setup for a key. The AI did not see the .gitignore files, so if a note below calls one of these keys exposed, this section is the checked answer.\n\n")
+		report.WriteString("These are keys in env files that a .gitignore file keeps out of git. This is the normal setup for a key, for what is in the file today. Omamori cannot see the git history. A file that was committed once and ignored later is still in the history, and so is its key. To check, run this in the repository for each file: git log --all --oneline -- the-file. If it prints a commit, treat the key as leaked: revoke it and create a new one. The AI did not see the .gitignore files, so if a note below calls one of these keys exposed, this section is the checked answer for today's files.\n\n")
 		for _, finding := range keptOut {
 			fmt.Fprintf(&report, "- %s:%d %s (%s)\n", plainText(finding.File), finding.Line, plainText(finding.Placeholder), plainText(finding.Type))
 		}
@@ -171,29 +181,30 @@ func renderNotYours(findings []Finding) string {
 }
 
 func renderFixes(findings []Finding) string {
-	counts := make(map[string]int)
-	adviceFor := make(map[string]string)
+	type fix struct{ label, advice string }
+	counts := make(map[fix]int)
 	for _, finding := range findings {
-		key := finding.Type
-		if finding.Severity == "low" {
-			key += " in generated files"
+		label := finding.Type
+		if finding.Advice == adviceOpenEnv {
+			label += " in an env file that git does not ignore"
 		}
-		counts[key]++
-		adviceFor[key] = finding.Advice
+		counts[fix{label, finding.Advice}]++
 	}
 
-	keys := make([]string, 0, len(counts))
-	for key := range counts {
-		keys = append(keys, key)
+	fixes := make([]fix, 0, len(counts))
+	for one := range counts {
+		fixes = append(fixes, one)
 	}
-	slices.Sort(keys)
+	slices.SortFunc(fixes, func(first, second fix) int {
+		return cmp.Or(cmp.Compare(first.label, second.label), cmp.Compare(first.advice, second.advice))
+	})
 
-	var fixes strings.Builder
-	for _, key := range keys {
-		fmt.Fprintf(&fixes, "- %s (%d): %s\n", plainText(key), counts[key], adviceFor[key])
+	var out strings.Builder
+	for _, one := range fixes {
+		fmt.Fprintf(&out, "- %s (%d): %s\n", plainText(one.label), counts[one], one.advice)
 	}
 
-	return fixes.String()
+	return out.String()
 }
 
 func renderLimits(stats Stats) string {
@@ -205,11 +216,14 @@ func renderLimits(stats Stats) string {
 	limits.WriteString("- A My Number with a valid check digit is a possible identifier, not proof.\n")
 	limits.WriteString("- For a key in an env file (.env), the .gitignore files inside the scanned folder are read. Omamori does not check git itself: a file that was committed before it was ignored is still in the git history.\n")
 	limits.WriteString("- Findings come only from the files that the scans in this run covered. Anything else is not covered.\n")
-	limits.WriteString("- These are not scanned: the .git folder (the history of the project), dependency folders (node_modules, vendor, venv, .venv, __pycache__), and lock files. A secret that was committed earlier and later removed is not found.\n")
+	limits.WriteString("- These are not scanned: the .git folder (the history of the project), dependency and library folders (node_modules, vendor, venv, .venv, __pycache__, Pods, SourcePackages, .angular, .gradle, and others), the skills and plugins of AI coding tools (.agents/skills, .claude/plugins, and the like), and lock files. A secret that was committed earlier and later removed is not found.\n")
 	limits.WriteString("- A placeholder in a file name stands for a secret found in the name. The real name is not shown. Placeholder numbers come from the scan and can change from run to run.\n")
 	limits.WriteString("- The AI notes are written by the AI. Omamori did not check them.\n")
+	if stats.Binary > 0 {
+		fmt.Fprintf(&limits, "- %d binary files (images, archives, fonts and the like) were not scanned, because digits in them are not text.\n", stats.Binary)
+	}
 	if stats.Skipped > 0 {
-		fmt.Fprintf(&limits, "- %d files were skipped because they were too large, binary, or could not be read.\n", stats.Skipped)
+		fmt.Fprintf(&limits, "- %d files were skipped because they were too large or could not be read.\n", stats.Skipped)
 	}
 	if stats.Truncated {
 		limits.WriteString("- At least one scan stopped at a limit, so some findings may be missing.\n")
