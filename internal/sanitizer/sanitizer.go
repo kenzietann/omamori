@@ -6,10 +6,15 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/kenzietann/omamori/internal/edge"
 	"github.com/kenzietann/omamori/internal/mynumber"
 	"github.com/kenzietann/omamori/internal/phone"
 	"github.com/kenzietann/omamori/internal/secrets"
 )
+
+// NumberLike is the label of digits that look like a phone number or a My Number but sit inside a longer
+// number or a name.
+const NumberLike = "NUMBERLIKE"
 
 type Finding struct {
 	Placeholder string
@@ -32,13 +37,29 @@ func findSpans(text string) []span {
 	var spans []span
 
 	for _, match := range secrets.FindSecrets(text) {
-		spans = append(spans, span{start: match.Start, end: match.End, label: "SECRET:" + match.Kind, priority: 0})
+		label := "SECRET:" + match.Kind
+		// A password like user:pass in an address is an example from a document or a test. It is hidden as well.
+		if match.Kind == "url-credentials" && edge.PlaceholderCredentials(text[match.Start:match.End]) {
+			label = "EXAMPLE:" + match.Kind
+		}
+		spans = append(spans, span{start: match.Start, end: match.End, label: label, priority: 0})
 	}
+	// A number inside a decimal (0.0643290124), a UUID, a row of digit groups, or next to letters (abc0312345678)
+	// is hidden like any other, because a missed value costs more than a needless placeholder. It gets its own
+	// label, so that the report can tell the user that it is most likely a coordinate, an id or a test value.
 	for _, match := range mynumber.FindMyNumbers(text) {
-		spans = append(spans, span{start: match.Start, end: match.End, label: "MYNUMBER", priority: 1})
+		label := "MYNUMBER"
+		if edge.Embedded(text, match.Start, match.End) || edge.InUUID(text, match.Start, match.End) || edge.InChain(text, match.Start, match.End) || edge.Trivial(text[match.Start:match.End]) {
+			label = NumberLike
+		}
+		spans = append(spans, span{start: match.Start, end: match.End, label: label, priority: 1})
 	}
 	for _, match := range phone.FindPhoneNumbers(text) {
-		spans = append(spans, span{start: match.Start, end: match.End, label: "PHONE", priority: 2})
+		label := "PHONE"
+		if edge.Embedded(text, match.Start, match.End) || edge.InUUID(text, match.Start, match.End) || edge.Trivial(text[match.Start:match.End]) {
+			label = NumberLike
+		}
+		spans = append(spans, span{start: match.Start, end: match.End, label: label, priority: 2})
 	}
 
 	return spans

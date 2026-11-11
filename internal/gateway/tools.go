@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -43,6 +44,9 @@ func shorten(line string) string {
 	return string(runes[:maxLineLength]) + "..."
 }
 
+// binaryProbeBytes is how much of the start of a file is checked for a zero byte.
+const binaryProbeBytes = 8000
+
 func (gateway *Gateway) readTextFile(resolvedPath string) (string, error) {
 	info, err := os.Stat(resolvedPath)
 	if err != nil {
@@ -65,6 +69,11 @@ func (gateway *Gateway) readTextFile(resolvedPath string) (string, error) {
 	}
 	if int64(len(data)) > gateway.limits.MaxFileBytes {
 		return "", ErrLimitExceeded
+	}
+
+	// A file with a zero byte near the start is binary (an image, an archive). Digits in it are not text.
+	if bytes.IndexByte(data[:min(len(data), binaryProbeBytes)], 0) >= 0 {
+		return "", ErrToolFailed
 	}
 
 	text := string(data)

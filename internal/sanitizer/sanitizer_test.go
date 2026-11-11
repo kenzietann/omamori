@@ -140,3 +140,29 @@ func TestAPrivateKeyBlockBecomesOnePlaceholderAndNoLineOfItRemains(t *testing.T)
 		t.Errorf("got %q with %d findings", got, len(findings))
 	}
 }
+
+func TestDigitsInsideADecimalOrANameAreHiddenButLabelledNumberLike(t *testing.T) {
+	testCases := []struct {
+		name string
+		text string
+		want string
+	}{
+		{"a decimal fraction", "x = -0.0643290124;", "x = -0.[NUMBERLIKE:001];"},
+		{"a long decimal fraction like a My Number", "y = 0.000428679482,", "y = 0.[NUMBERLIKE:001],"},
+		{"an id with letters", "id=abc0312345678", "id=abc[NUMBERLIKE:001]"},
+		{"a real number stays a phone number", "Tel: 03-1234-5678.", "Tel: [PHONE:001]."},
+		{"a real number after a Japanese word", "電話03-1234-5678です", "電話[PHONE:001]です"},
+		{"a bracket number after a word", "TEL（06）6789-0123 FAX", "TEL[PHONE:001] FAX"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var sanitizer Sanitizer
+
+			got, _ := sanitizer.Sanitize(testCase.text)
+
+			if got != testCase.want {
+				t.Errorf("Sanitize(%q) = %q, want %q", testCase.text, got, testCase.want)
+			}
+		})
+	}
+}
