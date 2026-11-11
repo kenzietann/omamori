@@ -2,6 +2,7 @@ package phone
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -73,6 +74,72 @@ func TestFindPhoneNumbers(t *testing.T) {
 	}
 }
 
+func findPhoneNumbersWholeText(text string) []Match {
+	normalized := make([]byte, 0, len(text))
+	byteOffsets := make([]int, 0, len(text)+1)
+
+	for byteIndex, character := range text {
+		normalized = append(normalized, normalizeCharacter(character))
+		byteOffsets = append(byteOffsets, byteIndex)
+	}
+	byteOffsets = append(byteOffsets, len(text))
+
+	var matches []Match
+
+	for _, position := range phonePattern.FindAllIndex(normalized, -1) {
+		start, end := position[0], position[1]
+
+		if start > 0 && isASCIIDigit(normalized[start-1]) {
+			continue
+		}
+		if end < len(normalized) && isASCIIDigit(normalized[end]) {
+			continue
+		}
+
+		matches = append(matches, Match{Start: byteOffsets[start], End: byteOffsets[end]})
+	}
+
+	return matches
+}
+
+func TestRunByRunMatchesWholeText(t *testing.T) {
+	inputTexts := []string{
+		"",
+		"090-1234-5678",
+		"call 090-1234-5678 or 03-1234-5678 now",
+		"0901234567890123",
+		"1 090-1234-5678 9",
+		"090-1234-5678\n090-1234-5678",
+		"tel (03) 1234-5678 / +81 (0) 90 1234 5678",
+		"１２３ 090-1234-5678９",
+		"090 1234 5678 1234 5678 9012",
+		"0 9 0 1 2 3 4 5 6 7 8",
+		"2026-11-11 10:15:32 request 123456",
+		"090-1234-56789 and 0312345678",
+		strings.Repeat("0123456789 ", 50),
+		strings.Repeat("a", 100) + "09012345678" + strings.Repeat("b", 100),
+	}
+
+	for _, inputText := range inputTexts {
+		gotMatches := FindPhoneNumbers(inputText)
+		wantMatches := findPhoneNumbersWholeText(inputText)
+
+		if !slices.Equal(gotMatches, wantMatches) {
+			t.Errorf("FindPhoneNumbers(%q) = %v, whole-text method gives %v", inputText, gotMatches, wantMatches)
+		}
+	}
+}
+
+func BenchmarkFindPhoneNumbers(b *testing.B) {
+	line := "2026-11-11 10:15:32 INFO request id=123456 took 45ms from 192.168.0.12 本日の会議は午後三時です\n"
+	benchmarkText := strings.Repeat(line, 10000)
+
+	b.SetBytes(int64(len(benchmarkText)))
+	for b.Loop() {
+		FindPhoneNumbers(benchmarkText)
+	}
+}
+
 func FuzzFindPhoneNumbers(f *testing.F) {
 	f.Add("call 090-1234-5678 now")
 	f.Add("+81 90 1234 5678")
@@ -80,6 +147,11 @@ func FuzzFindPhoneNumbers(f *testing.F) {
 	f.Add("")
 
 	f.Fuzz(func(t *testing.T, inputText string) {
-		FindPhoneNumbers(inputText)
+		gotMatches := FindPhoneNumbers(inputText)
+		wantMatches := findPhoneNumbersWholeText(inputText)
+
+		if !slices.Equal(gotMatches, wantMatches) {
+			t.Errorf("run-by-run gives %v, whole-text method gives %v", gotMatches, wantMatches)
+		}
 	})
 }

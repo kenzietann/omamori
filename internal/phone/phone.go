@@ -20,6 +20,11 @@ var numberShapes = [][]string{
 	{`[1-9]\d{3}`, `\d`, `\d{4}`},
 }
 
+const (
+	unrelatedCharacter = 'x'
+	minimumDigits      = 10
+)
+
 var phonePattern = buildPattern()
 
 func buildPattern() *regexp.Regexp {
@@ -70,7 +75,7 @@ func normalizeCharacter(character rune) byte {
 		return '.'
 	}
 
-	return 'x'
+	return unrelatedCharacter
 }
 
 func isASCIIDigit(character byte) bool {
@@ -89,17 +94,37 @@ func FindPhoneNumbers(text string) []Match {
 
 	var matches []Match
 
-	for _, position := range phonePattern.FindAllIndex(normalized, -1) {
-		start, end := position[0], position[1]
-
-		if start > 0 && isASCIIDigit(normalized[start-1]) {
-			continue
-		}
-		if end < len(normalized) && isASCIIDigit(normalized[end]) {
+	for runStart := 0; runStart < len(normalized); {
+		if normalized[runStart] == unrelatedCharacter {
+			runStart++
 			continue
 		}
 
-		matches = append(matches, Match{Start: byteOffsets[start], End: byteOffsets[end]})
+		runEnd := runStart
+		digitCount := 0
+		for runEnd < len(normalized) && normalized[runEnd] != unrelatedCharacter {
+			if isASCIIDigit(normalized[runEnd]) {
+				digitCount++
+			}
+			runEnd++
+		}
+
+		if digitCount >= minimumDigits {
+			for _, position := range phonePattern.FindAllIndex(normalized[runStart:runEnd], -1) {
+				start, end := runStart+position[0], runStart+position[1]
+
+				if start > 0 && isASCIIDigit(normalized[start-1]) {
+					continue
+				}
+				if end < len(normalized) && isASCIIDigit(normalized[end]) {
+					continue
+				}
+
+				matches = append(matches, Match{Start: byteOffsets[start], End: byteOffsets[end]})
+			}
+		}
+
+		runStart = runEnd
 	}
 
 	return matches
