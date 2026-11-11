@@ -45,8 +45,22 @@ type Request struct {
 }
 
 type Response struct {
-	Text      string
-	ToolCalls []ToolCall
+	Text       string
+	ToolCalls  []ToolCall
+	TokensUsed int
+}
+
+func ValidToolCall(call ToolCall) bool {
+	if !validIdentifier.MatchString(call.Name) {
+		return false
+	}
+	for key := range call.Arguments {
+		if !validIdentifier.MatchString(key) {
+			return false
+		}
+	}
+
+	return true
 }
 
 type SafeRequest struct {
@@ -185,13 +199,8 @@ func validate(request Request) error {
 			return ErrInvalidRequest
 		}
 		for _, call := range message.ToolCalls {
-			if !validIdentifier.MatchString(call.Name) {
+			if !ValidToolCall(call) {
 				return ErrInvalidRequest
-			}
-			for key := range call.Arguments {
-				if !validIdentifier.MatchString(key) {
-					return ErrInvalidRequest
-				}
 			}
 		}
 	}
