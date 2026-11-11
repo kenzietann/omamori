@@ -1,0 +1,17 @@
+{
+  "year": 2026,
+  "guessing.log": [
+    {"scenario": "guessing_then_success", "ip": "203.0.113.5", "users": ["admin"], "lines": [2, 3, 4, 5, 6], "success_line": 7, "count": 5, "first": "Nov 11 09:00:01", "last": "Nov 11 09:01:30"}
+  ],
+  "spraying.log": [
+    {"scenario": "password_spraying", "ip": "192.0.2.66", "users": ["admin", "git", "oracle", "postgres", "root", "test"], "lines": [1, 2, 3, 4, 5, 6], "count": 6, "first": "Nov 11 10:00:00", "last": "Nov 11 10:01:44"}
+  ],
+  "benign.log": [],
+  "malformed.log": [
+    {"scenario": "guessing_then_success", "ip": "203.0.113.5", "users": ["admin"], "lines": [1, 3, 4, 6, 8], "success_line": 9, "count": 5, "first": "Nov 11 09:00:01", "last": "Nov 11 09:01:30"}
+  ],
+  "equal_times.log": [
+    {"scenario": "guessing_then_success", "ip": "203.0.113.9", "users": ["root"], "lines": [1, 2, 3, 4, 5], "success_line": 6, "count": 5, "first": "Nov 11 09:00:00", "last": "Nov 11 09:00:00"}
+  ],
+  "malformed_lines": {"guessing.log": 0, "spraying.log": 0, "benign.log": 0, "malformed.log": 3, "equal_times.log": 0}
+}

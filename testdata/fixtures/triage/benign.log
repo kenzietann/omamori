@@ -1,0 +1,9 @@
+Nov 11 08:00:01 web sshd[300]: Accepted password for alice from 198.51.100.7 port 40000 ssh2
+Nov 11 08:15:00 web CRON[301]: (root) CMD (command -v debian-sa1)
+Nov 11 08:20:10 web sshd[302]: Failed password for bob from 198.51.100.8 port 40001 ssh2
+Nov 11 08:20:20 web sshd[302]: Failed password for bob from 198.51.100.8 port 40002 ssh2
+Nov 11 08:20:35 web sshd[302]: Accepted password for bob from 198.51.100.8 port 40003 ssh2
+Nov 11 09:00:00 web sshd[303]: Failed password for carol from 198.51.100.9 port 40004 ssh2
+Nov 11 09:40:00 web sshd[304]: Failed password for carol from 198.51.100.9 port 40005 ssh2
+Nov 11 10:10:00 web sshd[305]: Accepted publickey for dave from 198.51.100.10 port 40006 ssh2: RSA SHA256:fake
+Nov 11 10:30:00 web sshd[306]: Connection closed by 198.51.100.11 port 40007 [preauth]

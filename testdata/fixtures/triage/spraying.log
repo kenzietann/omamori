@@ -1,0 +1,9 @@
+Nov 11 10:00:00 web sshd[2001]: Failed password for root from 192.0.2.66 port 41001 ssh2
+Nov 11 10:00:20 web sshd[2001]: Failed password for invalid user admin from 192.0.2.66 port 41002 ssh2
+Nov 11 10:00:41 web sshd[2001]: Failed password for invalid user test from 192.0.2.66 port 41003 ssh2
+Nov 11 10:01:02 web sshd[2001]: Failed password for invalid user oracle from 192.0.2.66 port 41004 ssh2
+Nov 11 10:01:23 web sshd[2001]: Failed password for invalid user git from 192.0.2.66 port 41005 ssh2
+Nov 11 10:01:44 web sshd[2001]: Failed password for invalid user postgres from 192.0.2.66 port 41006 ssh2
+Nov 11 10:02:30 web sshd[2002]: Failed password for carol from 198.51.100.20 port 22 ssh2
+Nov 11 10:02:35 web sshd[2002]: Failed password for carol from 198.51.100.20 port 22 ssh2
+Nov 11 10:03:00 web sshd[2003]: Accepted password for carol from 198.51.100.20 port 22 ssh2

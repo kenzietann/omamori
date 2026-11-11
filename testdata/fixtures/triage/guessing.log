@@ -1,0 +1,9 @@
+Nov 11 08:55:10 web sshd[900]: Accepted password for alice from 198.51.100.7 port 40000 ssh2
+Nov 11 09:00:01 web sshd[1001]: Failed password for invalid user admin from 203.0.113.5 port 50001 ssh2
+Nov 11 09:00:15 web sshd[1001]: Failed password for admin from 203.0.113.5 port 50002 ssh2
+Nov 11 09:00:40 web sshd[1001]: Failed password for admin from 203.0.113.5 port 50003 ssh2
+Nov 11 09:01:05 web sshd[1001]: Failed password for admin from 203.0.113.5 port 50004 ssh2
+Nov 11 09:01:30 web sshd[1001]: Failed password for admin from 203.0.113.5 port 50005 ssh2
+Nov 11 09:02:00 web sshd[1002]: Accepted password for admin from 203.0.113.5 port 50006 ssh2
+Nov 11 09:30:00 web sshd[1003]: Failed password for bob from 198.51.100.9 port 22 ssh2
+Nov 11 09:30:30 web CRON[1004]: (root) CMD (run-parts /etc/cron.hourly)
