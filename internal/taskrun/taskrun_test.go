@@ -1247,6 +1247,7 @@ func TestOrdinaryCodeAndAssetsAreNotCountedButRealDataStillIs(t *testing.T) {
 	files := map[string][]byte{
 		".agents/skills/design/assets/icon.svg": []byte(svg),
 		".agents/skills/design/assets/real.txt": []byte("call 03-5555-0100\n"),
+		"third_party/lib/contact.txt":           []byte("call 03-5555-0101\n"),
 		"web/shader.js":                         []byte("const k = [4.0767416621, -3.3077115913, 0.2309699292];\n"),
 		"web/ids.go":                            []byte("const id = \"123e4567-e89b-12d3-a456-426614174000\"\nconst other = \"123e4567-e89b-12d3-a456-123123123128\"\n"),
 		"docs/dump.txt":                         []byte("0024 ffff ffff 8000 0014 0000 0000 0000\n"),
@@ -1289,10 +1290,13 @@ func TestOrdinaryCodeAndAssetsAreNotCountedButRealDataStillIs(t *testing.T) {
 		t.Errorf("a real password in an address must be counted:\n%s", table)
 	}
 
-	for _, want := range []string{"## Library and generated files", ".agents/skills/design/assets/real.txt", "## Probably not real", "web/shader.js", "web/ids.go", "docs/dump.txt", "web/digits.go", "docs/readme.md", "[EXAMPLE:url-credentials:001]"} {
+	for _, want := range []string{"## Library and generated files", "third_party/lib/contact.txt", "## Probably not real", "web/shader.js", "web/ids.go", "docs/dump.txt", "web/digits.go", "docs/readme.md", "[EXAMPLE:url-credentials:001]"} {
 		if !strings.Contains(result.Report, want) {
 			t.Errorf("the report has no %q:\n%s", want, result.Report)
 		}
+	}
+	if strings.Contains(result.Report, ".agents/skills/design") {
+		t.Error("the skills folder of an AI tool was scanned")
 	}
 	if strings.Contains(result.Report, "logo.bmp") {
 		t.Error("a binary file was scanned")
@@ -1301,5 +1305,57 @@ func TestOrdinaryCodeAndAssetsAreNotCountedButRealDataStillIs(t *testing.T) {
 		if strings.Contains(content, "k8Zq2vLp9Xw") || strings.Contains(content, "0.0643290124") {
 			t.Error("a value is in an output file")
 		}
+	}
+}
+
+func TestNoisyFoldersThatComeFirstNeverHideARealFindingInALaterFolder(t *testing.T) {
+	setup := newSetup(t, scanAll(), answerText("Done."))
+	project := filepath.Join(t.TempDir(), "project")
+	copyTree(t, setup.project, project)
+	setup.config.Target = project
+
+	files := map[string]string{
+		"backend/src/app.controller.ts": "return { openaiApiKey: '" + "sk-" + "proj-OMAMORITESTFAKEKEYOMAMORITESTFAKEKEY0001' };\n",
+		"backend/.env":                  "AI_KEY=" + "sk-" + "proj-OMAMORITESTFAKEKEYOMAMORITESTFAKEKEY0002\n",
+		"backend/.gitignore":            "dist\n",
+	}
+	for index := 0; index < 130; index++ {
+		files[fmt.Sprintf("aaa-assets/icon%03d.svg", index)] = "<path d=\"M0.0643290124,12.5\"/>\n"
+	}
+	for name, content := range files {
+		path := filepath.Join(project, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	session := setup.session(t)
+	session.Confirm()
+	var steps []string
+
+	result, err := session.Run(context.Background(), func(text string) { steps = append(steps, text) })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"backend/src/app.controller.ts | 1 |",
+		"| backend/.env | 1 |",
+		"No .gitignore rule in the scanned folder keeps this file out of git",
+	} {
+		if !strings.Contains(result.Report, want) {
+			t.Errorf("the report has no %q:\n%s", want, result.Report)
+		}
+	}
+	if strings.Contains(result.Report, "stopped at a limit") && strings.Contains(result.Report, "WARNING") {
+		t.Errorf("the scan was completed, so there must be no warning:\n%s", result.Report)
+	}
+	if !slices.Contains(steps, "tool full_scan: ok") {
+		t.Errorf("the user must see that the scan was completed: %q", steps)
+	}
+	if strings.Contains(result.Report, "OMAMORITESTFAKEKEY") {
+		t.Error("the key is in the report")
 	}
 }
