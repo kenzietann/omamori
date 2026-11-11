@@ -15,7 +15,8 @@ import (
 )
 
 const Instruction = `Check this project for exposed secrets and personal data. ` +
-	`Run run_detectors on the path "." first. Then explain each finding by its placeholder and suggest a fix. Do not guess any value.`
+	`Run run_detectors on the path "." first. Then explain each finding by its placeholder and suggest a fix. Do not guess any value. ` +
+	`A placeholder that starts with NUMBERLIKE or EXAMPLE was judged by Omamori to be probably not real (a number inside a longer number or a name, a test value, or an example password): mention these in one short line and suggest no fix.`
 
 var detectorLine = regexp.MustCompile(`^(.*):(\d+): (\[((?:SECRET|EXAMPLE):[a-z0-9-]+|MYNUMBER|PHONE|NUMBERLIKE):\d{3,}\])$`)
 
@@ -45,6 +46,7 @@ type Stats struct {
 	Scans     int
 	Truncated bool
 	Skipped   int
+	Binary    int
 	Unparsed  int
 }
 
@@ -66,6 +68,7 @@ func (collector *Collector) Call(ctx context.Context, toolName string, arguments
 
 	collector.stats.Scans++
 	collector.stats.Skipped += result.Skipped
+	collector.stats.Binary += result.Binary
 	if result.Truncated {
 		collector.stats.Truncated = true
 	}
@@ -270,6 +273,7 @@ type Runner interface {
 
 func Run(ctx context.Context, runner Runner, collector *Collector) (string, agent.Outcome, error) {
 	outcome := runner.Run(ctx, Instruction)
+	collector.Complete(ctx)
 	collector.CheckIgnore(ctx)
 	report, err := Render(collector.Findings(), collector.Stats(), outcome)
 
@@ -360,4 +364,32 @@ func (collector *Collector) readLayer(ctx context.Context, dir string) (*gitigno
 	}
 
 	return &gitignore.Layer{Dir: dir, Rules: gitignore.Parse(read.Text)}, true
+}
+
+// fullScanner is what the gateway offers to finish a scan that stopped at a limit.
+type fullScanner interface {
+	FullScan(ctx context.Context, path string) (gateway.Result, error)
+}
+
+// Complete finishes the scan. The answer of run_detectors to the AI is short on purpose, and it stops at a number of
+// results and of files. When it stopped, the findings of the folders that come after the stop would be missing, and the
+// report would look cleaner than the project is. So the report uses a scan of the whole project without those caps.
+// If that scan cannot be done, or reaches its own cap, the report keeps what it has and says so.
+func (collector *Collector) Complete(ctx context.Context) {
+	scanner, able := collector.inner.(fullScanner)
+	if !able || !collector.stats.Truncated || ctx.Err() != nil {
+		return
+	}
+
+	result, err := scanner.FullScan(ctx, ".")
+	if err != nil {
+		return
+	}
+
+	collector.findings = make(map[string]Finding)
+	collector.stats.Unparsed = 0
+	collector.stats.Skipped = result.Skipped
+	collector.stats.Binary = result.Binary
+	collector.stats.Truncated = result.Truncated
+	collector.absorb(result.Text)
 }

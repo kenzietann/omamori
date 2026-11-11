@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -483,11 +484,166 @@ func TestSkippedEntry(t *testing.T) {
 		{"dist", true, false}, {"build", true, false}, {"Node_Modules", true, false},
 		{"go.sum", false, true}, {"go.sum", true, false}, {"x.tsbuildinfo", false, true}, {".tsbuildinfo", false, true},
 		{"x.tsbuildinfo.txt", false, false}, {"main.go", false, false}, {"", false, false},
+		{"Pods", true, true}, {"SourcePackages", true, true}, {".angular", true, true}, {".gradle", true, true}, {"site-packages", true, true},
+		{"skills", true, false}, {"plugins", true, false},
 	}
 
 	for _, testCase := range testCases {
-		if got := skippedEntry(testCase.name, testCase.isDir); got != testCase.want {
+		if got := skippedEntry(testCase.name, "project", testCase.isDir); got != testCase.want {
 			t.Errorf("skippedEntry(%q, %v) = %v, want %v", testCase.name, testCase.isDir, got, testCase.want)
+		}
+	}
+}
+
+func TestSkillsAndPluginsOfAICodingToolsAreSkippedOnlyInsideThoseToolFolders(t *testing.T) {
+	for _, testCase := range []struct {
+		name, parent string
+		want         bool
+	}{
+		{"skills", ".agents", true}, {"skills", ".claude", true}, {"plugins", ".claude", true}, {"extensions", ".cursor", true},
+		{"marketplace", ".codex", true}, {"skills", "src", false}, {"plugins", "app", false}, {"skills", "", false}, {"commands", ".claude", false},
+		{"agents", ".claude", false},
+	} {
+		if got := skippedEntry(testCase.name, testCase.parent, true); got != testCase.want {
+			t.Errorf("skippedEntry(%q, parent %q, dir) = %v, want %v", testCase.name, testCase.parent, got, testCase.want)
+		}
+	}
+}
+
+func TestFullScanFindsWhatTheCappedScanMissedWithTheSamePlaceholders(t *testing.T) {
+	project := t.TempDir()
+	for index := 0; index < 8; index++ {
+		write(t, project, fmt.Sprintf("aaa/noise%d.txt", index), "tel 03-1234-5678\n")
+	}
+	write(t, project, "zzz/app.py", "KEY = 'AKIAIOSFODNN7EXAMPLE'\n")
+	root, err := pathguard.NewRoot(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limits := DefaultLimits
+	limits.MaxResults = 3
+	tools := New(root, limits)
+
+	capped, err := tools.Call(context.Background(), "run_detectors", map[string]any{"path": "."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, err := tools.FullScan(context.Background(), ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !capped.Truncated || strings.Contains(capped.Text, "zzz/app.py") || len(strings.Split(capped.Text, "\n")) != 3 {
+		t.Errorf("the capped scan: truncated %v\n%s", capped.Truncated, capped.Text)
+	}
+	if full.Truncated || !strings.Contains(full.Text, "zzz/app.py:1: [SECRET:aws-access-key:001]") || len(strings.Split(full.Text, "\n")) != 9 {
+		t.Errorf("the full scan: truncated %v\n%s", full.Truncated, full.Text)
+	}
+	if !strings.HasPrefix(full.Text, capped.Text) {
+		t.Errorf("the placeholders of the AI's scan are not the same as in the full scan:\ncapped:\n%s\nfull:\n%s", capped.Text, full.Text)
+	}
+}
+
+func TestTheFileLimitDoesNotHideTheFoldersAfterIt(t *testing.T) {
+	project := t.TempDir()
+	for index := 0; index < 6; index++ {
+		write(t, project, fmt.Sprintf("aaa/file%d.txt", index), "nothing\n")
+	}
+	write(t, project, "zzz/app.py", "KEY = 'AKIAIOSFODNN7EXAMPLE'\n")
+	root, err := pathguard.NewRoot(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limits := DefaultLimits
+	limits.MaxFiles = 4
+	tools := New(root, limits)
+
+	capped, _ := tools.Call(context.Background(), "run_detectors", map[string]any{"path": "."})
+	full, err := tools.FullScan(context.Background(), ".")
+
+	if err != nil || !capped.Truncated || capped.Text != "" || full.Truncated || !strings.Contains(full.Text, "zzz/app.py:1") {
+		t.Errorf("capped %+v, full %+v, err %v", capped, full, err)
+	}
+}
+
+func TestFullScanIsLoggedAndRefusesPathsOutsideTheProject(t *testing.T) {
+	project := t.TempDir()
+	root, _ := pathguard.NewRoot(project)
+	tools := New(root, DefaultLimits)
+	var events []Event
+	tools.Observe(func(event Event) error { events = append(events, event); return nil })
+
+	if _, err := tools.FullScan(context.Background(), "."); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tools.FullScan(context.Background(), "../outside"); err == nil {
+		t.Error("a path outside the project was scanned")
+	}
+
+	if len(events) != 2 || events[0].Tool != "full_scan" || !events[0].Allowed || events[1].Allowed {
+		t.Errorf("events = %+v", events)
+	}
+}
+
+func write(t *testing.T, project, name, content string) {
+	t.Helper()
+
+	path := filepath.Join(project, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBinaryFilesAreCountedApartFromFilesThatCouldNotBeRead(t *testing.T) {
+	project := t.TempDir()
+	write(t, project, "notes.txt", "tel 03-1234-5678\n")
+	write(t, project, "logo.png", "\x89PNG\x00\x00\x00 09012345678")
+	write(t, project, "font.woff", "wOFF\x00\x01")
+	write(t, project, "big.txt", strings.Repeat("a", int(DefaultLimits.MaxFileBytes)+10))
+	root, _ := pathguard.NewRoot(project)
+	tools := New(root, DefaultLimits)
+
+	capped, err := tools.Call(context.Background(), "run_detectors", map[string]any{"path": "."})
+	full, fullErr := tools.FullScan(context.Background(), ".")
+
+	for name, result := range map[string]Result{"run_detectors": capped, "full scan": full} {
+		if result.Binary != 2 || result.Skipped != 1 || !strings.Contains(result.Text, "notes.txt:1: [PHONE:001]") {
+			t.Errorf("%s: binary %d, skipped %d, text %q", name, result.Binary, result.Skipped, result.Text)
+		}
+	}
+	if err != nil || fullErr != nil {
+		t.Errorf("errors: %v, %v", err, fullErr)
+	}
+}
+
+func TestAToolThatIsAskedToReadABinaryFileSaysToolFailedAndNothingMore(t *testing.T) {
+	project := t.TempDir()
+	write(t, project, "logo.png", "\x89PNG\x00\x00 09012345678")
+	root, _ := pathguard.NewRoot(project)
+	tools := New(root, DefaultLimits)
+	var events []Event
+	tools.Observe(func(event Event) error { events = append(events, event); return nil })
+
+	for _, call := range []struct {
+		tool      string
+		arguments map[string]any
+	}{
+		{"read_file", map[string]any{"path": "logo.png"}},
+		{"search_text", map[string]any{"query": "PNG", "path": "logo.png"}},
+		{"run_detectors", map[string]any{"path": "logo.png"}},
+	} {
+		_, err := tools.Call(context.Background(), call.tool, call.arguments)
+
+		if !errors.Is(err, ErrToolFailed) {
+			t.Errorf("%s: err = %v, want ErrToolFailed", call.tool, err)
+		}
+	}
+	for _, event := range events {
+		if event.Allowed || event.Reason != ErrToolFailed.Error() {
+			t.Errorf("event %+v must say only that the tool failed", event)
 		}
 	}
 }

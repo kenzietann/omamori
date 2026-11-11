@@ -3,7 +3,9 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"github.com/kenzietann/omamori/internal/sanitizer"
 	"io"
 	"io/fs"
 	"os"
@@ -73,7 +75,7 @@ func (gateway *Gateway) readTextFile(resolvedPath string) (string, error) {
 
 	// A file with a zero byte near the start is binary (an image, an archive). Digits in it are not text.
 	if bytes.IndexByte(data[:min(len(data), binaryProbeBytes)], 0) >= 0 {
-		return "", ErrToolFailed
+		return "", errBinary
 	}
 
 	text := string(data)
@@ -87,7 +89,7 @@ func (gateway *Gateway) readTextFile(resolvedPath string) (string, error) {
 // walkFiles lists the regular files under a path. Symlinks are skipped, never followed.
 // The folders and files in skippedEntry are left out when they are inside the path. A path that is
 // itself one of them is still walked, because then the caller asked for it by name.
-func (gateway *Gateway) walkFiles(ctx context.Context, resolvedPath string) (files []string, isFile, truncated bool, err error) {
+func (gateway *Gateway) walkFiles(ctx context.Context, resolvedPath string, maxFiles int) (files []string, isFile, truncated bool, err error) {
 	info, err := os.Lstat(resolvedPath)
 	if err != nil {
 		return nil, false, false, ErrToolFailed
@@ -106,7 +108,7 @@ func (gateway *Gateway) walkFiles(ctx context.Context, resolvedPath string) (fil
 		if ctx.Err() != nil {
 			return ErrCancelled
 		}
-		if path != resolvedPath && skippedEntry(entry.Name(), entry.IsDir()) {
+		if path != resolvedPath && skippedEntry(entry.Name(), filepath.Base(filepath.Dir(path)), entry.IsDir()) {
 			if entry.IsDir() {
 				return fs.SkipDir
 			}
@@ -116,7 +118,7 @@ func (gateway *Gateway) walkFiles(ctx context.Context, resolvedPath string) (fil
 		if !entry.Type().IsRegular() {
 			return nil
 		}
-		if len(files) >= gateway.limits.MaxFiles {
+		if len(files) >= maxFiles {
 			truncated = true
 			return fs.SkipAll
 		}
@@ -138,6 +140,9 @@ func readFile(ctx context.Context, gateway *Gateway, arguments map[string]string
 	}
 
 	text, err := gateway.readTextFile(resolved)
+	if errors.Is(err, errBinary) {
+		return Result{}, ErrToolFailed
+	}
 	if err != nil {
 		return Result{}, err
 	}
@@ -189,7 +194,7 @@ func searchText(ctx context.Context, gateway *Gateway, arguments map[string]stri
 		return Result{}, err
 	}
 
-	files, isFile, truncated, err := gateway.walkFiles(ctx, resolved)
+	files, isFile, truncated, err := gateway.walkFiles(ctx, resolved, gateway.limits.MaxFiles)
 	if err != nil {
 		return Result{}, err
 	}
@@ -206,6 +211,9 @@ search:
 		text, err := gateway.readTextFile(filePath)
 		if err != nil {
 			if isFile {
+				if errors.Is(err, errBinary) {
+					return Result{}, ErrToolFailed
+				}
 				return Result{}, err
 			}
 			skipped++
@@ -234,13 +242,39 @@ func runDetectors(ctx context.Context, gateway *Gateway, arguments map[string]st
 		return Result{}, err
 	}
 
-	files, isFile, truncated, err := gateway.walkFiles(ctx, resolved)
+	return gateway.scan(ctx, resolved, &gateway.sanitizer, gateway.limits.MaxResults, gateway.limits.MaxFiles)
+}
+
+// fullScanFiles and fullScanResults are the caps of FullScan. They only stop a runaway scan.
+const (
+	fullScanFiles   = 200000
+	fullScanResults = 100000
+)
+
+// FullScan is run_detectors without the small caps that keep the answer to the AI short. The report needs every
+// finding, and a cap that is reached in the first folders must not hide the findings in the next ones. It is not a
+// tool of the AI. It uses its own sanitizer, so its placeholders count from 001, the same as a first run_detectors on
+// the same path, and the finding of the AI's own scan have the same placeholders here.
+func (gateway *Gateway) FullScan(ctx context.Context, path string) (Result, error) {
+	resolved, err := gateway.resolve(path)
+	if err != nil {
+		return gateway.finish("full_scan", Result{}, err)
+	}
+
+	var fresh sanitizer.Sanitizer
+	result, err := gateway.scan(ctx, resolved, &fresh, fullScanResults, fullScanFiles)
+
+	return gateway.finish("full_scan", result, err)
+}
+
+func (gateway *Gateway) scan(ctx context.Context, resolved string, finder *sanitizer.Sanitizer, maxResults, maxFiles int) (Result, error) {
+	files, isFile, truncated, err := gateway.walkFiles(ctx, resolved, maxFiles)
 	if err != nil {
 		return Result{}, err
 	}
 
 	var lines []string
-	skipped := 0
+	skipped, binary := 0, 0
 
 scan:
 	for _, filePath := range files {
@@ -251,24 +285,31 @@ scan:
 		text, err := gateway.readTextFile(filePath)
 		if err != nil {
 			if isFile {
+				if errors.Is(err, errBinary) {
+					return Result{}, ErrToolFailed
+				}
 				return Result{}, err
 			}
-			skipped++
+			if errors.Is(err, errBinary) {
+				binary++
+			} else {
+				skipped++
+			}
 			continue
 		}
 
-		_, findings := gateway.sanitizer.Sanitize(text)
+		_, findings := finder.Sanitize(text)
 		if len(findings) == 0 {
 			continue
 		}
 
 		// The file name can hold a secret too, so it goes through the sanitizer.
-		safePath, _ := gateway.sanitizer.Sanitize(gateway.root.Relative(filePath))
+		safePath, _ := finder.Sanitize(gateway.root.Relative(filePath))
 
 		lineNumber := 1
 		position := 0
 		for _, finding := range findings {
-			if len(lines) >= gateway.limits.MaxResults {
+			if len(lines) >= maxResults {
 				truncated = true
 				break scan
 			}
@@ -279,5 +320,5 @@ scan:
 		}
 	}
 
-	return Result{Text: strings.Join(lines, "\n"), Truncated: truncated, Skipped: skipped}, nil
+	return Result{Text: strings.Join(lines, "\n"), Truncated: truncated, Skipped: skipped, Binary: binary}, nil
 }
