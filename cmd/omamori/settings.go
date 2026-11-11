@@ -15,7 +15,7 @@ import (
 const (
 	defaultMaxSteps  = 15
 	defaultMaxTokens = 300000
-	usageText        = "usage: omamori [--provider id] [--model name] [--output folder] [--max-steps n] [--max-tokens n] <project folder>"
+	usageText        = "usage: omamori check|ui [--provider id] [--model name] [--output folder] [--max-steps n] [--max-tokens n] <project folder>"
 )
 
 type settings struct {
@@ -44,7 +44,12 @@ func parseSettings(args []string, lookupEnv func(string) string, homeDirectory f
 	flags.StringVar(&maxSteps, "max-steps", maxSteps, "limit of requests")
 	flags.StringVar(&maxTokens, "max-tokens", maxTokens, "limit of tokens")
 
-	if err := flags.Parse(args); err != nil || flags.NArg() != 1 {
+	// The folder may come before or after the flags, like in most tools.
+	if err := flags.Parse(args); err != nil || flags.NArg() == 0 {
+		return settings{}, errUsage
+	}
+	folder := flags.Arg(0)
+	if err := flags.Parse(flags.Args()[1:]); err != nil || flags.NArg() != 0 {
 		return settings{}, errUsage
 	}
 
@@ -60,7 +65,7 @@ func parseSettings(args []string, lookupEnv func(string) string, homeDirectory f
 		return settings{}, fmt.Errorf("the provider %q is not known", parsed.provider)
 	}
 
-	target, err := filepath.Abs(flags.Arg(0))
+	target, err := filepath.Abs(folder)
 	if err != nil {
 		return settings{}, errors.New("the project folder is not usable")
 	}

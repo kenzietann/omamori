@@ -150,6 +150,11 @@ func New(target string, backend Backend, defaults Defaults) Model {
 	return Model{target: target, backend: backend, defaults: defaults}
 }
 
+// WithTaskA opens the screen at the setup of Task A, as if the user had chosen it in the menu.
+func (model Model) WithTaskA() Model {
+	return model.beginSetup()
+}
+
 func (model Model) Init() tea.Cmd {
 	return nil
 }
@@ -263,7 +268,7 @@ func (model Model) handleHomeKey(key string) (tea.Model, tea.Cmd) {
 
 func (model Model) beginSetup() Model {
 	if model.target == "" || model.backend == nil {
-		model.notice = "There is no target folder. Start Omamori with a folder: omamori <folder>"
+		model.notice = "There is no target folder. Start Omamori with a folder: omamori check <folder>"
 		return model
 	}
 

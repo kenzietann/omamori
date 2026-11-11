@@ -1,0 +1,219 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	"github.com/kenzietann/omamori/internal/tui"
+)
+
+const commandKey = "sk-FAKE-command-key-123456"
+
+type commandRun struct {
+	code     int
+	stdout   string
+	stderr   string
+	screens  []tui.Model
+	listedAs []string
+}
+
+func runCommand(t testing.TB, args []string, environmentValues map[string]string, screenErr error) commandRun {
+	t.Helper()
+
+	var result commandRun
+	var stdout, stderr bytes.Buffer
+	result.code = run(args, environment{
+		stdout:    &stdout,
+		stderr:    &stderr,
+		lookupEnv: func(name string) string { return environmentValues[name] },
+		home:      homeAt(t.TempDir()),
+		openScreen: func(model tui.Model) error {
+			result.screens = append(result.screens, model)
+			return screenErr
+		},
+		listModels: func(ctx context.Context, id, key string) ([]string, error) {
+			result.listedAs = append(result.listedAs, id+":"+key)
+			return []string{"model-a", "model-b"}, nil
+		},
+	})
+	result.stdout, result.stderr = stdout.String(), stderr.String()
+
+	return result
+}
+
+func TestHelpAndVersion(t *testing.T) {
+	for _, args := range [][]string{nil, {"help"}, {"-h"}, {"--help"}} {
+		result := runCommand(t, args, nil, nil)
+
+		if result.code != exitOK || result.stderr != "" || !strings.Contains(result.stdout, "omamori <command>") || !strings.Contains(result.stdout, "check <folder>") {
+			t.Errorf("%v: code %d, stderr %q, stdout %q", args, result.code, result.stderr, result.stdout)
+		}
+	}
+
+	for _, args := range [][]string{{"version"}, {"--version"}, {"-v"}} {
+		if result := runCommand(t, args, nil, nil); result.code != exitOK || result.stdout != "omamori "+version+"\n" {
+			t.Errorf("%v: code %d, stdout %q", args, result.code, result.stdout)
+		}
+	}
+}
+
+func TestAnUnknownCommandIsAUsageError(t *testing.T) {
+	for _, command := range []string{"nope", "CHECK", "--nope", "/tmp", "."} {
+		result := runCommand(t, []string{command}, nil, nil)
+
+		if result.code != exitUsage || result.stdout != "" || !strings.Contains(result.stderr, "is not a command") || len(result.screens) != 0 {
+			t.Errorf("%q: code %d, stdout %q, stderr %q", command, result.code, result.stdout, result.stderr)
+		}
+	}
+}
+
+func TestProvidersShowsWhereEachKeyComesFromAndNeverTheKey(t *testing.T) {
+	result := runCommand(t, []string{"providers"}, map[string]string{"OPENAI_API_KEY": commandKey}, nil)
+
+	if result.code != exitOK {
+		t.Fatalf("code %d, stderr %q", result.code, result.stderr)
+	}
+	for _, want := range []string{"ID", "anthropic", "ANTHROPIC_API_KEY is not set", "OPENAI_API_KEY is set", "ollama", "no key needed"} {
+		if !strings.Contains(result.stdout, want) {
+			t.Errorf("the list has no %q:\n%s", want, result.stdout)
+		}
+	}
+	if strings.Contains(result.stdout+result.stderr, commandKey) {
+		t.Error("the key is printed")
+	}
+	if result := runCommand(t, []string{"providers", "extra"}, nil, nil); result.code != exitUsage {
+		t.Errorf("an extra argument: code %d", result.code)
+	}
+}
+
+func TestModelsPrintsOneNamePerLine(t *testing.T) {
+	result := runCommand(t, []string{"models", "openai"}, map[string]string{"OPENAI_API_KEY": commandKey}, nil)
+
+	if result.code != exitOK || result.stdout != "model-a\nmodel-b\n" || result.stderr != "" {
+		t.Errorf("code %d, stdout %q, stderr %q", result.code, result.stdout, result.stderr)
+	}
+	if len(result.listedAs) != 1 || result.listedAs[0] != "openai:"+commandKey {
+		t.Errorf("asked as %q", result.listedAs)
+	}
+
+	local := runCommand(t, []string{"models", "ollama"}, nil, nil)
+	if local.code != exitOK || local.listedAs[0] != "ollama:" {
+		t.Errorf("a local provider: code %d, asked %q", local.code, local.listedAs)
+	}
+}
+
+func TestModelsProblemsAreSaidInPlainWords(t *testing.T) {
+	testCases := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantStderr string
+	}{
+		{"no provider", []string{"models"}, exitUsage, "usage: omamori models <provider>"},
+		{"two providers", []string{"models", "openai", "groq"}, exitUsage, "usage: omamori models <provider>"},
+		{"an unknown provider", []string{"models", "nope"}, exitUsage, `the provider "nope" is not known`},
+		{"no key", []string{"models", "openai"}, exitFailed, "Set OPENAI_API_KEY and run the command again"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := runCommand(t, testCase.args, nil, nil)
+
+			if result.code != testCase.wantCode || result.stdout != "" || !strings.Contains(result.stderr, testCase.wantStderr) || len(result.listedAs) != 0 {
+				t.Errorf("code %d, stdout %q, stderr %q, asked %q", result.code, result.stdout, result.stderr, result.listedAs)
+			}
+		})
+	}
+}
+
+func TestModelsFailureDoesNotPrintTheKey(t *testing.T) {
+	var stderr bytes.Buffer
+	code := run([]string{"models", "openai"}, environment{
+		stdout: &bytes.Buffer{}, stderr: &stderr,
+		lookupEnv:  func(string) string { return commandKey },
+		listModels: func(context.Context, string, string) ([]string, error) { return nil, errors.New("boom " + commandKey) },
+	})
+
+	if code != exitFailed || strings.Contains(stderr.String(), commandKey) || !strings.Contains(stderr.String(), "the list of models could not be loaded") {
+		t.Errorf("code %d, stderr %q", code, stderr.String())
+	}
+}
+
+func TestCheckOpensTheScreenAtTheProviderChoice(t *testing.T) {
+	project := t.TempDir()
+
+	result := runCommand(t, []string{"check", project}, nil, nil)
+
+	if result.code != exitOK || len(result.screens) != 1 {
+		t.Fatalf("code %d, screens %d, stderr %q", result.code, len(result.screens), result.stderr)
+	}
+	if view := result.screens[0].View(); !strings.Contains(view, "Choose the AI provider") {
+		t.Errorf("check must start at the provider choice:\n%s", view)
+	}
+}
+
+func TestUiOpensTheHomeMenu(t *testing.T) {
+	result := runCommand(t, []string{"ui", t.TempDir()}, nil, nil)
+
+	if view := result.screens[0].View(); result.code != exitOK || !strings.Contains(view, "Task A: Exposure check") || strings.Contains(view, "Choose the AI provider") {
+		t.Errorf("code %d:\n%s", result.code, view)
+	}
+}
+
+func TestFlagsMayComeBeforeOrAfterTheFolder(t *testing.T) {
+	project := t.TempDir()
+
+	for _, args := range [][]string{
+		{"check", "--provider", "ollama", "--model", "m", project},
+		{"check", project, "--provider", "ollama", "--model", "m"},
+		{"check", "--provider", "ollama", project, "--model", "m"},
+	} {
+		result := runCommand(t, args, nil, nil)
+
+		if result.code != exitOK || len(result.screens) != 1 {
+			t.Errorf("%v: code %d, stderr %q", args, result.code, result.stderr)
+		}
+	}
+}
+
+func TestScreenCommandsReportProblems(t *testing.T) {
+	project := t.TempDir()
+	testCases := []struct {
+		name       string
+		args       []string
+		screenErr  error
+		wantCode   int
+		wantStderr string
+	}{
+		{"check without a folder", []string{"check"}, nil, exitUsage, "usage: omamori check|ui"},
+		{"ui with two folders", []string{"ui", project, project}, nil, exitUsage, "usage: omamori check|ui"},
+		{"a folder that is not there", []string{"check", project + "/missing"}, nil, exitFailed, "the target is not a folder"},
+		{"an unknown provider", []string{"check", "--provider", "nope", project}, nil, exitFailed, `the provider "nope" is not known`},
+		{"the screen stops", []string{"check", project}, errors.New("no terminal"), exitFailed, "the screen stopped: no terminal"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := runCommand(t, testCase.args, nil, testCase.screenErr)
+
+			if result.code != testCase.wantCode || !strings.Contains(result.stderr, testCase.wantStderr) {
+				t.Errorf("code %d, stderr %q", result.code, result.stderr)
+			}
+		})
+	}
+}
+
+func TestAKeyCannotBeGivenOnTheCommandLine(t *testing.T) {
+	project := t.TempDir()
+
+	for _, args := range [][]string{{"check", "--key", commandKey, project}, {"check", "--api-key=" + commandKey, project}, {"models", "openai", commandKey}} {
+		result := runCommand(t, args, nil, nil)
+
+		if result.code == exitOK || len(result.screens) != 0 || strings.Contains(result.stdout+result.stderr, commandKey) {
+			t.Errorf("%v: code %d, stderr %q", args, result.code, result.stderr)
+		}
+	}
+}
