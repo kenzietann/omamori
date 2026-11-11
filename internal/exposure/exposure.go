@@ -11,12 +11,21 @@ import (
 
 	"github.com/kenzietann/omamori/internal/agent"
 	"github.com/kenzietann/omamori/internal/gateway"
+	"github.com/kenzietann/omamori/internal/gitignore"
 )
 
 const Instruction = `Check this project for exposed secrets and personal data. ` +
 	`Run run_detectors on the path "." first. Then explain each finding by its placeholder and suggest a fix. Do not guess any value.`
 
 var detectorLine = regexp.MustCompile(`^(.*):(\d+): (\[(SECRET:[a-z0-9-]+|MYNUMBER|PHONE):\d{3,}\])$`)
+
+// SeverityKeptOut is for a key in an env file that .gitignore keeps out of git. It is the normal setup,
+// so it is listed in its own section and is not counted as a finding.
+const SeverityKeptOut = "kept-out"
+
+// SeverityNotYours is for a match in a library or in a file that a tool made. Code of other people is
+// not the responsibility of the project, and a phone-like number in it is nearly always sample text.
+const SeverityNotYours = "not-yours"
 
 type Finding struct {
 	Severity    string
@@ -103,6 +112,18 @@ func parseDetectorLine(line string) (Finding, bool) {
 	}
 
 	findingType, severity, advice := describe(parts[4])
+	// A key in a local .env file is the usual place for it. It is exposed only if the file leaves the computer.
+	if strings.HasPrefix(parts[4], "SECRET:") && dotenvFile(parts[1]) {
+		advice = "A key in a local .env file is the normal place for it. It is exposed only if the file is committed, shared, or copied into a build or an image. Check that .gitignore lists it and that it was never committed (git log --all on the file). If it ever left your computer, revoke the key and create a new one with the smallest rights."
+	}
+	// Code of a library is not the responsibility of the project. Build output is the project's own, so a secret in it
+	// still counts (keys do get baked into bundles), but a phone-like number or a My Number in it is sample text.
+	switch {
+	case libraryFile(parts[1]):
+		severity, advice = SeverityNotYours, adviceNotYours
+	case generatedFile(parts[1]) && (findingType == "phone" || findingType == "mynumber"):
+		severity, advice = SeverityNotYours, adviceNotYours
+	}
 
 	return Finding{
 		Severity:    severity,
@@ -137,9 +158,69 @@ func describe(label string) (findingType, severity, advice string) {
 	return "phone", "medium", "This looks like a Japanese phone number. Remove it if it belongs to a person."
 }
 
+// dotenvFile says whether a path is an environment file like .env or .env.production.
+func dotenvFile(path string) bool {
+	name := path[strings.LastIndex(path, "/")+1:]
+
+	return name == ".env" || strings.HasPrefix(name, ".env.") && !strings.HasSuffix(name, ".example") && !strings.HasSuffix(name, ".sample")
+}
+
+const adviceNotYours = "This is in a library, a cache, or a file that a tool made, not in your own code. It is not counted. If you want to be sure, look at the match with omamori peek."
+
+var libraryFolders = map[string]bool{
+	"deps": true, "bower_components": true, "site-packages": true, "third_party": true, "third-party": true,
+	"jspm_packages": true, ".yarn": true, ".pnpm-store": true, ".angular": true, ".cache": true, ".parcel-cache": true,
+	".turbo": true, ".gradle": true,
+}
+
+// libraryFile says whether a path is code of another project or a cache of it.
+func libraryFile(path string) bool {
+	parts := strings.Split(path, "/")
+	for _, folder := range parts[:len(parts)-1] {
+		if libraryFolders[folder] {
+			return true
+		}
+	}
+
+	return false
+}
+
+var generatedFolders = map[string]bool{
+	"dist": true, "build": true, "out": true, ".next": true, ".nuxt": true, ".svelte-kit": true,
+	"coverage": true, "playwright-report": true, "test-results": true, "storybook-static": true, "target": true,
+}
+
+var generatedSuffixes = []string{".map", ".min.js", ".min.css", ".bundle.js"}
+
+// generatedFile says whether a path is build output, a cache or a report that a tool made.
+func generatedFile(path string) bool {
+	parts := strings.Split(path, "/")
+	for _, folder := range parts[:len(parts)-1] {
+		if generatedFolders[folder] {
+			return true
+		}
+	}
+
+	name := parts[len(parts)-1]
+	for _, suffix := range generatedSuffixes {
+		if strings.HasSuffix(name, suffix) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func severityRank(severity string) int {
-	if severity == "high" {
+	switch severity {
+	case "high":
 		return 0
+	case "low":
+		return 2
+	case SeverityKeptOut:
+		return 3
+	case SeverityNotYours:
+		return 4
 	}
 
 	return 1
@@ -169,7 +250,94 @@ type Runner interface {
 
 func Run(ctx context.Context, runner Runner, collector *Collector) (string, agent.Outcome, error) {
 	outcome := runner.Run(ctx, Instruction)
+	collector.CheckIgnore(ctx)
 	report, err := Render(collector.Findings(), collector.Stats(), outcome)
 
 	return report, outcome, err
+}
+
+const (
+	adviceIgnoredEnv = "Your .gitignore keeps this file out of git, which is the right setup. Nothing to fix, if it was never committed (check with git log --all on the file). Keep the rights of the key small, and revoke the key if the file ever left your computer."
+	adviceOpenEnv    = "No .gitignore rule in the scanned folder keeps this file out of git. A commit would publish the key. Add the file to .gitignore, check that it was never committed, and revoke the key and create a new one if it was."
+)
+
+// CheckIgnore reads the .gitignore files above each env file that holds a secret, with the same read-only
+// tools, and sets the severity. A key in an env file that git ignores is the normal case (medium). A key in
+// an env file that git does not ignore is one commit away from being published (high). If a .gitignore
+// cannot be read, the finding keeps its first advice, which also says to check.
+func (collector *Collector) CheckIgnore(ctx context.Context) {
+	layers := make(map[string]*gitignore.Layer)
+	unknown := make(map[string]bool)
+
+	for key, finding := range collector.findings {
+		if !strings.HasPrefix(finding.Placeholder, "[SECRET:") || !dotenvFile(finding.File) {
+			continue
+		}
+
+		var chain []gitignore.Layer
+		readable := true
+		for _, dir := range directoriesAbove(finding.File) {
+			if unknown[dir] {
+				readable = false
+				break
+			}
+			if _, loaded := layers[dir]; !loaded {
+				layer, ok := collector.readLayer(ctx, dir)
+				if !ok {
+					unknown[dir] = true
+					readable = false
+					break
+				}
+				layers[dir] = layer
+			}
+			if layers[dir] != nil {
+				chain = append(chain, *layers[dir])
+			}
+		}
+		if !readable {
+			continue
+		}
+
+		if gitignore.Ignored(chain, finding.File) {
+			finding.Severity, finding.Advice = SeverityKeptOut, adviceIgnoredEnv
+		} else {
+			finding.Severity, finding.Advice = "high", adviceOpenEnv
+		}
+		collector.findings[key] = finding
+	}
+}
+
+// directoriesAbove lists the folders of a path from the project folder down: "" then "a" then "a/b".
+func directoriesAbove(path string) []string {
+	dirs := []string{""}
+	parts := strings.Split(path, "/")
+	for count := 1; count < len(parts); count++ {
+		dirs = append(dirs, strings.Join(parts[:count], "/"))
+	}
+
+	return dirs
+}
+
+// readLayer returns the rules of the .gitignore in one folder. A nil layer with true means that there is
+// none. False means that it could not be found out.
+func (collector *Collector) readLayer(ctx context.Context, dir string) (*gitignore.Layer, bool) {
+	folder := dir
+	if folder == "" {
+		folder = "."
+	}
+
+	listing, err := collector.inner.Call(ctx, "list_dir", map[string]any{"path": folder})
+	if err != nil {
+		return nil, false
+	}
+	if !slices.Contains(strings.Split(listing.Text, "\n"), ".gitignore") && !listing.Truncated {
+		return nil, true
+	}
+
+	read, err := collector.inner.Call(ctx, "read_file", map[string]any{"path": strings.TrimPrefix(dir+"/.gitignore", "/")})
+	if err != nil {
+		return nil, !slices.Contains(strings.Split(listing.Text, "\n"), ".gitignore")
+	}
+
+	return &gitignore.Layer{Dir: dir, Rules: gitignore.Parse(read.Text)}, true
 }

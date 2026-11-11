@@ -527,3 +527,119 @@ func FuzzRender(f *testing.F) {
 		}
 	})
 }
+
+func TestGeneratedFilesAreRecognizedByFolderAndByName(t *testing.T) {
+	testCases := []struct {
+		path string
+		want bool
+	}{
+		{"dist/app/main.js", true},
+		{"web/dist/main.js", true},
+		{"web/.angular/cache/21/vite/deps/a.js.map", true},
+		{"web/.angular/cache/21/vite/deps/a.js", false},
+		{"playwright-report/index.html", true},
+		{"coverage/lcov.info", true},
+		{"static/app.min.js", true},
+		{"static/site.min.css", true},
+		{"a.js.map", true},
+		{"app/config.py", false},
+		{"data/customers.csv", false},
+		{"src/distance.js", false},
+		{"distribution/readme.txt", false},
+		{"notes/dist", false},
+		{"buildings/list.txt", false},
+		{"mapper.js", false},
+		{"", false},
+	}
+	for _, testCase := range testCases {
+		if got := generatedFile(testCase.path); got != testCase.want {
+			t.Errorf("generatedFile(%q) = %v, want %v", testCase.path, got, testCase.want)
+		}
+	}
+}
+
+func TestLibraryAndGeneratedFilesAreNotCountedExceptSecretsInBuildOutput(t *testing.T) {
+	testCases := []struct {
+		line         string
+		wantSeverity string
+	}{
+		{"web/dist/main.js:1: [PHONE:001]", SeverityNotYours},
+		{"web/dist/main.js:1: [MYNUMBER:001]", SeverityNotYours},
+		{"web/dist/main.js:1: [SECRET:aws-access-key:001]", "high"},
+		{"web/playwright-report/index.html:18: [PHONE:001]", SeverityNotYours},
+		{"web/.angular/cache/21/vite/deps/a.js.map:4: [PHONE:001]", SeverityNotYours},
+		{"web/.angular/cache/21/vite/deps/a.js.map:4: [SECRET:aws-access-key:001]", SeverityNotYours},
+		{"web/node_modules_copy/deps/lib.js:4: [SECRET:github-token:001]", SeverityNotYours},
+		{"app/customers.csv:2: [PHONE:002]", "medium"},
+		{"app/customers.csv:3: [MYNUMBER:001]", "high"},
+		{"app/deploy.sh:5: [SECRET:github-token:001]", "high"},
+	}
+	for _, testCase := range testCases {
+		finding, ok := parseDetectorLine(testCase.line)
+		if !ok || finding.Severity != testCase.wantSeverity {
+			t.Errorf("%s: severity %q (ok %v), want %q", testCase.line, finding.Severity, ok, testCase.wantSeverity)
+		}
+	}
+	if finding, _ := parseDetectorLine("web/dist/main.js:1: [PHONE:001]"); !strings.Contains(finding.Advice, "omamori peek") {
+		t.Errorf("the advice does not point to peek: %q", finding.Advice)
+	}
+}
+
+func TestMatchesInLibrariesAreFoldedIntoOneLinePerLineOfAFileAndNotCounted(t *testing.T) {
+	var findings []Finding
+	for _, line := range []string{
+		"app/customers.csv:2: [PHONE:001]",
+		"web/.angular/cache/vite/deps/h.js.map:4: [PHONE:002]", "web/.angular/cache/vite/deps/h.js.map:4: [PHONE:003]", "web/.angular/cache/vite/deps/h.js.map:4: [PHONE:004]",
+		"web/dist/main.js:1: [PHONE:005]",
+	} {
+		finding, _ := parseDetectorLine(line)
+		findings = append(findings, finding)
+	}
+
+	report, err := Render(findings, Stats{Scans: 1}, agent.Outcome{Status: agent.Complete})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	section := report[strings.Index(report, "## Library and generated files"):]
+	for _, want := range []string{"not counted as findings", "- web/.angular/cache/vite/deps/h.js.map:4 [PHONE:002]–[PHONE:004] (3 phone matches)", "- web/dist/main.js:1 [PHONE:005] (phone)"} {
+		if !strings.Contains(section, want) {
+			t.Errorf("the section has no %q:\n%s", want, section)
+		}
+	}
+	table := report[strings.Index(report, "## Findings"):strings.Index(report, "## Library and generated files")]
+	if strings.Contains(table, "h.js.map") || strings.Contains(table, "main.js") || !strings.Contains(table, "app/customers.csv") {
+		t.Errorf("only your own file belongs in the table:\n%s", table)
+	}
+	if !strings.Contains(report, "omamori peek <this report folder> <project folder>") {
+		t.Error("the report does not say how to look at the matches")
+	}
+}
+
+func TestAKeyInADotenvFileGetsAdviceThatSaysWhenItIsReallyExposed(t *testing.T) {
+	for _, testCase := range []struct {
+		path string
+		want bool
+	}{
+		{".env", true}, {"backend/.env", true}, {".env.local", true}, {".env.production", true},
+		{".env.example", false}, {".env.sample", false}, {"app/environment.py", false}, {"notes.env", false}, {"config/envs", false},
+	} {
+		if got := dotenvFile(testCase.path); got != testCase.want {
+			t.Errorf("dotenvFile(%q) = %v, want %v", testCase.path, got, testCase.want)
+		}
+	}
+
+	inEnv, _ := parseDetectorLine("backend/.env:6: [SECRET:ai-api-key:001]")
+	inCode, _ := parseDetectorLine("backend/app.py:6: [SECRET:ai-api-key:002]")
+	phoneInEnv, _ := parseDetectorLine("backend/.env:7: [PHONE:001]")
+
+	if !strings.Contains(inEnv.Advice, "normal place") || inEnv.Severity != "high" {
+		t.Errorf("a key in .env: %+v", inEnv)
+	}
+	if strings.Contains(inCode.Advice, "normal place") || !strings.Contains(inCode.Advice, "Revoke this AI provider key") {
+		t.Errorf("a key in code: %+v", inCode)
+	}
+	if strings.Contains(phoneInEnv.Advice, "normal place") {
+		t.Errorf("a phone number in .env: %+v", phoneInEnv)
+	}
+}

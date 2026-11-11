@@ -61,28 +61,63 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 	}
 	fmt.Fprintf(&report, "Scans completed: %d\n\n", stats.Scans)
 
+	var exposed, keptOut, notYours []Finding
+	for _, finding := range findings {
+		switch finding.Severity {
+		case SeverityKeptOut:
+			keptOut = append(keptOut, finding)
+		case SeverityNotYours:
+			notYours = append(notYours, finding)
+		default:
+			exposed = append(exposed, finding)
+		}
+	}
+	notCounted := len(keptOut) + len(notYours)
+
 	report.WriteString("## Findings\n\n")
 	switch {
 	case stats.Scans == 0:
 		report.WriteString("No scan ran, so nothing was checked. This report has no findings because nothing was looked at.\n\n")
-	case len(findings) == 0:
+	case len(exposed) == 0 && notCounted > 0:
+		report.WriteString("The scans that ran reported no exposed data. Matches that are not counted (a key that .gitignore keeps out of git, or text in a library or a generated file) are listed below. This does not prove that the project is clean. See Limits.\n\n")
+	case len(exposed) == 0:
 		report.WriteString("The scans that ran reported no findings. This does not prove that the project is clean. See Limits.\n\n")
 	default:
 		report.WriteString("| ID | Severity | Type | File | Line |\n|---|---|---|---|---|\n")
-		for _, finding := range findings {
+		for _, finding := range exposed {
 			fmt.Fprintf(&report, "| %s | %s | %s | %s | %d |\n", plainText(finding.Placeholder), finding.Severity, plainText(finding.Type), plainText(finding.File), finding.Line)
 		}
 		report.WriteString("\n")
 	}
 
-	if len(findings) > 0 {
+	if len(exposed) > 0 {
 		report.WriteString("## Evidence locations\n\n")
-		for _, finding := range findings {
+		for _, finding := range exposed {
 			fmt.Fprintf(&report, "- %s:%d %s\n", plainText(finding.File), finding.Line, plainText(finding.Placeholder))
 		}
 		report.WriteString("\n## Fixes\n\n")
-		report.WriteString(renderFixes(findings))
+		report.WriteString(renderFixes(exposed))
 		report.WriteString("\n")
+	}
+
+	if len(keptOut) > 0 {
+		report.WriteString("## Kept out of git (not counted as findings)\n\n")
+		report.WriteString("These are keys in env files that a .gitignore file keeps out of git. This is the normal setup for a key. The AI did not see the .gitignore files, so if a note below calls one of these keys exposed, this section is the checked answer.\n\n")
+		for _, finding := range keptOut {
+			fmt.Fprintf(&report, "- %s:%d %s (%s)\n", plainText(finding.File), finding.Line, plainText(finding.Placeholder), plainText(finding.Type))
+		}
+		report.WriteString("\n")
+	}
+
+	if len(notYours) > 0 {
+		report.WriteString("## Library and generated files (not counted as findings)\n\n")
+		report.WriteString("These matches are in code of other projects, in caches, or in files that a tool made. They are not your code, so they are not counted. Most are sample text. A real number in a library is not your responsibility.\n\n")
+		report.WriteString(renderNotYours(notYours))
+		report.WriteString("\n")
+	}
+
+	if len(findings) > 0 {
+		report.WriteString("To see what was matched, masked and on your screen only, run: omamori peek <this report folder> <project folder>\n\n")
 	}
 
 	if len(outcome.Texts) > 0 {
@@ -103,23 +138,50 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 	return text, nil
 }
 
+// renderNotYours folds the matches of one type on one line into one bullet.
+func renderNotYours(findings []Finding) string {
+	var out strings.Builder
+	for index := 0; index < len(findings); {
+		first := findings[index]
+		end := index + 1
+		for end < len(findings) && findings[end].File == first.File && findings[end].Line == first.Line && findings[end].Type == first.Type {
+			end++
+		}
+
+		where := fmt.Sprintf("%s:%d %s", plainText(first.File), first.Line, plainText(first.Placeholder))
+		if end-index > 1 {
+			where += "–" + plainText(findings[end-1].Placeholder) + fmt.Sprintf(" (%d %s matches)", end-index, plainText(first.Type))
+		} else {
+			where += fmt.Sprintf(" (%s)", plainText(first.Type))
+		}
+		fmt.Fprintf(&out, "- %s\n", where)
+		index = end
+	}
+
+	return out.String()
+}
+
 func renderFixes(findings []Finding) string {
 	counts := make(map[string]int)
 	adviceFor := make(map[string]string)
 	for _, finding := range findings {
-		counts[finding.Type]++
-		adviceFor[finding.Type] = finding.Advice
+		key := finding.Type
+		if finding.Severity == "low" {
+			key += " in generated files"
+		}
+		counts[key]++
+		adviceFor[key] = finding.Advice
 	}
 
-	types := make([]string, 0, len(counts))
-	for findingType := range counts {
-		types = append(types, findingType)
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
 	}
-	slices.Sort(types)
+	slices.Sort(keys)
 
 	var fixes strings.Builder
-	for _, findingType := range types {
-		fmt.Fprintf(&fixes, "- %s (%d): %s\n", plainText(findingType), counts[findingType], adviceFor[findingType])
+	for _, key := range keys {
+		fmt.Fprintf(&fixes, "- %s (%d): %s\n", plainText(key), counts[key], adviceFor[key])
 	}
 
 	return fixes.String()
@@ -132,6 +194,7 @@ func renderLimits(stats Stats) string {
 	limits.WriteString("- Omamori looks for: AWS access key IDs (AKIA, ASIA), GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_), AI provider keys (sk-), Google API keys (AIza), Slack tokens (xox), Stripe live keys, JWTs, private key blocks, passwords written inside web addresses, My Number, and Japanese phone numbers.\n")
 	limits.WriteString("- It does not find or hide other secret formats, passwords, email addresses, IP addresses, names, or street addresses.\n")
 	limits.WriteString("- A My Number with a valid check digit is a possible identifier, not proof.\n")
+	limits.WriteString("- For a key in an env file (.env), the .gitignore files inside the scanned folder are read. Omamori does not check git itself: a file that was committed before it was ignored is still in the git history.\n")
 	limits.WriteString("- Findings come only from the files that the scans in this run covered. Anything else is not covered.\n")
 	limits.WriteString("- These are not scanned: the .git folder (the history of the project), dependency folders (node_modules, vendor, venv, .venv, __pycache__), and lock files. A secret that was committed earlier and later removed is not found.\n")
 	limits.WriteString("- A placeholder in a file name stands for a secret found in the name. The real name is not shown. Placeholder numbers come from the scan and can change from run to run.\n")
