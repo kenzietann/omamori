@@ -260,14 +260,61 @@ func TestInvalidRequests(t *testing.T) {
 	}
 }
 
-func TestEscapingCannotCreateAFinding(t *testing.T) {
+func TestEscapingCannotCreateAFindingAndTheRequestIsStillSent(t *testing.T) {
+	testCases := []struct {
+		name string
+		text string
+	}{
+		{"a control character before digits", "\x00" + "00000000A"},
+		{"an ampersand before digits in minified code", "x=e&62914560;y=1"},
+		{"a less than sign before digits", "if(a<3355443){return a<<16&16711680}"},
+		{"a greater than sign after digits", "a=33554432>>8;b=4194304>x"},
+		{"a line separator between digits", "123456\u2028789018"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			provider := &fakeProvider{}
+			sender, _ := newTestSender(t, provider)
+
+			_, err := sender.Send(context.Background(), Request{Messages: []Message{{Role: "user", Text: testCase.text}}})
+
+			if err != nil || provider.callCount != 1 {
+				t.Fatalf("err = %v, calls = %d, want the request to be sent once", err, provider.callCount)
+			}
+			if encodingHasFindings(provider.recorded[0]) {
+				t.Errorf("the request that was sent has a finding in its encoded form: %+v", provider.recorded[0])
+			}
+		})
+	}
+}
+
+func TestACharacterThatDoesNotTouchADigitIsNotChanged(t *testing.T) {
 	provider := &fakeProvider{}
 	sender, _ := newTestSender(t, provider)
+	text := "if (a < b && c > d) { return \"<tag>&amp;\" }"
 
-	_, err := sender.Send(context.Background(), Request{Messages: []Message{{Role: "user", Text: "\x00" + "00000000A"}}})
+	_, err := sender.Send(context.Background(), Request{Messages: []Message{{Role: "user", Text: text}}})
 
-	if !errors.Is(err, ErrUnsafeRequest) || provider.callCount != 0 {
-		t.Errorf("err = %v, calls = %d, want ErrUnsafeRequest and 0 calls", err, provider.callCount)
+	if err != nil || provider.recorded[0].Messages[0].Text != text {
+		t.Errorf("err = %v, text = %q, want it unchanged", err, provider.recorded[0].Messages[0].Text)
+	}
+}
+
+func TestNeutralizeEscapesOnlyChangesTheCharactersNextToDigits(t *testing.T) {
+	for text, want := range map[string]string{
+		"e&6291":     "e 6291",
+		"6&":         "6 ",
+		"a&b":        "a&b",
+		"1<2":        "1 2",
+		"1\x002":     "1 2",
+		"1\n2\t3":    "1\n2\t3",
+		"12\u202834": "12 34",
+		"":           "",
+		"日本<7":       "日本 7",
+	} {
+		if got := neutralizeEscapes(text); got != want {
+			t.Errorf("neutralizeEscapes(%q) = %q, want %q", text, got, want)
+		}
 	}
 }
 

@@ -207,9 +207,32 @@ func (sender *Sender) prepare(request Request) (SafeRequest, error) {
 		return SafeRequest{}, err
 	}
 
+	safe := sender.clean(request, false)
+	if !encodingHasFindings(safe) {
+		return SafeRequest{request: safe}, nil
+	}
+
+	// A character like & or < is written as \u0026 or \u003c in JSON. Its digits can join the digits next to it
+	// and make a number that the text did not have. Text of code (a minified script) does this often. Those
+	// characters are replaced by a space where they touch a digit, and the request is checked again. If it still
+	// has a finding, the request is refused.
+	safe = sender.clean(request, true)
+	if encodingHasFindings(safe) {
+		return SafeRequest{}, ErrUnsafeRequest
+	}
+
+	return SafeRequest{request: safe}, nil
+}
+
+func (sender *Sender) clean(request Request, neutralize bool) Request {
 	textSanitizer := &sanitizer.Sanitizer{}
 	clean := func(text string) string {
-		cleaned, _ := textSanitizer.Sanitize(sender.shortenPaths(text))
+		text = sender.shortenPaths(text)
+		if neutralize {
+			text = neutralizeEscapes(text)
+		}
+		cleaned, _ := textSanitizer.Sanitize(text)
+
 		return cleaned
 	}
 
@@ -236,11 +259,38 @@ func (sender *Sender) prepare(request Request) (SafeRequest, error) {
 		safe.Tools = append(safe.Tools, safeSpec)
 	}
 
-	if encodingHasFindings(safe) {
-		return SafeRequest{}, ErrUnsafeRequest
+	return safe
+}
+
+// neutralizeEscapes replaces the characters that JSON writes as \uXXXX (the ones that have digits in their escape)
+// by a space, where they touch a digit.
+func neutralizeEscapes(text string) string {
+	runes := []rune(text)
+	for index, character := range runes {
+		if !writtenAsUnicodeEscape(character) {
+			continue
+		}
+		if index > 0 && isDigit(runes[index-1]) || index+1 < len(runes) && isDigit(runes[index+1]) {
+			runes[index] = ' '
+		}
 	}
 
-	return SafeRequest{request: safe}, nil
+	return string(runes)
+}
+
+func writtenAsUnicodeEscape(character rune) bool {
+	switch character {
+	case '<', '>', '&', '\u2028', '\u2029':
+		return true
+	case '\n', '\r', '\t':
+		return false
+	}
+
+	return character < ' ' || character == 0x7f
+}
+
+func isDigit(character rune) bool {
+	return character >= '0' && character <= '9' || character >= '\uFF10' && character <= '\uFF19'
 }
 
 func validate(request Request) error {
