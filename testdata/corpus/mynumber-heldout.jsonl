@@ -1,0 +1,16 @@
+{"text": "住民票の写しに記載されたマイナンバー（123123123128）は提出後に破棄します。", "expected": ["123123123128"]}
+{"text": "INFO form.save user=u1001 mynumber=4564-5645-6450 status=pending", "expected": ["4564-5645-6450"]}
+{"text": "column3\n７８９７８９７８９７８１\ncolumn4", "expected": ["７８９７８９７８９７８１"]}
+{"text": "name: Sample Person\nnumber: 1010 1010 1019\naddress: Tokyo", "expected": ["1010 1010 1019"]}
+{"text": "two numbers 909090909094 and 214365870926", "expected": ["909090909094", "214365870926"]}
+{"text": "番号は123123123128。", "expected": ["123123123128"]}
+{"text": "the ticket id is 123123123129 (not a person)", "expected": []}
+{"text": "bank account 1234567890123", "expected": []}
+{"text": "JAN code 4901234567894 and 4912345678904", "expected": []}
+{"text": "2026-11-12T09:30:00.123456789Z", "expected": []}
+{"text": "card 4111 1111 1111 1111", "expected": []}
+{"text": "session 482915063721 expired", "expected": []}
+{"text": "memo: 0120-123-456 まで電話", "expected": []}
+{"text": "price 1,234,567,890 円", "expected": []}
+{"text": "serial AB123456789012CD", "expected": []}
+{"text": "file backup_20261112093000.tar.gz", "expected": []}
