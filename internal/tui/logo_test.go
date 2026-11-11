@@ -226,8 +226,9 @@ func TestSmallWindowsGetAOneLineHeader(t *testing.T) {
 	if !strings.Contains(exact.View(), wordmarkRows[1]) {
 		t.Error("a window that is exactly big enough did not get the wordmark")
 	}
-	withNotice, _ := pressAll(t, exact, "down", "enter")
-	if lines := strings.Count(withNotice.View(), "\n") + 1; lines > minWordmarkHeight || !strings.Contains(withNotice.View(), "not built yet") {
+	notReady := &fakeBackend{choices: []Choice{localChoice}, taskReadyErr: errors.New("Task B needs a log file")}
+	withNotice, _ := pressAll(t, sized(newModelWith("/work/project", notReady, Defaults{}), wordmarkWidth(), minWordmarkHeight), "down", "enter")
+	if lines := strings.Count(withNotice.View(), "\n") + 1; lines > minWordmarkHeight || !strings.Contains(withNotice.View(), "Task B needs a log file") || !strings.Contains(withNotice.View(), wordmarkRows[1]) {
 		t.Errorf("with a notice the menu has %d lines in a window of %d", lines, minWordmarkHeight)
 	}
 }

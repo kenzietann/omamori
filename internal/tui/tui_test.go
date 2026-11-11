@@ -158,6 +158,16 @@ type fakeBackend struct {
 	forgetKeyErr    error
 	savedSettings   []Defaults
 	saveSettingsErr error
+	taskChecks      []string
+	taskReadyErr    error
+	title           string
+	label           string
+}
+
+func (backend *fakeBackend) TaskReady(task string) error {
+	backend.taskChecks = append(backend.taskChecks, task)
+
+	return backend.taskReadyErr
 }
 
 func (backend *fakeBackend) KeysCanBeSaved() bool { return backend.canSaveKeys }
@@ -219,6 +229,8 @@ func (backend *fakeBackend) Prepare(setup Setup) (Plan, error) {
 	}
 
 	return Plan{
+		Title:       backend.title,
+		Label:       backend.label,
 		ConsentText: consent,
 		Summary:     backend.summary,
 		Preview:     backend.preview,
@@ -313,13 +325,24 @@ func TestHomeChoices(t *testing.T) {
 	model := newModel("/work/project", finishedRunner("r", true))
 
 	taskB, command := pressAll(t, model, "down", "enter")
-	if taskB.screen != homeScreen || command != nil || !strings.Contains(taskB.View(), "Task B is not built yet.") {
-		t.Errorf("Task B: screen = %d, view:\n%s", taskB.screen, taskB.View())
+	if taskB.step != stepProvider || command != nil || taskB.task != TaskTriage {
+		t.Errorf("Task B: step = %d, task = %q, the provider choice must start", taskB.step, taskB.task)
 	}
 
-	moved, _ := press(t, taskB, "up")
+	notReady := &fakeBackend{choices: []Choice{localChoice}, taskReadyErr: errors.New("Task B needs the log file auth.log in the target folder.")}
+	blocked, _ := pressAll(t, newModelWith("/work/project", notReady, Defaults{}), "down", "enter")
+	if blocked.step != stepMenu || !strings.Contains(blocked.View(), "Task B needs the log file auth.log") || len(notReady.taskChecks) != 1 || notReady.taskChecks[0] != TaskTriage {
+		t.Errorf("a task that is not ready: step = %d, checks = %q, view:\n%s", blocked.step, notReady.taskChecks, blocked.View())
+	}
+	moved, _ := press(t, blocked, "up")
 	if moved.notice != "" {
 		t.Error("the notice stayed after moving")
+	}
+	if _, command := pressAll(t, newModelWith("/work/project", notReady, Defaults{}), "enter"); command != nil {
+		t.Error("Task A asked if the log is there")
+	}
+	if len(notReady.taskChecks) != 1 {
+		t.Errorf("Task A checked a task: %q", notReady.taskChecks)
 	}
 
 	_, quitCommand := pressAll(t, model, "down", "down", "down", "enter")

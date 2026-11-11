@@ -77,6 +77,10 @@ func (choice Choice) HasKey() bool {
 var ErrKeyRejected = errors.New("the provider rejected the key")
 
 type Setup struct {
+	// Task is empty for the exposure check, and TaskTriage for the log triage.
+	Task string
+	// Replay makes the run a replay of the recording that the backend holds. No provider, model or key is needed.
+	Replay     bool
 	ProviderID string
 	Model      string
 	Key        string
@@ -90,14 +94,24 @@ type ReasoningChoice struct {
 	Label string
 }
 
+// TaskTriage is the name of the log triage in Setup.
+const TaskTriage = "triage"
+
 // A Plan is what the user is asked to confirm. Nothing has been sent when a Plan exists.
 type Plan struct {
 	ConsentText string
+	// Title names the task, for example "Task A: Exposure check". Empty means the exposure check.
+	Title string
+	// Label is shown next to the title when the run is a replay, for example "REPLAY".
+	Label string
 	// Summary is the short form of Preview. It is shown first when it is there.
 	Summary string
 	Preview string
-	Confirm func()
-	Run     Runner
+	// MaxRequests and MaxTokens are the limits of the run. The progress bar shows how much of them is used.
+	MaxRequests int
+	MaxTokens   int
+	Confirm     func()
+	Run         Runner
 }
 
 // Backend does the real work for the screen. It is defined here, where it is used,
@@ -108,6 +122,8 @@ type Backend interface {
 	// ReasoningChoices is empty when the model has no documented choice. Then the step is skipped.
 	ReasoningChoices(providerID, model string) []ReasoningChoice
 	Prepare(setup Setup) (Plan, error)
+	// TaskReady says whether a task has what it needs, for example the log of the triage. The error is shown to the user.
+	TaskReady(task string) error
 	// KeysCanBeSaved says whether a key can be kept between runs on this system.
 	KeysCanBeSaved() bool
 	SaveKey(ctx context.Context, providerID, key string) error
@@ -174,6 +190,9 @@ type Model struct {
 	keyNotice      string
 	consentFull    bool
 	consentScroll  int
+	task           string
+	title          string
+	label          string
 	outbox         []string
 	transcript     []string
 	version        string
@@ -189,6 +208,7 @@ type Model struct {
 	setupError      string
 	plan            *Plan
 	steps           []string
+	progress        progress
 	running         bool
 	cancelling      bool
 	cancel          context.CancelFunc
@@ -213,7 +233,33 @@ func (model Model) WithVersion(version string) Model {
 
 // WithTaskA opens the screen at the setup of Task A, as if the user had chosen it in the menu.
 func (model Model) WithTaskA() Model {
-	return model.startTaskA()
+	return model.startTask("")
+}
+
+// WithTask opens the screen at the setup of a task: "" for Task A, or TaskTriage for Task B.
+func (model Model) WithTask(task string) Model {
+	return model.startTask(task)
+}
+
+// WithReplay opens the screen at the dry run of a replay. The backend holds the recording.
+func (model Model) WithReplay() Model {
+	if model.backend == nil {
+		model.notice = "There is nothing to replay."
+		return model
+	}
+
+	plan, err := model.backend.Prepare(Setup{Replay: true})
+	if err != nil {
+		model.notice = "The recording cannot be replayed: " + err.Error()
+		return model
+	}
+	model.plan = &plan
+	model.consentFull = false
+	model.consentScroll = 0
+	model.hasPending = false
+	model.step = stepConsent
+
+	return model
 }
 
 func (model Model) Init() tea.Cmd {
@@ -277,7 +323,9 @@ func (model Model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 		model.steps = append(slices.Clone(model.steps), message.text)
-		model = model.say(styleDim.Render("  ⎿ " + safeText(message.text)))
+		if !model.progress.read(message.text) {
+			model = model.say(styleDim.Render("  ⎿ " + safeText(message.text)))
+		}
 
 		return model, waitForMessage(model.stepChannel)
 	case doneMsg:
@@ -319,7 +367,12 @@ func (model Model) sayRunStart(plan *Plan) Model {
 	if model.version != "" {
 		info = "  Omamori " + safeText(model.version) + " · Target folder: " + safeText(model.target)
 	}
-	lines := []string{"", styleAccent.Render("● Task A: Exposure check"), styleDim.Render(info), ""}
+	model.title, model.label = plan.Title, plan.Label
+	heading := model.titleText()
+	if model.label != "" {
+		heading += " · " + safeText(model.label)
+	}
+	lines := []string{"", styleAccent.Render("● " + heading), styleDim.Render(info), ""}
 	for _, line := range strings.Split(safeText(text), "\n") {
 		lines = append(lines, "  "+line)
 	}
@@ -328,14 +381,48 @@ func (model Model) sayRunStart(plan *Plan) Model {
 	return model.say(strings.Join(lines, "\n"))
 }
 
+// titleText is the name of the task, for example "Task A: Exposure check".
+func (model Model) titleText() string {
+	if model.title == "" {
+		return "Task A: Exposure check"
+	}
+
+	return safeText(model.title)
+}
+
+// shortTitle is the part before the colon, for example "Task A".
+func (model Model) shortTitle() string {
+	short, _, _ := strings.Cut(model.titleText(), ":")
+
+	return short
+}
+
+// runningTitle is the name of the task for the status line, for example "Task A, exposure check".
+func (model Model) runningTitle() string {
+	short, rest, found := strings.Cut(model.titleText(), ": ")
+	if !found {
+		return short
+	}
+	runes := []rune(rest)
+	if len(runes) > 0 {
+		runes[0] = unicode.ToLower(runes[0])
+	}
+
+	return short + ", " + string(runes)
+}
+
 func (model Model) resultsText(done doneMsg) string {
 	report := done.result.Report
 	if done.err != nil {
 		report = "The run stopped: " + done.err.Error()
 	}
-	title, style := "Results: Task A, complete", styleGood
+	state, style := "complete", styleGood
 	if done.err != nil || !done.result.Complete {
-		title, style = "Results: Task A, incomplete", styleWarn
+		state, style = "incomplete", styleWarn
+	}
+	title := "Results: " + model.shortTitle() + ", " + state
+	if model.label != "" {
+		title += " · " + safeText(model.label)
 	}
 
 	lines := []string{"", style.Render("● " + title)}
@@ -415,9 +502,9 @@ func (model Model) handleHomeKey(key string) (tea.Model, tea.Cmd) {
 	case "enter":
 		switch model.cursor {
 		case menuTaskA:
-			return model.startTaskA(), nil
+			return model.startTask(""), nil
 		case menuTaskB:
-			model.notice = "Task B is not built yet."
+			return model.startTask(TaskTriage), nil
 		case menuSettings:
 			return model.openSettings(), nil
 		case menuQuit:
@@ -451,10 +538,18 @@ func (model Model) beginSetup() Model {
 	return model
 }
 
-// startTaskA goes straight to the consent screen when the saved choices are complete and a key is
+// startTask goes straight to the consent screen when the saved choices are complete and a key is
 // available. The consent screen and the dry run are never skipped. Otherwise the setup steps start.
-func (model Model) startTaskA() Model {
+func (model Model) startTask(task string) Model {
 	model.settingsMode = false
+	model.task = task
+
+	if task != "" && model.backend != nil {
+		if err := model.backend.TaskReady(task); err != nil {
+			model.notice = err.Error()
+			return model
+		}
+	}
 
 	started := model.beginSetup()
 	if started.step != stepProvider {
@@ -467,7 +562,7 @@ func (model Model) startTaskA() Model {
 	}
 
 	chosen := started.choices[index]
-	setup := Setup{ProviderID: chosen.ID, Model: started.defaults.Model, Reasoning: started.defaults.Reasoning}
+	setup := Setup{Task: task, ProviderID: chosen.ID, Model: started.defaults.Model, Reasoning: started.defaults.Reasoning}
 	plan, err := started.backend.Prepare(setup)
 	if err != nil {
 		model.step = stepMenu
@@ -864,7 +959,7 @@ func (model Model) handleReasoningKey(key string) (Model, tea.Cmd) {
 func (model Model) prepare() Model {
 	chosen := model.choices[model.providerCursor]
 
-	plan, err := model.backend.Prepare(Setup{ProviderID: chosen.ID, Model: string(model.modelInput), Key: string(model.keyInput), Reasoning: model.reasoning})
+	plan, err := model.backend.Prepare(Setup{Task: model.task, ProviderID: chosen.ID, Model: string(model.modelInput), Key: string(model.keyInput), Reasoning: model.reasoning})
 	if err != nil {
 		model.setupError = err.Error()
 		return model
@@ -923,6 +1018,7 @@ func (model Model) confirm() (tea.Model, tea.Cmd) {
 	}
 
 	model = model.sayRunStart(plan)
+	model.progress = progress{maxRequests: plan.MaxRequests, maxTokens: plan.MaxTokens}
 	model.plan = nil
 	model.step = stepMenu
 	plan.Confirm()

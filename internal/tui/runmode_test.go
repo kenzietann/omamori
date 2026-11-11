@@ -188,7 +188,7 @@ func TestEachStepIsPrintedOnItsOwnAsItArrives(t *testing.T) {
 	waiting := func(ctx context.Context, step func(string)) (Result, error) { <-ctx.Done(); return Result{}, nil }
 	model, _ := startedRun(t, waiting)
 
-	for _, text := range []string{"run started", "tool run_detectors: ok"} {
+	for _, text := range []string{"tool run_detectors: ok", "tool read_file: refused (outside the folder)", "report saved", "run finished: limit reached"} {
 		updated, command := model.Update(stepMsg{run: model.runID, text: text})
 		model = updated.(Model)
 
@@ -491,4 +491,58 @@ func FuzzScreens(f *testing.F) {
 			}
 		}
 	})
+}
+
+func TestOnlyTheStepsThatMatterToTheUserArePrinted(t *testing.T) {
+	waiting := func(ctx context.Context, step func(string)) (Result, error) { <-ctx.Done(); return Result{}, nil }
+	model, _ := startedRun(t, waiting)
+
+	for _, text := range []string{"run started", "sending request 1 to OpenAI", "answer received (step 1, 460 tokens used in total)", "run finished: finished"} {
+		updated, command := model.Update(stepMsg{run: model.runID, text: text})
+		model = updated.(Model)
+
+		if lines := printedBy(command); len(lines) != 0 {
+			t.Errorf("the step %q was printed: %q", text, lines)
+		}
+	}
+	model.cancel()
+}
+
+func TestTheLiveLineShowsTheBudgetThatIsUsed(t *testing.T) {
+	testCases := []struct {
+		name  string
+		steps []string
+		want  []string
+	}{
+		{"before the first request", nil, []string{"[░░░░░░░░░░░░] 0%", "starting"}},
+		{"after the first request", []string{"sending request 1 to OpenAI"}, []string{"6%", "request 1 of up to 15", "0 tokens", "OpenAI"}},
+		{"tokens count more than requests", []string{"sending request 2 to OpenAI", "answer received (step 2, 150000 tokens used in total)"}, []string{"[██████░░░░░░] 50%", "request 2 of up to 15", "150,000 tokens"}},
+		{"never more than a full bar", []string{"sending request 9 to OpenAI", "answer received (step 9, 900000 tokens used in total)"}, []string{"[████████████] 100%", "900,000 tokens"}},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			waiting := func(ctx context.Context, step func(string)) (Result, error) { <-ctx.Done(); return Result{}, nil }
+			model, _ := startedRun(t, waiting)
+			model.progress.maxRequests, model.progress.maxTokens = 15, 300000
+			for _, text := range testCase.steps {
+				updated, _ := model.Update(stepMsg{run: model.runID, text: text})
+				model = updated.(Model)
+			}
+
+			view := model.View()
+			for _, want := range testCase.want {
+				if !strings.Contains(view, want) {
+					t.Errorf("the live line has no %q:\n%s", want, view)
+				}
+			}
+			model.cancel()
+		})
+	}
+}
+
+func TestAnUnknownStepIsStillPrinted(t *testing.T) {
+	var current progress
+	if current.read("something new happened") {
+		t.Error("an unknown step was hidden")
+	}
 }

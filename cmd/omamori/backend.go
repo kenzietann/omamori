@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kenzietann/omamori/internal/appconfig"
+	"github.com/kenzietann/omamori/internal/replay"
 	"github.com/kenzietann/omamori/internal/taskrun"
 	"github.com/kenzietann/omamori/internal/tui"
 )
@@ -14,11 +15,32 @@ const keyActionWait = 15 * time.Second
 
 // backend connects the screen to the core. It only converts types and holds no rules.
 type backend struct {
-	// copyText puts text on the clipboard. Empty means the default for this system.
-	copyText func(text string) error
-	config   taskrun.Config
+	config taskrun.Config
 	// settingsPath is where the choices are kept. Empty means that they are not kept.
 	settingsPath string
+	// log is the log of the triage, relative to the project folder. Empty means auth.log.
+	log string
+	// recording is what a replay plays back. Without it, there is no replay.
+	recording *replay.Recording
+}
+
+var errNoRecording = errors.New("there is no recording to replay")
+
+// TaskReady says in plain words what a task is missing.
+func (backend backend) TaskReady(task string) error {
+	if task != tui.TaskTriage {
+		return nil
+	}
+
+	log := backend.log
+	if log == "" {
+		log = taskrun.DefaultLog
+	}
+	if backend.config.CheckTask(taskrun.TaskTriage, log) != nil {
+		return errors.New("Task B needs the log file " + log + " in the target folder. Start Omamori with the log: omamori triage <log file>")
+	}
+
+	return nil
 }
 
 func (backend backend) Providers() []tui.Choice {
@@ -72,7 +94,18 @@ func (backend backend) ReasoningChoices(providerID, model string) []tui.Reasonin
 }
 
 func (backend backend) Prepare(setup tui.Setup) (tui.Plan, error) {
-	session, err := taskrun.Prepare(backend.config, taskrun.Setup{ProviderID: setup.ProviderID, Model: setup.Model, Key: setup.Key, Reasoning: setup.Reasoning})
+	prepared := taskrun.Setup{ProviderID: setup.ProviderID, Model: setup.Model, Key: setup.Key, Reasoning: setup.Reasoning, Log: backend.log}
+	if setup.Task == tui.TaskTriage {
+		prepared.Task = taskrun.TaskTriage
+	}
+	if setup.Replay {
+		if backend.recording == nil {
+			return tui.Plan{}, errNoRecording
+		}
+		prepared.Recording = backend.recording
+	}
+
+	session, err := taskrun.Prepare(backend.config, prepared)
 	if err != nil {
 		return tui.Plan{}, err
 	}
@@ -87,10 +120,16 @@ func (backend backend) Prepare(setup tui.Setup) (tui.Plan, error) {
 		return tui.Plan{}, taskrun.ErrSetup
 	}
 
+	maxRequests, maxTokens := session.Budget()
+
 	return tui.Plan{
+		Title:       session.Title(),
+		Label:       session.Label(),
 		ConsentText: session.ConsentText(),
 		Summary:     summary,
 		Preview:     preview,
+		MaxRequests: maxRequests,
+		MaxTokens:   maxTokens,
 		Confirm:     session.Confirm,
 		Run: func(ctx context.Context, step func(string)) (tui.Result, error) {
 			result, err := session.Run(ctx, step)

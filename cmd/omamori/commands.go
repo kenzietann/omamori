@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"text/tabwriter"
 	"time"
 
 	"github.com/kenzietann/omamori/internal/agent"
 	"github.com/kenzietann/omamori/internal/appconfig"
+	"github.com/kenzietann/omamori/internal/replay"
 	"github.com/kenzietann/omamori/internal/taskrun"
+	"github.com/kenzietann/omamori/internal/triage"
 	"github.com/kenzietann/omamori/internal/tui"
 )
 
@@ -29,21 +33,33 @@ Usage:
 
 Commands:
   check <folder>      Task A: check a project for leaked data (opens the screen)
+  triage <log file>   Task B: triage an sshd auth.log for guessing and password spraying
   ui <folder>         open the home screen, where you choose a task
+  replay <recording> [folder or log file]
+                      play back the recorded answers of an earlier run. Nothing is sent
   providers           list the AI providers and say whether their key is set
   models <provider>   list the models that a provider offers for your key
   version             print the version
   help                print this help
 
-Flags for check and ui:
+Flags for check, triage, ui and replay:
   --provider id       AI provider (or set OMAMORI_PROVIDER)
   --model name        model name (or set OMAMORI_MODEL)
   --output folder     where reports are saved (default ~/omamori-output)
   --max-steps n       limit of requests in one run (default 15)
   --max-tokens n      limit of tokens in one run (default 300000)
 
+Flags for the triage (Task B). The log lines have no year and no time zone:
+  --year n            year of the log lines (default: this year)
+  --timezone name     time zone of the log lines, for example Asia/Tokyo (default: this computer)
+  --triage-config f   file with window_minutes, failure_threshold and spray_threshold
+
+Every live run saves recording.json next to its report. "omamori replay" plays it back through
+the same guard, tools and report. A replay is labeled REPLAY, and it makes no network call.
+
 API keys are never read from the command line. Set the key of your provider in the
-environment (for example ANTHROPIC_API_KEY) or type it in the screen. It is not saved.
+environment (for example ANTHROPIC_API_KEY) or type it in the screen. On macOS a key that works
+is saved in your Keychain, and you can remove it in Settings.
 `
 )
 
@@ -97,8 +113,10 @@ func run(args []string, env environment) int {
 		return runProviders(rest, env)
 	case "models":
 		return runModels(rest, env)
-	case "check", "ui":
+	case "check", "ui", "triage":
 		return runScreen(command, rest, env)
+	case "replay":
+		return runReplay(rest, env)
 	}
 
 	fmt.Fprintf(env.stderr, "omamori: %q is not a command. Run omamori help to see the commands.\n", command)
@@ -172,11 +190,54 @@ func keyName(config taskrun.Config, providerID string) string {
 	return "the key of the provider"
 }
 
+// loadTriageConfig reads the settings of Task B: the file, then the flags. It is used for the commands that can
+// run Task B. A settings file that is broken stops them, because a wrong window or year gives wrong findings.
+func loadTriageConfig(chosen settings, env environment) (triage.Config, error) {
+	return layerTriageConfig(chosen, env, nil)
+}
+
+// layerTriageConfig reads the settings of Task B. The base is the settings of a recording, when a replay has them;
+// a settings file replaces the base, and the flags are put on top. Without a base, the defaults are the base.
+func layerTriageConfig(chosen settings, env environment, recorded *replay.Settings) (triage.Config, error) {
+	path := chosen.triageFile
+	if path == "" && recorded == nil && env.settingsPath != nil {
+		if found, err := env.settingsPath(); err == nil {
+			path = filepath.Join(filepath.Dir(found), "triage.json")
+		}
+	}
+
+	config, err := triage.LoadConfig(path, time.Now())
+	if err != nil {
+		return triage.Config{}, err
+	}
+	if recorded != nil && chosen.triageFile == "" {
+		if config, err = taskrun.TriageFromRecording(*recorded); err != nil {
+			return triage.Config{}, err
+		}
+	}
+	if chosen.year != 0 {
+		config.Year = chosen.year
+	}
+	if chosen.zone != "" {
+		location, err := time.LoadLocation(chosen.zone)
+		if err != nil {
+			return triage.Config{}, errors.New("the time zone is not known")
+		}
+		config.Location, config.ZoneName = location, chosen.zone
+	}
+
+	return config, config.Validate()
+}
+
 func runScreen(command string, args []string, env environment) int {
-	chosen, err := parseSettings(args, env.lookupEnv, env.home)
+	parse := parseSettings
+	if command == "triage" {
+		parse = parseTriage
+	}
+	chosen, err := parse(args, env.lookupEnv, env.home)
 	if err != nil {
 		fmt.Fprintln(env.stderr, "omamori:", err)
-		if err == errUsage {
+		if isUsage(err) {
 			return exitUsage
 		}
 
@@ -191,6 +252,14 @@ func runScreen(command string, args []string, env environment) int {
 		ListModels: env.listModels,
 		Keys:       env.keys,
 	}
+	if command != "check" || chosen.triageFile != "" {
+		triageConfig, err := loadTriageConfig(chosen, env)
+		if err != nil {
+			fmt.Fprintln(env.stderr, "omamori:", err)
+			return exitFailed
+		}
+		config.Triage = &triageConfig
+	}
 
 	var path string
 	var saved appconfig.Settings
@@ -200,10 +269,69 @@ func runScreen(command string, args []string, env environment) int {
 			saved, _ = appconfig.Load(path)
 		}
 	}
-	model := tui.New(chosen.target, backend{config: config, settingsPath: path}, mergeDefaults(chosen, saved)).WithVersion(version)
-	if command == "check" {
-		model = model.WithTaskA()
+	model := tui.New(chosen.target, backend{config: config, settingsPath: path, log: chosen.log}, mergeDefaults(chosen, saved)).WithVersion(version)
+	switch command {
+	case "check":
+		model = model.WithTask("")
+	case "triage":
+		model = model.WithTask(tui.TaskTriage)
 	}
+
+	if err := env.openScreen(model); err != nil {
+		fmt.Fprintln(env.stderr, "omamori: the screen stopped:", err)
+		return exitFailed
+	}
+
+	return exitOK
+}
+
+// runReplay plays a recording back. It needs no provider and no key, and it sends nothing.
+func runReplay(args []string, env environment) int {
+	chosen, err := parseReplay(args, env.lookupEnv, env.home)
+	if err != nil {
+		fmt.Fprintln(env.stderr, "omamori:", err)
+		if isUsage(err) {
+			return exitUsage
+		}
+
+		return exitFailed
+	}
+
+	recording, err := replay.Load(chosen.recording)
+	if err != nil {
+		fmt.Fprintln(env.stderr, "omamori:", err)
+		return exitFailed
+	}
+
+	target, log := chosen.target, ""
+	info, err := os.Stat(target)
+	switch {
+	case err != nil:
+		fmt.Fprintln(env.stderr, "omamori: the project folder or log file is not there")
+		return exitFailed
+	case info.Mode().IsRegular() && recording.Task == string(taskrun.TaskTriage):
+		target, log = filepath.Dir(target), filepath.Base(target)
+	case !info.IsDir():
+		fmt.Fprintln(env.stderr, "omamori: the target is not a folder")
+		return exitFailed
+	}
+
+	config := taskrun.Config{
+		Target:     target,
+		OutputBase: chosen.output,
+		Limits:     agent.Limits{MaxSteps: chosen.maxSteps, MaxTokens: chosen.maxTokens},
+		LookupEnv:  env.lookupEnv,
+	}
+	// A replay reads the log with the settings of the recording. Settings that the user gives win.
+	if chosen.year != 0 || chosen.zone != "" || chosen.triageFile != "" {
+		triageConfig, err := layerTriageConfig(chosen, env, recording.Triage)
+		if err != nil {
+			fmt.Fprintln(env.stderr, "omamori:", err)
+			return exitFailed
+		}
+		config.Triage = &triageConfig
+	}
+	model := tui.New(target, backend{config: config, log: log, recording: &recording}, tui.Defaults{}).WithVersion(version).WithReplay()
 
 	if err := env.openScreen(model); err != nil {
 		fmt.Fprintln(env.stderr, "omamori: the screen stopped:", err)

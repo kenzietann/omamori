@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -198,7 +199,7 @@ func (model Model) targetLine(label string) string {
 }
 
 func (model Model) menuView() string {
-	menu := []string{"Task A: Exposure check", "Task B: Log triage (not built yet)", "Settings", "Quit"}
+	menu := []string{"Task A: Exposure check", "Task B: Log triage", "Settings", "Quit"}
 
 	lead := append(model.headerLines(), "", model.targetLine("Target folder: "), "")
 	var trail []string
@@ -207,7 +208,7 @@ func (model Model) menuView() string {
 	}
 
 	return model.page(lead, menu, model.cursor, trail,
-		model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"q", "quit"}), menuTaskB)
+		model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"q", "quit"}))
 }
 
 func (model Model) providerView() string {
@@ -456,7 +457,10 @@ func (model Model) runView() string {
 		return model.footer(hint{"enter", "back to the menu"}, hint{"q", "quit"})
 	}
 
-	title, style := "Running: Task A, exposure check", styleAccent
+	title, style := "Running: "+model.runningTitle(), styleAccent
+	if model.label != "" {
+		title += " · " + safeText(model.label)
+	}
 	if model.cancelling {
 		title, style = "Cancelling... waiting for the current step to stop", styleWarn
 	}
@@ -464,6 +468,9 @@ func (model Model) runView() string {
 
 	// The line is cut once, as a whole, so that it never goes over the width.
 	const keys = "  (esc: cancel, q: quit)"
+	if !model.cancelling {
+		title += "  " + model.progress.bar() + " " + strconv.Itoa(model.progress.percent()) + "%  " + model.progress.summary()
+	}
 	line := model.truncate(mark+" "+title+keys, 0)
 	if first, found := strings.CutSuffix(line, keys); found {
 		return style.Render(first) + styleDim.Render(keys)
