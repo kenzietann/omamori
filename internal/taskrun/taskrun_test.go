@@ -364,8 +364,8 @@ func TestAFullRunWritesTheReportAndTheLogAndNothingElse(t *testing.T) {
 	}
 
 	files := outputFiles(t, setup.output)
-	if len(files) != 2 || files[filepath.Join("run-20261112-093000", "report.md")] != result.Report || files[filepath.Join("run-20261112-093000", "events.jsonl")] == "" {
-		t.Fatalf("the output files are %v, want exactly report.md (the same as the result) and events.jsonl", slices.Sorted(mapKeys(files)))
+	if len(files) != 3 || files[filepath.Join("run-20261112-093000", "report.md")] != result.Report || files[filepath.Join("run-20261112-093000", "events.jsonl")] == "" || files[filepath.Join("run-20261112-093000", "recording.json")] == "" {
+		t.Fatalf("the output files are %v, want exactly report.md (the same as the result), events.jsonl and recording.json", slices.Sorted(mapKeys(files)))
 	}
 
 	expected, err := os.ReadFile(filepath.Join(fixtureDirectory, "expected_findings.json"))

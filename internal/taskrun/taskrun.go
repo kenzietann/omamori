@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -19,7 +20,9 @@ import (
 	"github.com/kenzietann/omamori/internal/gateway"
 	"github.com/kenzietann/omamori/internal/outbound"
 	"github.com/kenzietann/omamori/internal/pathguard"
+	"github.com/kenzietann/omamori/internal/replay"
 	"github.com/kenzietann/omamori/internal/reportwriter"
+	"github.com/kenzietann/omamori/internal/triage"
 )
 
 const (
@@ -37,12 +40,28 @@ var (
 	ErrReasoning       = errors.New("this reasoning level is not available for this model")
 	ErrKeyStore        = errors.New("the key could not be saved or removed")
 	ErrKeyRejected     = errors.New("the provider rejected the key")
+	ErrRecording       = errors.New("the recording cannot be used for this task")
+	ErrUnknownTask     = errors.New("this task is not known")
+	ErrLogFile         = errors.New("the log file cannot be used")
 	ErrModelList       = errors.New("the list of models could not be loaded")
 	ErrNotConfirmed    = errors.New("the user has not confirmed the run")
 	ErrOutput          = errors.New("the output folder cannot be used: it must be outside the project and new files must be possible")
 )
 
 type ProviderFactory func(id, apiKey, model, reasoning string) (outbound.Provider, error)
+
+// Task is the work that a run does.
+type Task string
+
+const (
+	TaskExposure Task = "exposure"
+	TaskTriage   Task = "triage"
+
+	// DefaultLog is the log that the triage reads when none is named, relative to the project folder.
+	DefaultLog = "auth.log"
+)
+
+var logNamePattern = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,200}$`)
 
 type ModelLister func(ctx context.Context, id, apiKey string) ([]string, error)
 
@@ -58,6 +77,8 @@ type Config struct {
 	Target     string
 	OutputBase string
 	Limits     agent.Limits
+	// Triage holds the settings of the log triage. Without it, the defaults are used.
+	Triage *triage.Config
 	// LookupEnv, Now, NewProvider and ListModels default to the real ones. Tests replace them.
 	LookupEnv   func(string) string
 	Now         func() time.Time
@@ -78,6 +99,12 @@ type Choice struct {
 }
 
 type Setup struct {
+	// Task is empty for the exposure check.
+	Task Task
+	// Log is the log of the triage, relative to the project folder. Empty means auth.log.
+	Log string
+	// Recording makes the run a replay: the answers come from the recording, and nothing is sent.
+	Recording  *replay.Recording
 	ProviderID string
 	Model      string
 	Key        string
@@ -257,6 +284,12 @@ func (config Config) ForgetKey(ctx context.Context, providerID string) error {
 }
 
 type Session struct {
+	task         Task
+	log          string
+	logPath      string
+	triage       triage.Config
+	replay       *replay.Player
+	recorder     *replay.Recorder
 	providerName string
 	model        string
 	reasoning    string
@@ -272,6 +305,21 @@ func Prepare(config Config, setup Setup) (*Session, error) {
 	root, err := pathguard.NewRoot(config.Target)
 	if err != nil {
 		return nil, ErrTarget
+	}
+
+	task := setup.Task
+	if task == "" {
+		task = TaskExposure
+	}
+	if setup.Recording != nil {
+		return prepareReplay(config, root, *setup.Recording, setup.Log)
+	}
+	if task != TaskExposure && task != TaskTriage {
+		return nil, ErrUnknownTask
+	}
+	log, logPath, triageConfig, err := prepareTask(config, root, task, setup.Log, nil)
+	if err != nil {
+		return nil, err
 	}
 
 	chosen := config.choice(setup.ProviderID)
@@ -300,33 +348,177 @@ func Prepare(config Config, setup Setup) (*Session, error) {
 	if err != nil {
 		return nil, ErrSetup
 	}
-	sender, err := outbound.New(provider, config.Target)
+	// Every live run is recorded, so that it can be played back later without a network.
+	recorder := replay.NewRecorder(provider, string(task), model, log)
+	if task == TaskTriage {
+		recorder.SetTriage(replay.Settings{WindowMinutes: int(triageConfig.Window.Minutes()), FailureThreshold: triageConfig.FailureThreshold,
+			SprayThreshold: triageConfig.SprayThreshold, Year: triageConfig.Year, TimeZone: triageConfig.ZoneName})
+	}
+	sender, err := outbound.New(recorder, config.Target)
 	if err != nil {
 		return nil, ErrSetup
 	}
 
 	toolGateway := gateway.New(root, gateway.DefaultLimits)
 
-	return &Session{providerName: provider.Name(), model: model, reasoning: setup.Reasoning, config: config, gateway: toolGateway, sender: sender, specs: agent.SpecsFromGateway(toolGateway.Specs())}, nil
+	return &Session{task: task, log: log, logPath: logPath, triage: triageConfig, recorder: recorder, providerName: provider.Name(), model: model, reasoning: setup.Reasoning, config: config, gateway: toolGateway, sender: sender, specs: agent.SpecsFromGateway(toolGateway.Specs())}, nil
+}
+
+// prepareReplay builds a session that plays a recording back. It has no provider, no key and no model:
+// the player answers, and it has no network code.
+func prepareReplay(config Config, root *pathguard.Root, recording replay.Recording, logOverride string) (*Session, error) {
+	player, err := replay.NewPlayer(recording)
+	task := Task(recording.Task)
+	if err != nil || (task != TaskExposure && task != TaskTriage) {
+		return nil, ErrRecording
+	}
+	logName := recording.Log
+	if logOverride != "" {
+		logName = logOverride
+	}
+	log, logPath, triageConfig, err := prepareTask(config, root, task, logName, recording.Triage)
+	if err != nil {
+		return nil, err
+	}
+	sender, err := outbound.New(player, config.Target)
+	if err != nil {
+		return nil, ErrSetup
+	}
+
+	toolGateway := gateway.New(root, gateway.DefaultLimits)
+
+	return &Session{task: task, log: log, logPath: logPath, triage: triageConfig, replay: player, providerName: player.Name(), model: recording.Model, config: config, gateway: toolGateway, sender: sender, specs: agent.SpecsFromGateway(toolGateway.Specs())}, nil
+}
+
+// prepareTask checks what the task needs. The exposure check needs nothing. The triage needs a log file
+// inside the project folder, and its settings.
+func prepareTask(config Config, root *pathguard.Root, task Task, logName string, recorded *replay.Settings) (log, logPath string, settings triage.Config, err error) {
+	if task != TaskTriage {
+		return "", "", triage.Config{}, nil
+	}
+
+	if logName == "" {
+		logName = DefaultLog
+	}
+	if !logNamePattern.MatchString(logName) {
+		return "", "", triage.Config{}, ErrLogFile
+	}
+	resolved, resolveErr := root.Resolve(logName)
+	if resolveErr != nil {
+		return "", "", triage.Config{}, ErrLogFile
+	}
+	if info, statErr := os.Lstat(resolved); statErr != nil || !info.Mode().IsRegular() {
+		return "", "", triage.Config{}, ErrLogFile
+	}
+
+	// The settings of the user come first, then the ones in the recording, then the defaults.
+	settings = triage.Defaults(config.now())
+	switch {
+	case config.Triage != nil:
+		settings = *config.Triage
+	case recorded != nil:
+		fromRecording, recordingErr := TriageFromRecording(*recorded)
+		if recordingErr != nil {
+			return "", "", triage.Config{}, ErrLogFile
+		}
+		settings = fromRecording
+	}
+	if settings.Validate() != nil {
+		return "", "", triage.Config{}, ErrLogFile
+	}
+
+	return logName, resolved, settings, nil
+}
+
+// TriageFromRecording turns the settings in a recording into the settings of a run.
+func TriageFromRecording(recorded replay.Settings) (triage.Config, error) {
+	location, err := time.LoadLocation(recorded.TimeZone)
+	if err != nil {
+		return triage.Config{}, ErrRecording
+	}
+	config := triage.Config{Window: time.Duration(recorded.WindowMinutes) * time.Minute, FailureThreshold: recorded.FailureThreshold,
+		SprayThreshold: recorded.SprayThreshold, Year: recorded.Year, Location: location, ZoneName: recorded.TimeZone}
+
+	return config, config.Validate()
+}
+
+// ValidLogName says whether a name can be the log of the triage.
+func ValidLogName(name string) bool {
+	return logNamePattern.MatchString(name)
+}
+
+// CheckTask says whether a task has what it needs in the project folder. The exposure check needs nothing.
+func (config Config) CheckTask(task Task, logName string) error {
+	root, err := pathguard.NewRoot(config.Target)
+	if err != nil {
+		return ErrTarget
+	}
+	_, _, _, err = prepareTask(config, root, task, logName, nil)
+
+	return err
+}
+
+// Label is shown on the screen and in the report when the run is a replay. It is empty for a live run.
+func (session *Session) Label() string {
+	if session.replay == nil {
+		return ""
+	}
+	if session.replay.Source() == replay.SourceScripted {
+		return "REPLAY (scripted answers)"
+	}
+
+	return "REPLAY"
+}
+
+// Budget is the most requests and tokens that the run may use.
+func (session *Session) Budget() (requests, tokens int) {
+	return session.config.Limits.MaxSteps, session.config.Limits.MaxTokens
+}
+
+// Title names the task for the screen.
+func (session *Session) Title() string {
+	if session.task == TaskTriage {
+		return "Task B: Log triage"
+	}
+
+	return "Task A: Exposure check"
+}
+
+func (session *Session) instruction() string {
+	if session.task == TaskTriage {
+		return triage.Instruction(session.log, session.triage)
+	}
+
+	return exposure.Instruction
 }
 
 // ConsentText is what the user confirms. It is made from the same provider name that the sender uses.
 func (session *Session) ConsentText() string {
+	if session.replay != nil {
+		return "This is a " + session.Label() + ". Recorded answers are played back through the real guard. Nothing is sent to any provider."
+	}
+
 	return session.sender.ConsentText()
 }
 
 // Preview is the dry run: the first request exactly as it would be sent, after cleaning.
 // It sends nothing.
 func (session *Session) Preview() (string, error) {
-	cleaned, err := session.sender.Preview(agent.FirstRequest(exposure.Instruction, session.specs))
+	cleaned, err := session.sender.Preview(agent.FirstRequest(session.instruction(), session.specs))
 	if err != nil {
 		return "", err
 	}
 
 	var preview strings.Builder
-	fmt.Fprintf(&preview, "This is the first request, as it would be sent.\n")
+	if session.replay != nil {
+		fmt.Fprintf(&preview, "%s. This is the first request. It is checked against the recording, and nothing is sent.\n", session.Label())
+	} else {
+		fmt.Fprintf(&preview, "This is the first request, as it would be sent.\n")
+	}
 	fmt.Fprintf(&preview, "Limits for this run: up to %d requests and %d tokens.\n", session.config.Limits.MaxSteps, session.config.Limits.MaxTokens)
-	fmt.Fprintf(&preview, "Model: %s\n", session.model)
+	if session.replay == nil {
+		fmt.Fprintf(&preview, "Model: %s\n", session.model)
+	}
 	if session.reasoning != "" {
 		fmt.Fprintf(&preview, "Reasoning level: %s\n", session.reasoning)
 	}
@@ -346,16 +538,28 @@ func (session *Session) Preview() (string, error) {
 // Summary is the short form of the dry run: what is chosen, the limits, and the instruction.
 // The fixed system prompt and the tool list are left out. Preview has them.
 func (session *Session) Summary() (string, error) {
-	cleaned, err := session.sender.Preview(agent.FirstRequest(exposure.Instruction, session.specs))
+	cleaned, err := session.sender.Preview(agent.FirstRequest(session.instruction(), session.specs))
 	if err != nil {
 		return "", err
 	}
 
 	var summary strings.Builder
-	fmt.Fprintf(&summary, "Provider: %s\n", session.providerName)
-	fmt.Fprintf(&summary, "Model: %s\n", session.model)
+	if session.replay != nil {
+		fmt.Fprintf(&summary, "Mode: %s. The answers come from a recording. Nothing is sent.\n", session.Label())
+		if session.model != "" {
+			fmt.Fprintf(&summary, "Recorded with the model: %s\n", session.model)
+		}
+	} else {
+		fmt.Fprintf(&summary, "Provider: %s\n", session.providerName)
+		fmt.Fprintf(&summary, "Model: %s\n", session.model)
+	}
 	if session.reasoning != "" {
 		fmt.Fprintf(&summary, "Reasoning level: %s\n", session.reasoning)
+	}
+	if session.task == TaskTriage {
+		fmt.Fprintf(&summary, "Log: %s (read by Omamori too, to check every claim of the AI)\n", session.log)
+		fmt.Fprintf(&summary, "Settings: window %d minutes, failure threshold %d, spray threshold %d, year %d, time zone %s\n",
+			int(session.triage.Window.Minutes()), session.triage.FailureThreshold, session.triage.SprayThreshold, session.triage.Year, session.triage.ZoneName)
 	}
 	fmt.Fprintf(&summary, "Limits for this run: up to %d requests and %d tokens.\n\n", session.config.Limits.MaxSteps, session.config.Limits.MaxTokens)
 	fmt.Fprintf(&summary, "The first request holds only the instruction below, a fixed system prompt, and a list of %d read-only tools. It holds no file content.\n", len(cleaned.Tools))
@@ -403,7 +607,11 @@ func (session *Session) Run(ctx context.Context, step func(string)) (Result, err
 		return Result{}, ErrNotConfirmed
 	}
 
-	directory := filepath.Join(session.config.OutputBase, "run-"+session.config.now().UTC().Format("20060102-150405"))
+	prefix := "run-"
+	if session.replay != nil {
+		prefix = "replay-"
+	}
+	directory := filepath.Join(session.config.OutputBase, prefix+session.config.now().UTC().Format("20060102-150405"))
 	writer, err := reportwriter.New(session.config.Target, directory)
 	if err != nil {
 		return Result{}, ErrOutput
@@ -435,20 +643,43 @@ func (session *Session) Run(ctx context.Context, step func(string)) (Result, err
 		return log.Record("provider_request", "", true, "sent", describeRequest(request, requests))
 	})
 
-	collector := exposure.NewCollector(session.gateway)
-	runner, err := agent.New(session.sender, collector, &stepRecorder{log: log, step: step}, session.config.Limits, session.specs)
+	var tools agent.Tools = session.gateway
+	var collector *exposure.Collector
+	if session.task == TaskExposure {
+		collector = exposure.NewCollector(session.gateway)
+		tools = collector
+	}
+	runner, err := agent.New(session.sender, tools, &stepRecorder{log: log, step: step}, session.config.Limits, session.specs)
 	if err != nil {
 		return Result{}, ErrSetup
 	}
 
-	report, outcome, err := exposure.Run(ctx, runner, collector)
+	var report string
+	var outcome agent.Outcome
+	if session.task == TaskTriage {
+		report, outcome, err = triage.Run(ctx, runner, triage.Source{Path: session.logPath, Name: session.log}, session.triage)
+	} else {
+		report, outcome, err = exposure.Run(ctx, runner, collector)
+	}
 	if err != nil {
 		return Result{}, err
+	}
+	if label := session.Label(); label != "" {
+		report = "**" + label + ": recorded answers were played back. Nothing was sent.**\n\n" + report
 	}
 	if err := writer.Write("report.md", report); err != nil {
 		return Result{}, ErrOutput
 	}
 	step("report saved")
+	if session.recorder != nil {
+		if recorded := session.recorder.Recording(); len(recorded.Steps) > 0 {
+			text, err := recorded.JSON()
+			if err != nil || writer.Write("recording.json", text) != nil {
+				return Result{}, ErrOutput
+			}
+			step("recording saved")
+		}
+	}
 
 	return Result{Report: report, Complete: outcome.Status == agent.Complete, SavedTo: directory}, nil
 }
