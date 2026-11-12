@@ -40,6 +40,9 @@ Commands:
   scenario <folder>   write synthetic logs of one day with attacks into a new folder, for demos and tests
                       (--host: a whole synthetic system for forensics; --campaign: one attack
                       through three hosts, with host logs and network sensor logs)
+  rule draft <logs>...
+                      Task C: the AI writes the matching part of a detection rule for events that you
+                      point at, and Omamori accepts it only if it passes fixed checks (see below)
   dashboard [folder]  local web dashboard: investigations and confirmed runs
   store <command>    stored runs, event/alert search, cases and timelines (run "omamori store" for usage)
   ui <folder>         open the home screen, where you choose a task
@@ -95,6 +98,18 @@ Flags for analyze (also accepts the detect flags):
   --dry-run           show the guarded request without sending or writing reports
   --replay file       use recorded analyst answers offline, with the same logs and rules
   --timeout duration  maximum run time (default 2m)
+
+Flags for rule draft (also --assets, --indicators, --format, --year, --timezone and --output):
+  --goal text         what the rule is for, in your words (required)
+  --example ref       an event that the rule must match, as a report names it, like web01/auth.log:68
+                      (required, up to 20 times)
+  --title, --level    title and level of the saved rule (default: the goal, and medium)
+  --benign path       logs that you know to be clean; the rule must match nothing in them (repeatable)
+  --attempts n        answers the AI may give; after a refusal it is told the fixed reasons (default 3, max 5)
+  --yes, --dry-run, --replay, --provider, --model, --reasoning, --timeout, --max-tokens  as for analyze
+The AI writes only the log source, the detection and tests. A rule is accepted only if it loads, passes its
+tests, matches every example, matches nothing on built-in synthetic days without an attack or in --benign
+logs, and is not too broad on your logs. rule.yml is written only for an accepted rule.
 
 Every live run saves recording.json next to its report. "omamori replay" plays it back through
 the same guard, tools and report. A replay is labeled REPLAY, and it makes no network call.
@@ -174,6 +189,8 @@ func run(args []string, env environment) int {
 		return runDashboard(rest, env)
 	case "store":
 		return runStore(rest, env)
+	case "rule":
+		return runRule(rest, env)
 	}
 
 	fmt.Fprintf(env.stderr, "omamori: %q is not a command. Run omamori help to see the commands.\n", command)
