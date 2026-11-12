@@ -426,9 +426,16 @@ for writing a Sigma rule by hand. `internal/ruledraft` and `omamori rule draft`;
   other hosts are no longer shown as "other events".
 - `Check` fuzzed for 60 s; 20 mutations in a copy all caught (one equivalent mutation replaced).
 
-Not done: a live provider run (none has been made for any AI feature), correlation rules, the home
-screen and the dashboard (no text input for a goal and example references), real clean logs as a
-built-in benign set.
+Home screen (same day): a **Rule draft** line opens a page with four text fields (goal, examples,
+title, level), then the usual provider, model and consent pages. Wrong input brings the user back to
+the page with the reason and the text kept. Tested through the screen model (7 tests) and the backend
+on the campaign (preview sends and writes nothing; a confirmed run saves a rule that loads; a refused
+draft is incomplete and writes no rule), not by a person in a terminal. 11 mutations in a copy: 9
+caught at once; two survived (an error after saved settings was shown as a settings problem, and a
+refused draft was not tested from the home screen) until tests for both were added.
+
+Not done: a live provider run (none has been made for any AI feature), correlation rules, the
+dashboard, `--benign` and replay in the home screen, real clean logs as a built-in benign set.
 
 ## Not decided yet
 

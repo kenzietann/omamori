@@ -30,7 +30,7 @@ claims is checked by code, and collectors only read.
 | Sigma | A documented subset as the rule format, with correlations, aliases and tests inside the rule | Conversion to other SIEM query languages. Many modifiers |
 | MISP | `--indicators`: a list of addresses, domains and SHA-256 hashes marks events in every source ([demo.md](demo.md)) | Feeds, sharing, sightings, expiry, scores, MISP's own formats |
 | YARA | nothing (the exposure check finds secrets, not malware) | Pattern rules over files |
-| AI rule writing | `rule draft`: the AI writes the matching part of one rule for events you point at; code accepts it only if it loads, passes its tests, matches every example, matches nothing on built-in benign days or `--benign` logs, and is not too broad ([rule-writing.md](rule-writing.md)) | Correlation rules, a live model measurement, the home screen and the dashboard |
+| AI rule writing | `rule draft`: the AI writes the matching part of one rule for events you point at; code accepts it only if it loads, passes its tests, matches every example, matches nothing on built-in benign days or `--benign` logs, and is not too broad ([rule-writing.md](rule-writing.md)) | Correlation rules, a live model measurement, the dashboard. `--benign` in the home screen |
 
 ## 4. SIEM, log management and orchestration
 
@@ -42,7 +42,7 @@ claims is checked by code, and collectors only read.
 
 ## What is AI-powered today
 
-`rule draft`: the AI drafts the matching part of a detection rule and code decides whether it is
+`rule draft` (also in the home screen): the AI drafts the matching part of a detection rule and code decides whether it is
 accepted ([rule-writing.md](rule-writing.md)).
 
 `analyze` and `forensics --analyze`: the AI reviews alerts, relates them through an address, a user, a
