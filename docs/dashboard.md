@@ -24,8 +24,13 @@ SQLite database/journal paths must remain outside the selected input evidence.
 
 ## Investigation views
 
-- **Overview:** recent run counts, observed events, detected alerts and open cases.
-  Counts are explicitly scoped to the most recent 50 runs/cases, not global totals.
+- **Alert review:** a selected-run alert queue with adjacent evidence, rule and AI-review tabs.
+  The picker lists 50 recent runs (and a directly linked older run when selected). The charts and
+  queue use up to 200 of the selected run’s latest alerts; this scope is disclosed. Event/alert totals
+  come from that run, while the open-case count is scoped to 50 recent cases.
+- **Data charts:** severity counts and a UTC activity histogram with explicit bucket duration,
+  full interval endpoints, per-bucket values and a data table. Zero results never invent history.
+  On phones, chart detail is available through a disclosure so an alert is immediately reachable.
 - **Saved runs:** paginated history, run details, coverage and source provenance.
 - **Alert and event details:** severity, rule metadata, group values, full stored
   fields and retained evidence links. Checked AI citations resolve through the
@@ -115,3 +120,13 @@ previews, case-version conflicts, source preservation, safe metadata, AI checks
 and forensic manifests. Browser verification covers case creation/link/update,
 case timelines, detection preview/confirmation, stored AI citation navigation,
 script-like notes remaining inert, and desktop/mobile layouts.
+
+## Reference workspace design
+
+Light is the default; the theme switch saves a matching dark preference locally. Fonts and brand
+assets are self-hosted. Desktop queue and inspector panes scroll independently in a bounded working
+frame. Mobile stacks the panes, moves to selected evidence on selection, and has an explicit menu.
+The design contract is in `DESIGN.md`, product facts in `PRODUCT.md`, and surface-specific decisions
+in `.impeccable/surfaces/dashboard.md`. Optional frontend tests live under `tests/`; they add no
+runtime dependency to the Go binary. See [design validation](dashboard-design-validation.md) for
+measured checks and the marketing-template gate’s unresolved, separately recorded findings.

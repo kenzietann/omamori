@@ -1,58 +1,103 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-type="software" data-theme="light">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="color-scheme" content="dark" />
-    <title>Omamori · Local dashboard</title>
-    <link rel="icon" href="/icon.png" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="page-type" content="software" />
+    <meta name="site-kind" content="software" />
+    <meta
+      name="description"
+      content="Review blue-team alerts, inspect their evidence and work through local investigations with Omamori."
+    />
+    <meta name="theme-color" content="#f2f3ef" />
+    <title>Omamori — Alert review workspace</title>
+    <link rel="icon" href="/icon-light.png" />
+    <script src="/theme.js"></script>
+    <link
+      rel="preload"
+      href="/public-sans.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
     <link rel="stylesheet" href="/style.css" />
+    <script src="/chart-data.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
     <div class="shell">
-      <aside>
+      <aside class="navigation">
         <a class="brand" href="#overview"
-          ><img src="/icon.png" alt="" width="36" height="36" /><span
-            >omamori<small>BLUE TEAM WORKSPACE</small></span
-          ></a
+          ><img
+            id="brand-icon"
+            src="/icon-light.png"
+            alt=""
+            width="30"
+            height="30"
+          /><span>omamori</span></a
         >
-        <div class="nav-label">INVESTIGATE</div>
         <nav aria-label="Main navigation">
-          <a href="#overview">Overview</a><a href="#runs">Saved runs</a
+          <a href="#overview">Alert review</a><a href="#runs">Saved runs</a
           ><a href="#search">Search evidence</a><a href="#cases">Cases</a
           ><a href="#timeline">Timeline</a><a href="#activity">Run activity</a>
         </nav>
         <div class="sidebar-foot">
-          <span class="dot"></span> Local workspace
-          <p>Evidence stays connected.<br />AI claims stay checked.</p>
+          <span class="connection"
+            ><span class="dot"></span>Local workspace</span
+          ><button
+            id="theme-toggle"
+            class="theme-toggle"
+            type="button"
+            aria-pressed="false"
+          >
+            Switch to dark theme</button
+          ><span class="subtle">Private session · 127.0.0.1</span>
         </div>
       </aside>
       <div class="workspace">
-        <header>
+        <header class="app-header">
           <div>
-            <span class="eyebrow">OMAMORI / LOCAL DASHBOARD</span>
-            <h1 id="page-title">Overview</h1>
+            <h1 id="page-title">Alert review</h1>
+            <p id="page-description">
+              Review the signals. Open the source evidence.
+            </p>
           </div>
-          <a class="button primary" href="#new">+ New run</a>
+          <div class="header-actions">
+            <button
+              id="menu-toggle"
+              type="button"
+              aria-controls="mobile-nav"
+              aria-expanded="false"
+            >
+              Menu</button
+            ><a class="button primary" href="#new">Start a run</a>
+          </div>
         </header>
+        <nav id="mobile-nav" aria-label="Mobile navigation" hidden>
+          <a href="#overview">Alert review</a><a href="#runs">Saved runs</a
+          ><a href="#search">Search evidence</a><a href="#cases">Cases</a
+          ><a href="#timeline">Timeline</a><a href="#activity">Run activity</a>
+        </nav>
         <div id="notice" role="alert" hidden></div>
         <main id="main" tabindex="-1" aria-live="polite">
-          <p>Connecting to your workspace…</p>
+          <p>Loading stored evidence…</p>
         </main>
         <footer>
-          Local evidence. Explicit provenance. Verified claims.<span
-            >127.0.0.1 · private session</span
-          >
+          <span>Omamori · Local investigation workspace</span
+          ><span>Rule matches require investigation.</span>
         </footer>
       </div>
     </div>
-    <dialog id="detail">
+    <dialog id="detail" aria-labelledby="detail-title">
       <div class="dialog-heading">
         <h2 id="detail-title">Evidence</h2>
         <button id="close-detail" class="secondary" aria-label="Close details">
-          Close
+          Close details
         </button>
       </div>
       <div id="detail-body"></div>

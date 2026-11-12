@@ -18,3 +18,13 @@ CLAUDE.md
 DECISIONS.md
 # Local browser verification artifacts
 .playwright-mcp/
+
+# Locally installed agent skills and their machine-specific hooks
+.agents/
+.hermes/
+.codex/hooks.json
+skills-lock.json
+.taste-skill/
+
+# Optional frontend test dependencies
+tests/node_modules/

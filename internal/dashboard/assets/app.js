@@ -3,7 +3,14 @@ const $ = (s) => document.querySelector(s);
 const fragment = new URLSearchParams(location.hash.slice(1));
 if (fragment.has("token")) {
   sessionStorage.setItem("omamori-token", fragment.get("token"));
-  history.replaceState(null, "", location.pathname + "#overview");
+  const view = fragment.get("view") || "overview";
+  history.replaceState(
+    null,
+    "",
+    location.pathname +
+      "#" +
+      (/^review\/[A-Za-z0-9_-]+\/a[0-9]+$/.test(view) ? view : "overview"),
+  );
 }
 let token = sessionStorage.getItem("omamori-token") || "",
   config = {},
@@ -178,6 +185,17 @@ async function render(title, fn) {
   clearTimeout(poll);
   const current = ++generation;
   $("#page-title").textContent = title;
+  $("#page-description").textContent =
+    {
+      "Alert review": "Review alerts with their source evidence in view.",
+      "Saved runs": "Collection history, coverage and checked analysis.",
+      "Search evidence": "Find records across your stored runs.",
+      Cases: "Track investigations and their linked evidence.",
+      "Case detail": "Keep notes and evidence together.",
+      Timeline: "Inspect the order of recorded observations.",
+      "New run": "Prepare a preview before starting work.",
+      "Run activity": "Follow preparation, review and completion.",
+    }[title] || "Inspect stored findings and source records.";
   $("#main").replaceChildren(
     node("p", { class: "hint" }, "Loading your workspace…"),
   );
@@ -263,121 +281,613 @@ function eventRows(events) {
     ]),
   );
 }
+let reviewRun = "",
+  reviewSelected = "";
+const severityOrder = ["critical", "high", "medium", "low", "informational"];
+function svg(tag, attributes = {}, ...children) {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attributes)) e.setAttribute(k, v);
+  for (const c of children) e.append(c);
+  return e;
+}
+function chartBar(value, max) {
+  return svg(
+    "svg",
+    {
+      viewBox: "0 0 200 9",
+      "aria-hidden": "true",
+      preserveAspectRatio: "none",
+    },
+    svg("rect", { class: "track", width: 200, height: 9, rx: 2 }),
+    svg("rect", {
+      class: "fill",
+      width: max ? (200 * value) / max : 0,
+      height: 9,
+      rx: 2,
+    }),
+  );
+}
+function distributionChart(alerts) {
+  const counts = OmamoriCharts.severityCounts(alerts);
+  const max = Math.max(1, ...counts.map((x) => x[1]));
+  const rows = node(
+    "div",
+    { class: "distribution" },
+    counts.map(([level, count]) => {
+      const row = node(
+        "div",
+        { class: "distribution-row" },
+        node(
+          "span",
+          {},
+          level === "informational"
+            ? "Information"
+            : level[0].toUpperCase() + level.slice(1),
+        ),
+        chartBar(count, max),
+        node("strong", {}, count),
+      );
+      row.style.setProperty(
+        "--severity",
+        `var(--${level === "informational" ? "info" : level})`,
+      );
+      return row;
+    }),
+  );
+  return node(
+    "section",
+    { class: "chart-panel" },
+    node(
+      "div",
+      { class: "chart-heading" },
+      node("h2", {}, "Alert severity"),
+      node("span", {}, alerts.length + " displayed alerts"),
+    ),
+    rows,
+  );
+}
+function activityChart(alerts) {
+  if (!alerts.length)
+    return node(
+      "section",
+      { class: "chart-panel" },
+      node("div", { class: "chart-heading" }, node("h2", {}, "Alert activity")),
+      empty(
+        "No alert activity",
+        "A chart appears when the selected run has alerts.",
+      ),
+    );
+  const hour = 3600000;
+  const { start, step, width, buckets } = OmamoriCharts.timeBuckets(alerts);
+  const highest = Math.max(...buckets.map((b) => b.count), 1);
+  const format = (t) =>
+    new Date(t).toLocaleString(undefined, {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  const bars = node(
+    "div",
+    { class: "histogram", "aria-label": "Alert count by observed time bucket" },
+    buckets.map((b) => {
+      const height = (80 * b.count) / highest;
+      const image = svg(
+        "svg",
+        {
+          viewBox: "0 0 40 90",
+          role: "img",
+          "aria-label": `${format(b.start)} to ${format(b.start + step * width)} UTC: ${b.count} alerts`,
+        },
+        svg("rect", { x: 5, y: 90 - height, width: 30, height: height, rx: 2 }),
+      );
+      const tick =
+        step === hour
+          ? String(new Date(b.start).getUTCHours()).padStart(2, "0") + ":00"
+          : new Date(b.start).getUTCDate() +
+            "/" +
+            (new Date(b.start).getUTCMonth() + 1);
+      return node(
+        "div",
+        { class: "bar" },
+        node("span", {}, b.count),
+        image,
+        node("span", { class: "bar-tick" }, tick),
+      );
+    }),
+  );
+  return node(
+    "section",
+    { class: "chart-panel" },
+    node(
+      "div",
+      { class: "chart-heading" },
+      node("h2", {}, "Alert activity"),
+      node(
+        "span",
+        {},
+        width + (step === hour ? "-hour" : "-day") + " buckets · UTC",
+      ),
+    ),
+    node(
+      "div",
+      {
+        class: "chart-plot",
+        tabindex: 0,
+        role: "region",
+        "aria-label": "Alert activity chart",
+      },
+      bars,
+    ),
+    node(
+      "div",
+      { class: "chart-labels" },
+      node("span", {}, format(start)),
+      node("span", {}, format(buckets.at(-1).start + step * width)),
+    ),
+    node(
+      "details",
+      {},
+      node("summary", {}, "View chart data"),
+      table(
+        ["Bucket start (UTC)", "Bucket end (UTC)", "Alerts"],
+        buckets.map((b) => [
+          new Date(b.start).toISOString(),
+          new Date(b.start + step * width).toISOString(),
+          b.count,
+        ]),
+      ),
+    ),
+  );
+}
 async function overview() {
-  await render("Overview", async () => {
+  await render("Alert review", async () => {
     const [runs, cases, jobs] = await Promise.all([
       api("runs?limit=50"),
       api("cases?limit=50"),
       api("jobs"),
     ]);
-    const open = cases.filter((c) => c.status !== "closed").length;
+    if (!runs.length)
+      return panel(
+        "Your investigation workspace",
+        empty(
+          "Start with your evidence",
+          "Prepare a detection or forensic run. Saved alerts, source records and charts will appear here.",
+          link("Start a run", "new"),
+        ),
+      );
+    let run = runs.find((r) => r.id === reviewRun);
+    if (!run && reviewRun) {
+      run = await api("runs/" + encodeURIComponent(reviewRun));
+      runs.unshift(run);
+    }
+    run ||= runs[0];
+    reviewRun = run.id;
+    const alerts = await api(
+      "alerts?run=" + encodeURIComponent(run.id) + "&limit=200",
+    );
+    alerts.sort(
+      (a, b) =>
+        severityOrder.indexOf(a.level) - severityOrder.indexOf(b.level) ||
+        new Date(b.time) - new Date(a.time),
+    );
+    const scope = select(
+      "Selected run",
+      "review-run",
+      runs.map((r) => [r.id, (r.label || r.mode) + " · " + stamp(r.made)]),
+      run.id,
+    );
+    scope.querySelector("select").addEventListener(
+      "change",
+      attempt(async (e) => {
+        reviewRun = e.target.value;
+        reviewSelected = "";
+        await overview();
+      }),
+    );
+    const facts = node(
+      "div",
+      { class: "run-facts" },
+      node(
+        "span",
+        {},
+        node("strong", {}, run.event_count.toLocaleString()),
+        "stored events",
+      ),
+      node(
+        "span",
+        {},
+        node("strong", {}, run.alert_count.toLocaleString()),
+        "alerts",
+      ),
+      node(
+        "span",
+        {},
+        node("strong", {}, cases.filter((c) => c.status !== "closed").length),
+        "open cases in recent 50",
+      ),
+    );
+    const inspector = node("section", {
+      class: "inspector",
+      "aria-label": "Selected alert evidence",
+    });
+    const list = node("div", { class: "queue-list" });
+    let request = 0,
+      selection = 0;
+    async function inspect(alert, focus = false) {
+      reviewSelected = alert.id;
+      history.replaceState(
+        null,
+        "",
+        location.pathname + "#review/" + run.id + "/" + alert.id,
+      );
+      inspector.scrollTop = 0;
+      const chosen = ++selection;
+      for (const row of list.querySelectorAll("button"))
+        row.setAttribute(
+          "aria-pressed",
+          String(row.dataset.alert === alert.id),
+        );
+      const ticket = ++request;
+      inspector.replaceChildren(
+        node("p", { class: "hint" }, "Loading selected evidence…"),
+      );
+      try {
+        const a = await api("runs/" + run.id + "/alerts/" + alert.id);
+        if (ticket !== request) return;
+        const tabs = node("div", {
+          class: "inspector-controls",
+          role: "tablist",
+          "aria-label": "Alert detail sections",
+        });
+        const body = node("div", {
+          class: "inspector-body",
+          role: "tabpanel",
+          id: "review-panel",
+          tabindex: 0,
+        });
+        async function show(which) {
+          const revision = ++request;
+          body.setAttribute("aria-labelledby", "review-tab-" + which);
+          for (const tab of tabs.children) {
+            tab.setAttribute(
+              "aria-selected",
+              String(tab.dataset.tab === which),
+            );
+            tab.tabIndex = tab.dataset.tab === which ? 0 : -1;
+          }
+          body.replaceChildren(node("p", { class: "hint" }, "Loading…"));
+          if (which === "evidence") {
+            const cited = Object.entries(a.payload?.analyst_evidence || {})
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([, id]) => id)
+              .filter((id) => a.event_ids.includes(id));
+            const ids = [...new Set(cited.length ? cited : a.event_ids)].slice(
+              0,
+              8,
+            );
+            const events = await Promise.all(
+              ids.map((id) => api("runs/" + run.id + "/events/" + id)),
+            ).catch((error) => {
+              if (revision === request)
+                body.replaceChildren(
+                  node("p", { class: "warning" }, error.message),
+                );
+              return null;
+            });
+            if (!events || revision !== request) return;
+            body.replaceChildren(
+              node(
+                "div",
+                { class: "evidence-list" },
+                events.map((e) =>
+                  node(
+                    "article",
+                    { class: "evidence-entry" },
+                    button(
+                      (e.fields.event_id ? e.fields.event_id + " · " : "") +
+                        (e.fields.action || e.source),
+                      () => showEvent(run.id, e.id),
+                      "link",
+                    ),
+                    node("p", {}, e.ref + " · " + stamp(e.time)),
+                    node(
+                      "p",
+                      { class: "mono" },
+                      [e.fields.user, e.fields.src_ip, e.fields.host]
+                        .filter(Boolean)
+                        .join(" · "),
+                    ),
+                  ),
+                ),
+              ),
+              node(
+                "p",
+                { class: "hint" },
+                "Showing " +
+                  events.length +
+                  " of " +
+                  a.event_ids.length +
+                  " retained evidence records.",
+              ),
+              button("Open alert details", () => showAlert(run.id, a.id)),
+              node(
+                "div",
+                { class: "actions" },
+                link("Open run timeline", "timeline/" + run.id),
+              ),
+            );
+          } else if (which === "rule") {
+            body.replaceChildren(
+              kv({
+                rule: a.rule,
+                matched: a.count + " events / hits",
+                first: stamp(a.first),
+                last: stamp(a.last),
+              }),
+              jsonDetails("Rule metadata", a.payload || {}),
+              node(
+                "p",
+                { class: "hint" },
+                "A rule match does not establish malicious intent.",
+              ),
+            );
+          } else {
+            const checked = run.analysis?.analysis;
+            const matches = (checked?.verified || []).filter((f) =>
+              f.alerts.includes(a.id),
+            );
+            body.replaceChildren(
+              ...(matches.length
+                ? matches.map((f) =>
+                    node(
+                      "article",
+                      { class: "claim" },
+                      node("p", {}, f.summary),
+                      f.weak_times
+                        ? node(
+                            "p",
+                            { class: "warning" },
+                            "Some times reflect a file’s last change.",
+                          )
+                        : null,
+                      node(
+                        "div",
+                        { class: "actions" },
+                        f.evidence.map((e) =>
+                          button(
+                            e.id,
+                            () => showCitation(run.id, e.id),
+                            "link",
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : [
+                    node(
+                      "p",
+                      { class: "hint" },
+                      "No checked AI claim is saved for this alert.",
+                    ),
+                  ]),
+              link("Open full run review", "run/" + run.id),
+            );
+          }
+        }
+        for (const [id, label] of [
+          ["evidence", "Evidence"],
+          ["rule", "Rule details"],
+          ["ai", "AI review"],
+        ]) {
+          const tab = button(label, () => show(id));
+          tab.dataset.tab = id;
+          tab.id = "review-tab-" + id;
+          tab.setAttribute("role", "tab");
+          tab.setAttribute("aria-controls", "review-panel");
+          tabs.append(tab);
+        }
+        tabs.addEventListener("keydown", (e) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key))
+            return;
+          e.preventDefault();
+          const all = [...tabs.children];
+          let index = all.indexOf(document.activeElement);
+          index =
+            e.key === "Home"
+              ? 0
+              : e.key === "End"
+                ? all.length - 1
+                : (index + (e.key === "ArrowRight" ? 1 : -1) + all.length) %
+                  all.length;
+          all[index].focus();
+          all[index].click();
+        });
+        inspector.replaceChildren(
+          node(
+            "div",
+            { class: "status-line" },
+            badge(a.level),
+            node("span", { class: "mono subtle" }, a.id),
+          ),
+          node("h2", {}, a.title),
+          node(
+            "p",
+            { class: "identity" },
+            Object.entries(a.group || {})
+              .map(([k, v]) => k + "=" + v)
+              .join(" · ") || a.rule,
+          ),
+          tabs,
+          body,
+        );
+        await show("evidence");
+        if (chosen === selection && matchMedia("(min-width:901px)").matches) {
+          const selected = [...list.children].find(
+            (row) => row.dataset.alert === a.id,
+          );
+          if (selected) {
+            const top = selected.offsetTop - list.offsetTop;
+            if (top < list.scrollTop) list.scrollTop = top;
+            else if (
+              top + selected.offsetHeight >
+              list.scrollTop + list.clientHeight
+            )
+              list.scrollTop = top + selected.offsetHeight - list.clientHeight;
+          }
+        }
+        if (
+          focus &&
+          chosen === selection &&
+          matchMedia("(max-width:900px)").matches
+        )
+          inspector.scrollIntoView({
+            block: "start",
+            behavior: matchMedia("(prefers-reduced-motion:reduce)").matches
+              ? "auto"
+              : "smooth",
+          });
+      } catch (e) {
+        if (chosen === selection)
+          inspector.replaceChildren(node("p", { class: "warning" }, e.message));
+      }
+    }
+    const filter = select("Severity", "severity", [
+      ["", "All severities"],
+      ...severityOrder,
+    ]);
+
+    const filterControl = filter.querySelector("select");
+    filterControl.setAttribute("aria-label", "Filter alert queue by severity");
+    function fill() {
+      const filtered = alerts.filter(
+        (a) => !filterControl.value || a.level === filterControl.value,
+      );
+      list.replaceChildren(
+        ...filtered.map((a) => {
+          const row = button("", () => inspect(a, true), "alert-row");
+          row.title = a.title;
+          row.dataset.alert = a.id;
+          row.setAttribute("aria-pressed", "false");
+          const severity = node(
+            "span",
+            { class: "severity-label" },
+            a.level === "informational" ? "Info" : a.level,
+          );
+          severity.style.setProperty(
+            "--severity",
+            `var(--${a.level === "informational" ? "info" : a.level})`,
+          );
+          row.append(
+            severity,
+            node(
+              "span",
+              {},
+              node("span", { class: "row-title" }, a.title),
+              node(
+                "span",
+                { class: "row-meta" },
+                a.rule + " · " + a.count + " events / hits",
+              ),
+            ),
+            node(
+              "time",
+              {},
+              new Date(a.time).toLocaleTimeString(undefined, {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            ),
+          );
+          return row;
+        }),
+      );
+      if (filtered.length)
+        inspect(filtered.find((a) => a.id === reviewSelected) || filtered[0]);
+      else {
+        ++request;
+        list.append(
+          empty(
+            "No alerts in this filter",
+            "Choose another severity to continue.",
+          ),
+        );
+        inspector.replaceChildren(
+          empty("Select an alert", "Evidence appears beside the alert queue."),
+        );
+      }
+    }
+    filterControl.addEventListener("change", fill);
+    fill();
     const active = jobs.filter((j) =>
       ["preparing", "ready", "running"].includes(j.state),
     );
     return node(
       "div",
-      {},
+      { class: "review-page" },
+      node("div", { class: "scope-bar" }, scope, facts),
       node(
-        "section",
-        { class: "hero" },
-        node(
-          "div",
-          {},
-          node("div", { class: "hero-label" }, "YOUR LOCAL DEFENSE WORKSPACE"),
-          node("h2", {}, "Evidence, connected."),
-          node(
-            "p",
-            {},
-            "Follow the signals. Review checked findings. Build investigations with the evidence always one click away.",
-          ),
-        ),
-        node("div", { class: "hero-mark", "aria-hidden": "true" }, "守"),
+        "p",
+        { class: "hint" },
+        "Charts and queue cover the latest " +
+          alerts.length +
+          " of " +
+          run.alert_count +
+          " alerts in the selected run. " +
+          (run.alert_count > alerts.length
+            ? "Use Search evidence to page through the full run."
+            : ""),
       ),
       node(
-        "div",
-        { class: "stats" },
-        [
-          ["Saved runs", runs.length, "Most recent 50 runs"],
-          [
-            "Observed events",
-            runs.reduce((n, r) => n + r.event_count, 0),
-            "Across these runs",
-          ],
-          [
-            "Detected alerts",
-            runs.reduce((n, r) => n + r.alert_count, 0),
-            "Rule matches, not verdicts",
-          ],
-          ["Open investigations", open, "Among 50 recent cases"],
-        ].map(([label, count, note]) =>
-          node(
-            "div",
-            { class: "stat" },
-            node("span", { class: "label" }, label),
-            node("strong", {}, count.toLocaleString()),
-            node("small", {}, note),
-          ),
+        "details",
+        {
+          class: "charts-disclosure",
+          open: !matchMedia("(max-width:650px)").matches,
+        },
+        node("summary", {}, "Charts · " + alerts.length + " displayed alerts"),
+        node(
+          "div",
+          { class: "charts-grid" },
+          activityChart(alerts),
+          distributionChart(alerts),
         ),
       ),
       active.length
-        ? panel(
-            "In progress",
-            active.map((j) =>
-              node(
-                "div",
-                { class: "status-line" },
-                badge(j.state),
-                link(j.message, "job/" + j.id),
-              ),
-            ),
+        ? node(
+            "div",
+            { class: "toolbar" },
+            ...active.map((j) => link(j.kind + ": " + j.state, "job/" + j.id)),
           )
         : null,
       node(
-        "section",
-        { class: "panel" },
+        "div",
+        { class: "review-workspace" },
         node(
-          "div",
-          { class: "panel-head" },
-          node("h2", {}, "Recent runs"),
-          link("View all runs →", "runs"),
+          "section",
+          { class: "queue", "aria-label": "Alert queue" },
+          node(
+            "div",
+            { class: "queue-head" },
+            node("h2", {}, "Alerts"),
+            filter,
+          ),
+          list,
         ),
-        runs.length
-          ? runsTable(runs.slice(0, 6))
-          : empty(
-              "Your workspace is ready",
-              "Start with local logs or a prepared Linux evidence folder. Every run preserves its provenance.",
-              link("Create your first run →", "new"),
-            ),
+        inspector,
       ),
       node(
         "div",
-        { class: "split" },
-        panel(
-          "Investigation flow",
-          node(
-            "div",
-            {},
-            node("h3", {}, "Collect → Detect → Review → Investigate"),
-            node(
-              "p",
-              { class: "hint" },
-              "Use local rules to find signals, ask the analyst for checked reviews, and attach relevant alerts to a case.",
-            ),
-            link("Browse investigations →", "cases"),
-          ),
-        ),
-        panel(
-          "Built around your evidence",
-          node(
-            "p",
-            { class: "hint" },
-            "The AI never executes tools. Source limits, rejected claims and uncertain timestamps remain visible alongside every review.",
-          ),
-        ),
+        { class: "actions" },
+        link("Open selected run", "run/" + run.id),
+        link("Search all evidence", "search/" + run.id),
       ),
     );
   });
 }
+
 async function listRuns(offset = 0) {
   await render("Saved runs", async () => {
     const runs = await api("runs?limit=25&offset=" + offset);
@@ -395,7 +905,7 @@ async function listRuns(offset = 0) {
         : empty(
             "No runs on this page",
             "Runs saved by the CLI with --store appear here too.",
-            link("Start a run →", "new"),
+            link("Start a run", "new"),
           ),
       pager(offset, runs.length, 25, listRuns),
     );
@@ -443,7 +953,7 @@ async function runDetail(id) {
       node(
         "div",
         { class: "toolbar" },
-        link("← Saved runs", "runs"),
+        link("Saved runs", "runs"),
         badge(r.mode),
         node("span", { class: "mono subtle" }, r.id),
       ),
@@ -460,8 +970,8 @@ async function runDetail(id) {
           node(
             "div",
             { class: "actions" },
-            link("Search this run →", "search/" + id),
-            link("Open timeline →", "timeline/" + id),
+            link("Search this run", "search/" + id),
+            link("Open timeline", "timeline/" + id),
           ),
         ),
       ),
@@ -643,7 +1153,7 @@ async function showAlert(run, id) {
         "div",
         { class: "actions" },
         node("button", { class: "primary", type: "submit" }, "Add to case"),
-        link("Create a case →", "cases"),
+        link("Create a case", "cases"),
       ),
     );
     return node(
@@ -892,9 +1402,9 @@ async function caseDetail(id) {
       node(
         "div",
         { class: "toolbar" },
-        link("← Cases", "cases"),
+        link("Cases", "cases"),
         badge(c.status),
-        link("Case timeline →", "timeline-case/" + id),
+        link("Case timeline", "timeline-case/" + id),
       ),
       panel(c.title, form),
       panel(
@@ -1169,7 +1679,7 @@ async function activity() {
         : empty(
             "No active work",
             "Prepare a new run to inspect its preview.",
-            link("New run →", "new"),
+            link("New run", "new"),
           ),
     );
   });
@@ -1222,7 +1732,7 @@ async function jobPage(id) {
         ? node(
             "div",
             { class: "actions" },
-            link("Open saved run →", "run/" + j.run_id),
+            link("Open saved run", "run/" + j.run_id),
           )
         : null,
       j.saved_to
@@ -1238,7 +1748,7 @@ async function jobPage(id) {
 }
 async function route() {
   if ($("#detail").open) $("#detail").close();
-  const [page, id] = location.hash.slice(1).split("/");
+  const [page, id, alertID] = location.hash.slice(1).split("/");
   for (const a of document.querySelectorAll("nav a"))
     a.classList.toggle(
       "active",
@@ -1246,6 +1756,7 @@ async function route() {
         "#" +
           ({
             run: "runs",
+            review: "overview",
             case: "cases",
             "timeline-case": "timeline",
             job: "activity",
@@ -1254,6 +1765,14 @@ async function route() {
             "overview"),
     );
   switch (page) {
+    case "overview":
+      reviewRun = "";
+      reviewSelected = "";
+      return overview();
+    case "review":
+      reviewRun = id;
+      reviewSelected = alertID;
+      return overview();
     case "runs":
       return listRuns();
     case "run":
@@ -1312,3 +1831,43 @@ window.addEventListener("hashchange", async () => {
     );
   }
 })();
+
+function applyTheme() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  $("#theme-toggle").textContent = dark
+    ? "Switch to light theme"
+    : "Switch to dark theme";
+  $("#theme-toggle").setAttribute("aria-pressed", String(dark));
+  $("#brand-icon").src = dark ? "/icon.png" : "/icon-light.png";
+  document.querySelector('meta[name="theme-color"]').content = dark
+    ? "#151d20"
+    : "#f2f3ef";
+}
+$("#theme-toggle").addEventListener("click", () => {
+  const next =
+    document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try {
+    localStorage.setItem("omamori-theme", next);
+  } catch {}
+  const address = new URL(location.href);
+  address.searchParams.delete("theme");
+  history.replaceState(
+    null,
+    "",
+    address.pathname + address.search + address.hash,
+  );
+  applyTheme();
+});
+applyTheme();
+$("#menu-toggle").addEventListener("click", () => {
+  const open = $("#mobile-nav").hidden;
+  $("#mobile-nav").hidden = !open;
+  $("#menu-toggle").setAttribute("aria-expanded", String(open));
+});
+$("#mobile-nav").addEventListener("click", (e) => {
+  if (e.target.closest("a")) {
+    $("#mobile-nav").hidden = true;
+    $("#menu-toggle").setAttribute("aria-expanded", "false");
+  }
+});

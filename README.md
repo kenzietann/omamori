@@ -358,3 +358,8 @@ The UI is embedded in the Go binary, listens only on `127.0.0.1` (port 8765 by
 default), and accepts new evidence paths only inside the chosen workspace.
 Prepare a preview before confirming an AI request; provider keys stay server-side.
 See [dashboard.md](docs/dashboard.md) for setup, capabilities and limits.
+
+The dashboard’s Reference workspace puts the alert queue beside its evidence, with scoped activity
+and severity charts and a persistent light/dark theme switch. On small screens, chart detail can be
+expanded while the alert queue remains immediately accessible. See [DESIGN.md](DESIGN.md) for the
+shared visual system and [the validation notes](docs/dashboard-design-validation.md) for test scope.

@@ -1,0 +1,1 @@
+{"name":"omamori-dashboard-tests","private":true,"scripts":{"test":"node --test *.test.cjs"},"devDependencies":{"jsdom":"31.0.0"}}
