@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Omamori · Local dashboard</title>
+    <link rel="icon" href="/icon.png" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <div class="shell">
+      <aside>
+        <a class="brand" href="#overview"
+          ><img src="/icon.png" alt="" width="36" height="36" /><span
+            >omamori<small>BLUE TEAM WORKSPACE</small></span
+          ></a
+        >
+        <div class="nav-label">INVESTIGATE</div>
+        <nav aria-label="Main navigation">
+          <a href="#overview">Overview</a><a href="#runs">Saved runs</a
+          ><a href="#search">Search evidence</a><a href="#cases">Cases</a
+          ><a href="#timeline">Timeline</a><a href="#activity">Run activity</a>
+        </nav>
+        <div class="sidebar-foot">
+          <span class="dot"></span> Local workspace
+          <p>Evidence stays connected.<br />AI claims stay checked.</p>
+        </div>
+      </aside>
+      <div class="workspace">
+        <header>
+          <div>
+            <span class="eyebrow">OMAMORI / LOCAL DASHBOARD</span>
+            <h1 id="page-title">Overview</h1>
+          </div>
+          <a class="button primary" href="#new">+ New run</a>
+        </header>
+        <div id="notice" role="alert" hidden></div>
+        <main id="main" tabindex="-1" aria-live="polite">
+          <p>Connecting to your workspace…</p>
+        </main>
+        <footer>
+          Local evidence. Explicit provenance. Verified claims.<span
+            >127.0.0.1 · private session</span
+          >
+        </footer>
+      </div>
+    </div>
+    <dialog id="detail">
+      <div class="dialog-heading">
+        <h2 id="detail-title">Evidence</h2>
+        <button id="close-detail" class="secondary" aria-label="Close details">
+          Close
+        </button>
+      </div>
+      <div id="detail-body"></div>
+    </dialog>
+  </body>
+</html>

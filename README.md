@@ -11,8 +11,8 @@
 
 An AI blue-team tool for exposure checks, log detection and evidence-based alert
 review. It uses read-only tools, and a guard sits between the AI and your data.
-The CLI is available now. A dashboard running locally on `127.0.0.1` is planned
-and will use the same detection and analyst services.
+The CLI and a dashboard running locally on `127.0.0.1` use the same detection,
+analyst and investigation services.
 
 **Status: work in progress, detection, AI analysis and persistent investigation data run.** Task A
 (exposure check), Task B (AI log triage), the guard, a terminal screen and replay
@@ -21,8 +21,7 @@ demo logs. `analyze` reviews detected alerts with the AI and verifies its claims
 SQLite, PostgreSQL and MariaDB can store runs for search, cases and timelines.
 `forensics` reads the artifacts of a Linux system read-only, hashes them and
 builds a timeline.
-The local dashboard, AI rule generation (Task C) and the Should items are not
-done. I am learning Go while I build it.
+AI rule generation (Task C) and the remaining Should items are not done. I am learning Go while I build it.
 
 ## Why I am building this
 
@@ -125,7 +124,7 @@ the pipeline; live model quality has not been measured for this slice.
 The [multi-source fixture](testdata/fixtures/intake/README.md) exercises all four
 new source families with eight synthetic records and six expected observation
 alerts. It runs through the same detection and analyst services as the CLI and
-future local dashboard.
+local dashboard.
 
 ### Store, search and investigate
 
@@ -146,7 +145,7 @@ omamori store timeline --from 2026-11-10T00:00:00Z --to 2026-11-11T00:00:00Z
 
 Cases link chosen alerts across runs and use versions to prevent stale updates.
 Timelines retain event/alert provenance, and AI citations resolve to full stored
-events. These APIs are shared with the future local dashboard. See the
+events. These APIs are shared with the local dashboard. See the
 [storage guide](docs/storage.md) for backend setup, case commands, query semantics
 and limits. PostgreSQL and MariaDB have been tested with disposable real servers,
 including the CLI detection and analyst replay paths.
@@ -302,7 +301,7 @@ AI is limited by the guard and can only use read-only tools.
 - [Platform plan and decisions](docs/platform-plan.md): the detection pipeline,
   supported rule subset, verification results and next slices.
 - [AI analyst](docs/analyst.md): checked alert reviews, replay and the shared
-  service for the future local dashboard.
+  service for the local dashboard.
 - [Local rules](docs/rules.md): supported detection and correlation YAML.
 - [Log intake](docs/intake.md): supported source formats, field maps and a
   mixed-source demo.
@@ -347,3 +346,15 @@ for custom rules, optional forensic process/socket snapshots, storage filters,
 case management and other advanced flags. Demo generation writes separate logs
 and host artifacts under a new output folder; open its `logs` or `host/root`
 folder for the corresponding task.
+
+### Local web dashboard
+
+Run `omamori dashboard <evidence-workspace>` and open the private session link
+printed in the terminal. The dashboard includes saved runs, alert/event details,
+checked AI citations, search, cases, timelines and confirmed detection/forensic
+runs. It uses the configured SQLite, PostgreSQL or MariaDB store.
+
+The UI is embedded in the Go binary, listens only on `127.0.0.1` (port 8765 by
+default), and accepts new evidence paths only inside the chosen workspace.
+Prepare a preview before confirming an AI request; provider keys stay server-side.
+See [dashboard.md](docs/dashboard.md) for setup, capabilities and limits.

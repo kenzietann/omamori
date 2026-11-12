@@ -14,8 +14,8 @@ One Go binary, `omamori`. Everything is a library package under `internal/`, and
     Linux artifacts ──> forensics (hashed) ─> event.Event (same timeline)         └──> AI analyst,
                                                                                        every claim checked by code
 
-Omamori is an AI blue-team tool with a CLI now and a local dashboard planned. The dashboard will run on
-`127.0.0.1` and use the same application services as the CLI: it is another way to use the platform,
+Omamori is an AI blue-team tool with a CLI and a local dashboard. The dashboard runs on
+`127.0.0.1` and uses the same application services as the CLI: it is another way to use the platform,
 not a separate detection or AI implementation. The guard that already exists (sanitizer, outbound,
 replay, gateway, eventlog) stays the only way to an AI provider. The exposure check remains one module.
 
@@ -30,7 +30,7 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
 | 3 | More intake: Suricata eve.json, Zeek, Wazuh alerts, Sysmon/Windows event JSON, with field maps and fuzz tests | built and verified (2026-11-12), documented JSON subsets |
 | 4 | SQLite/PostgreSQL/MariaDB storage, search, cases, timelines across runs | built and verified (2026-11-12) |
 | 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | built and verified (2026-11-12), with the checked AI review (`--analyze`); live model evaluation pending |
-| 6 | Local web UI on 127.0.0.1 over the store | February |
+| 6 | Local web UI on 127.0.0.1 over the store | built and verified (2026-11-12), initial investigation dashboard |
 | 7 | Full synthetic scenario across sources (SSH takeover, persistence, lateral movement), rehearsed demo | February |
 
 ## Decisions
@@ -247,7 +247,7 @@ case create/update/link/detach operations, and cross-run timelines. Previews nev
   database file had mode `0600`.
 
 See [storage.md](storage.md) for configuration, command examples, query semantics and limits.
-The local web dashboard remains planned; this slice provides its persistent application APIs.
+The store supplies the local dashboard implemented in slice 6.
 
 ## Slice 5 verification (2026-11-12)
 
@@ -304,8 +304,35 @@ tool (`O_NOFOLLOW` and named pipes are Unix).
   which was written.
 - No live provider was called. How well a real model reviews artifact evidence is not measured.
 
+## Slice 6 implementation (2026-11-12)
+
+`omamori dashboard` embeds the UI in the binary and adapts shared services over a loopback-only HTTP
+server. It provides recent-run overview, stored runs, alerts/events, checked AI citation navigation,
+search, case editing with optimistic versions, scoped timelines and a confirmed run queue.
+
+- A per-launch token protects API access; Host/Origin checks and JSON-only mutations reject foreign
+  browser access. No arbitrary files or shell commands are served. New input/rule/snapshot paths
+  are confined to the approved root, and outputs/database files stay away from evidence.
+- Run preparation sends no AI request and writes no run artifacts. Explicit confirmation starts a
+  frozen preview once. Progress, cancellation, expiry, incomplete results and saved-run links are
+  exposed through bounded job state. Existing services perform the actual analysis and persistence.
+- Provider keys and database credentials stay server-side. The UI uses no CDN or external scripts.
+  It renders evidence and case notes as text and preserves weak-time and coverage disclosures.
+- Desktop browser checks exercised case create/link/update, case timeline, a confirmed 8-event /
+  6-alert detection run and AI citation-to-event navigation using a labeled scripted replay.
+  Script-like case notes remained inert. At 390 px, tables scroll inside panels without page overflow.
+- Build, vet, the full race-enabled Go suite, formatting and JavaScript syntax checks passed.
+  The final browser session reported no console errors; a server restart invalidated the old token
+  and the new private link reconnected successfully. No real AI provider was called for these checks.
+- Automated tests cover access boundaries, path escape, cancelled/expired previews, double starts,
+  fake-provider review, source preservation, metadata redaction and forensic manifests. External
+  process/socket snapshots remain explicitly not rechecked by manifest verification, as in the CLI.
+
+See [dashboard.md](dashboard.md). Full cross-source rehearsal remains slice 7. Live model evaluation,
+streaming, multi-user access and production sensor/disk validation are not claimed by this dashboard.
+
 ## Not decided yet
 
 - Streaming (tail -f) evaluation. The engine is written so that state is per group, which is what a
   stream needs, but slice 1 is batch only.
-- Dashboard interaction and presentation over the shared store.
+- Broader dashboard workflows and backend-specific search optimization after the initial release.

@@ -71,6 +71,15 @@ func TestBackendContract(t *testing.T) {
 			if again, err := database.SaveRun(ctx, input); err != nil || again.ID != run.ID || again.Digest != run.Digest {
 				t.Fatalf("idempotent save: %#v %v", again, err)
 			}
+			if event, err := database.GetEvent(ctx, run.ID, "e1"); err != nil || event.Fields["user"] != "Alice" || event.RunID != run.ID {
+				t.Fatalf("event detail: %#v %v", event, err)
+			}
+			if alert, err := database.GetAlert(ctx, run.ID, "a1"); err != nil || alert.Count != 2 || alert.RunID != run.ID {
+				t.Fatalf("alert detail: %#v %v", alert, err)
+			}
+			if _, err := database.GetEvent(ctx, prefix+"_missing", "e1"); !errors.Is(err, ErrNotFound) {
+				t.Fatalf("cross-run event detail: %v", err)
+			}
 			changed := input
 			changed.Label = "changed " + prefix
 			if _, err := database.SaveRun(ctx, changed); !errors.Is(err, ErrConflict) {

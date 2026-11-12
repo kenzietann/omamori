@@ -3,6 +3,7 @@
 package detect
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/netip"
@@ -38,7 +39,12 @@ type Outcome struct {
 
 // Run reads the logs and evaluates the rules.
 func Run(paths []string, set rules.Set, rulesFrom string, options intake.Options, now time.Time) (Outcome, error) {
-	read, err := intake.Read(paths, options)
+	return RunContext(context.Background(), paths, set, rulesFrom, options, now)
+}
+
+// RunContext supports dashboard cancellation while reading input; rule evaluation is a bounded batch.
+func RunContext(ctx context.Context, paths []string, set rules.Set, rulesFrom string, options intake.Options, now time.Time) (Outcome, error) {
+	read, err := intake.ReadContext(ctx, paths, options)
 	if err != nil {
 		return Outcome{}, err
 	}

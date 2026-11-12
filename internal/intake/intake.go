@@ -7,6 +7,7 @@ package intake
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -92,6 +93,14 @@ func (options Options) valid() error {
 
 // Read reads files and folders. A folder is read with the folders in it. Links are not followed.
 func Read(paths []string, options Options) (Result, error) {
+	return ReadContext(context.Background(), paths, options)
+}
+
+// ReadContext checks cancellation during directory discovery and between buffered file reads.
+func ReadContext(ctx context.Context, paths []string, options Options) (Result, error) {
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
 	if err := options.valid(); err != nil {
 		return Result{}, err
 	}
@@ -117,6 +126,9 @@ func Read(paths []string, options Options) (Result, error) {
 		return nil
 	}
 	for _, path := range paths {
+		if err := ctx.Err(); err != nil {
+			return Result{}, err
+		}
 		info, err := os.Lstat(path)
 		if err != nil {
 			return Result{}, fmt.Errorf("%w: %s", ErrBadInput, filepath.Base(path))
@@ -131,6 +143,9 @@ func Read(paths []string, options Options) (Result, error) {
 			continue
 		}
 		err = filepath.WalkDir(path, func(found string, entry fs.DirEntry, walkErr error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			if walkErr != nil {
 				return walkErr
 			}
@@ -154,6 +169,9 @@ func Read(paths []string, options Options) (Result, error) {
 			return nil
 		})
 		if err != nil {
+			if ctx.Err() != nil {
+				return Result{}, ctx.Err()
+			}
 			if errors.Is(err, ErrTooBig) {
 				return Result{}, err
 			}
@@ -164,6 +182,9 @@ func Read(paths []string, options Options) (Result, error) {
 	// Add the parent for collisions, and use the absolute path when that still conflicts with any label.
 	names := make(map[string]int)
 	for _, current := range targets {
+		if err := ctx.Err(); err != nil {
+			return Result{}, err
+		}
 		names[current.name]++
 	}
 	ambiguous := make([]bool, len(targets))
@@ -191,8 +212,11 @@ func Read(paths []string, options Options) (Result, error) {
 			result.Skipped = append(result.Skipped, current.name+": cannot be opened")
 			continue
 		}
-		events, stats, err := Parse(file, current.name, options)
+		events, stats, err := Parse(contextReader{ctx, file}, current.name, options)
 		file.Close()
+		if ctx.Err() != nil {
+			return Result{}, ctx.Err()
+		}
 		if errors.Is(err, ErrFormat) {
 			result.Skipped = append(result.Skipped, current.name+": the format was not recognized")
 			continue
@@ -208,6 +232,18 @@ func Read(paths []string, options Options) (Result, error) {
 	event.Sort(result.Events)
 
 	return result, nil
+}
+
+type contextReader struct {
+	context context.Context
+	reader  io.Reader
+}
+
+func (reader contextReader) Read(buffer []byte) (int, error) {
+	if err := reader.context.Err(); err != nil {
+		return 0, err
+	}
+	return reader.reader.Read(buffer)
 }
 
 func compressed(name string) bool {

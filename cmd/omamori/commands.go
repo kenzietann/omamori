@@ -40,6 +40,7 @@ Commands:
                       write a report with a timeline. "forensics verify <manifest> <folder>" checks the hashes again
   scenario <folder>   write synthetic logs of one day with attacks into a new folder, for demos and tests
                       (add --host for a whole synthetic system for forensics)
+  dashboard [folder]  local web dashboard: investigations and confirmed runs
   store <command>    stored runs, event/alert search, cases and timelines (run "omamori store" for usage)
   ui <folder>         open the home screen, where you choose a task
   replay <recording> [folder or log file]
@@ -169,6 +170,8 @@ func run(args []string, env environment) int {
 		return runAnalyze(rest, env)
 	case "scenario":
 		return runScenario(rest, env)
+	case "dashboard":
+		return runDashboard(rest, env)
 	case "store":
 		return runStore(rest, env)
 	}

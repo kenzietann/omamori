@@ -16,3 +16,5 @@ docs/archive/
 AGENTS.md
 CLAUDE.md
 DECISIONS.md
+# Local browser verification artifacts
+.playwright-mcp/
