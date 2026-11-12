@@ -25,7 +25,7 @@ import (
 
 const (
 	usageDetect   = "usage: omamori detect [--rules folder] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
-	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] [--host] <new folder>"
+	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] [--host | --campaign] <new folder>"
 )
 
 func (env environment) clock() time.Time {
@@ -215,8 +215,10 @@ func runScenario(args []string, env environment) int {
 	flags.BoolVar(&benign, "benign", false, "a day without attacks")
 	var host bool
 	flags.BoolVar(&host, "host", false, "write a whole synthetic system for the forensic triage")
+	var campaign bool
+	flags.BoolVar(&campaign, "campaign", false, "write one attack through three hosts, with host logs and network sensor logs")
 	positional, err := splitFlags(flags, args)
-	if err != nil || len(positional) != 1 {
+	if err != nil || len(positional) != 1 || host && campaign {
 		fmt.Fprintln(env.stderr, usageScenario)
 		return exitUsage
 	}
@@ -246,6 +248,9 @@ func runScenario(args []string, env environment) int {
 	}
 	if host {
 		return writeHostScenario(env, directory, seed, day, location, benign)
+	}
+	if campaign {
+		return writeCampaignScenario(env, directory, seed, day, location, benign)
 	}
 	writer, err := reportwriter.NewFolder(directory)
 	if err != nil {
@@ -281,4 +286,40 @@ func runScenario(args []string, env environment) int {
 // shellArgument keeps a copied command's values literal, including spaces, quotes and shell expansions.
 func shellArgument(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+// writeCampaignScenario writes the logs of one attack through three hosts into a new folder: the logs under
+// "logs", and next to them the list of alerts that must fire and the story in words.
+func writeCampaignScenario(env environment, directory string, seed int64, day time.Time, location *time.Location, benign bool) int {
+	fail := func(err error) int {
+		fmt.Fprintln(env.stderr, "omamori:", err)
+		return exitFailed
+	}
+	made := scenario.GenerateCampaign(seed, day, !benign)
+	story := []string{}
+	if !benign {
+		story = scenario.Story()
+	}
+	expected, err := json.MarshalIndent(map[string]any{
+		"note": "Synthetic logs made by omamori scenario --campaign. No line comes from a real system.", "seed": seed, "date": day.Format("2006-01-02"),
+		"story": story, "expected_alerts": append([]scenario.Expected{}, made.Expected...), "known_misses": append([]string{}, made.KnownMisses...),
+	}, "", "  ")
+	if err != nil {
+		return fail(errors.New("the list of expected alerts could not be written"))
+	}
+	files := scenario.Host{Files: map[string]scenario.HostFile{"expected.json": {Text: string(expected) + "\n", Modified: env.clock()}}}
+	for name, file := range made.Files {
+		files.Files["logs/"+name] = file
+	}
+	if err := os.MkdirAll(filepath.Dir(directory), 0o700); err != nil {
+		return fail(errors.New("the folder cannot be made"))
+	}
+	if err := scenario.WriteHost(directory, files); err != nil {
+		return fail(err)
+	}
+	fmt.Fprintf(env.stdout, "Wrote %d log files of three hosts and two network sensors for %s to %s\nThe story and the expected alerts are in %s\nTry: omamori detect --year %d --timezone %s -- %s\n",
+		len(made.Files), day.Format("2006-01-02"), filepath.Join(directory, "logs"), filepath.Join(directory, "expected.json"),
+		day.Year(), shellArgument(location.String()), shellArgument(filepath.Join(directory, "logs")))
+
+	return exitOK
 }

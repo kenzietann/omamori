@@ -39,7 +39,8 @@ Commands:
   forensics <folder>  read the artifacts of a Linux system from a folder (read-only): hash them, run rules,
                       write a report with a timeline. "forensics verify <manifest> <folder>" checks the hashes again
   scenario <folder>   write synthetic logs of one day with attacks into a new folder, for demos and tests
-                      (add --host for a whole synthetic system for forensics)
+                      (--host: a whole synthetic system for forensics; --campaign: one attack
+                      through three hosts, with host logs and network sensor logs)
   dashboard [folder]  local web dashboard: investigations and confirmed runs
   store <command>    stored runs, event/alert search, cases and timelines (run "omamori store" for usage)
   ui <folder>         open the home screen, where you choose a task

@@ -110,7 +110,7 @@ func TestScenarioThenDetect(t *testing.T) {
 	if found.code != exitOK {
 		t.Fatalf("detect: %d %s", found.code, found.stderr)
 	}
-	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 17 rules. 14 alerts, 1 critical, 5 high, 8 medium.") {
+	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 26 rules. 14 alerts, 1 critical, 5 high, 8 medium.") {
 		t.Errorf("the summary is %q", found.stdout)
 	}
 
@@ -304,5 +304,56 @@ func TestHelpNamesTheNewCommands(t *testing.T) {
 		if !strings.Contains(got.stdout, want) {
 			t.Errorf("help does not have %q", want)
 		}
+	}
+}
+
+// Slice 7 through the real command line: the campaign is written, detect reads the folders of three hosts
+// and two sensors, and every expected alert is in alerts.json.
+func TestCampaignScenarioThenDetect(t *testing.T) {
+	base := t.TempDir()
+	campaign, output := filepath.Join(base, "campaign"), filepath.Join(base, "out")
+	made := runAt(t, detectNow, "scenario", "--campaign", "--seed", "3", "--date", "2026-11-10", "--timezone", "Asia/Tokyo", campaign)
+	if made.code != exitOK || !strings.Contains(made.stdout, "Wrote 6 log files of three hosts and two network sensors") {
+		t.Fatalf("scenario --campaign: %d %s %s", made.code, made.stdout, made.stderr)
+	}
+	text, err := os.ReadFile(filepath.Join(campaign, "expected.json"))
+	var expected struct {
+		Story  []string                     `json:"story"`
+		Alerts []struct{ Rule, Who string } `json:"expected_alerts"`
+		Misses []string                     `json:"known_misses"`
+	}
+	if err != nil || json.Unmarshal(text, &expected) != nil || len(expected.Alerts) != 17 || len(expected.Misses) != 3 || len(expected.Story) != 7 {
+		t.Fatalf("expected.json: %v, %d alerts, %d misses, %d steps", err, len(expected.Alerts), len(expected.Misses), len(expected.Story))
+	}
+	before := snapshot(t, campaign)
+
+	found := runAt(t, detectNow, "detect", filepath.Join(campaign, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", output)
+	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "26 rules. 19 alerts, 2 critical, 9 high, 8 medium.") {
+		t.Fatalf("detect: %d %s %s", found.code, found.stdout, found.stderr)
+	}
+	alerts, _ := os.ReadFile(filepath.Join(output, "detect-20261111-030405", "alerts.json"))
+	for _, wanted := range expected.Alerts {
+		if !strings.Contains(string(alerts), `"rule": "`+wanted.Rule+`"`) {
+			t.Errorf("alerts.json does not have %s", wanted.Rule)
+		}
+	}
+	after := snapshot(t, campaign)
+	for path, state := range before {
+		if after[path] != state {
+			t.Fatalf("%s was changed", path)
+		}
+	}
+
+	both := runAt(t, detectNow, "scenario", "--campaign", "--host", filepath.Join(base, "x"))
+	if both.code != exitUsage {
+		t.Fatalf("--campaign with --host gave %d", both.code)
+	}
+	quiet := filepath.Join(base, "quiet")
+	if made := runAt(t, detectNow, "scenario", "--campaign", "--benign", "--date", "2026-11-10", "--timezone", "Asia/Tokyo", quiet); made.code != exitOK {
+		t.Fatal(made.stderr)
+	}
+	calm := runAt(t, detectNow, "detect", filepath.Join(quiet, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", filepath.Join(base, "out2"))
+	if calm.code != exitOK || !strings.Contains(calm.stdout, "26 rules. 0 alerts.") {
+		t.Fatalf("the quiet campaign: %d %s", calm.code, calm.stdout)
 	}
 }
