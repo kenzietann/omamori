@@ -44,7 +44,7 @@ func indexSnapshot(snapshot Snapshot) (snapshotIndex, bool) {
 		return index, false
 	}
 	for _, entity := range snapshot.Entities {
-		if entity.ID == "" || !slices.Contains(entityFields, entity.Field) {
+		if entity.ID == "" || !ValidEntityField(entity.Field) {
 			return index, false
 		}
 		if _, exists := index.entities[entity.ID]; exists {
@@ -206,7 +206,16 @@ func AlertSummary(id, title string, count int) string {
 	return fmt.Sprintf("%s: the rule %q matched %d events or hits. A rule match alone does not prove compromise.", id, title, count)
 }
 
+// ValidEntityField says which kinds of entity alerts can share. The checker and the store both ask here,
+// so the store never refuses, or accepts, a kind that the checker sees differently.
+func ValidEntityField(field string) bool {
+	return slices.Contains(entityFields, field) || field == assetEntity
+}
+
 func RelatedSummary(alerts int, entity Entity) string {
+	if entity.Field == assetEntity {
+		return fmt.Sprintf("%d alerts involve the machine %s of the asset list within 24 hours, as the machine that wrote the events or as one end of a connection. This is a review lead, not proof of one attacker or a causal chain.", alerts, entity.Value)
+	}
 	return fmt.Sprintf("%d alerts share %s=%s within 24 hours. A shared entity is a review lead, not proof of one attacker or a causal chain.", alerts, entity.Field, entity.Value)
 }
 

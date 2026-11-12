@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/kenzietann/omamori/internal/analyst"
-	"github.com/kenzietann/omamori/internal/event"
 	"github.com/kenzietann/omamori/internal/store"
 )
 
@@ -166,7 +165,7 @@ func validFinding(finding analyst.Finding, alerts map[string]store.Alert, action
 			return false
 		}
 	} else if len(finding.Alerts) < 2 || finding.Count != 0 || finding.Entity == nil ||
-		!entityIDPattern.MatchString(finding.Entity.ID) || !slices.Contains([]string{event.SourceIP, event.User, event.Host}, finding.Entity.Field) ||
+		!entityIDPattern.MatchString(finding.Entity.ID) || !analyst.ValidEntityField(finding.Entity.Field) ||
 		last.Sub(first) > 24*time.Hour {
 		return false
 	}

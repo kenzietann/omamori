@@ -81,3 +81,26 @@ func TestFindingsSayWhenTheirTimesAreWeak(t *testing.T) {
 		t.Fatal("a claim with a weak_times field was accepted")
 	}
 }
+
+// Alerts can share an address, a user, a host or a machine of the asset list. Nothing else is an entity:
+// a snapshot that names another kind is refused before a request is made or a claim is checked.
+func TestOnlyKnownKindsOfEntity(t *testing.T) {
+	for _, field := range []string{"src_ip", "user", "host", "asset"} {
+		if !ValidEntityField(field) {
+			t.Errorf("%s is refused", field)
+		}
+	}
+	for _, field := range []string{"command", "src_asset", "dst_asset", "message", ""} {
+		if ValidEntityField(field) {
+			t.Errorf("%s is accepted", field)
+		}
+	}
+	snapshot := snapshotFor(t, fixture())
+	snapshot.Entities[0].Field = "command"
+	if _, err := Request(snapshot); err == nil {
+		t.Error("a request was made from a snapshot with an entity of an unknown kind")
+	}
+	if result := Check(snapshot, `{"claims":[]}`); result.Status != StatusInvalid {
+		t.Errorf("claims were checked against that snapshot: %s", result.Status)
+	}
+}
