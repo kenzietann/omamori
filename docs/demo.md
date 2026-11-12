@@ -22,12 +22,12 @@ scan, injection attempts). They belong to the day of web01 and have no link to t
 
 ```sh
 omamori scenario --campaign --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-campaign
-omamori detect ./demo-campaign/logs --year 2026 --timezone Asia/Tokyo --store
+omamori detect ./demo-campaign/logs --assets ./demo-campaign/assets.yml --year 2026 --timezone Asia/Tokyo --store
 omamori dashboard ./demo-campaign/logs
 ```
 
-`detect` reads six files of three hosts and two sensors: 1,820 events, 26 rules, 19 alerts
-(2 critical, 9 high, 8 medium). The report has one timeline for all sources. With `--store` the run
+`detect` reads six files of three hosts and two sensors: 1,820 events, 27 rules, 20 alerts
+(3 critical, 9 high, 8 medium). Without `--assets` it is 19 alerts: the one that joins the story is missing. The report has one timeline for all sources. With `--store` the run
 is in the local database, and the dashboard shows the alert queue with the evidence beside it.
 `./demo-campaign/expected.json` holds the story, the alerts that must fire and the known misses.
 
@@ -39,15 +39,33 @@ address, and a host that keeps trying one address that is gone. `detect` gives n
 For the checked AI review, add `analyze` in place of `detect` (preview first, `--yes` to send).
 No recording of a review of this campaign is bundled yet.
 
+## The asset list
+
+```yaml
+assets:
+  - name: web01
+    addresses: [10.0.1.10]
+  - name: app01
+    addresses: [10.0.2.20]
+```
+
+A name is matched with the host name in a log (also with a domain after it, and without regard to
+case). An address is matched with the source and the destination of an event. Events then carry
+`asset` (the machine that wrote the log), `src_asset` and `dst_asset`. A name or an address that
+stands twice is refused, because one address must mean one machine. `detect` and `analyze` take
+`--assets`; the forensic triage, the home screen and the dashboard do not take it yet.
+
 ## What the demo must say out loud
 
 - **Step 5 is not found.** One accepted key from an internal address looks like every ordinary login.
   Finding it needs knowledge that the rules do not have: which host normally logs in to which.
-- **The two halves are not joined by the tool.** In its own logs the first host is `web01`. In the
-  logs of the other hosts and of the sensor it is `10.0.1.10`. Nothing in the program knows that these
-  are the same machine, so the alerts of steps 1–2 and of steps 3–4 share no entity. A person joins
-  them, or the AI review does not join them at all. An asset list (host name to address) is the next
-  piece of work.
+- **The two halves are joined only with the asset list.** In its own logs the first host is `web01`.
+  In the logs of the other hosts and of the sensor it is `10.0.1.10`. `assets.yml` says that these are
+  one machine. With it, one more critical alert fires ("A host was logged in to after password guessing
+  and then guesses passwords inside", machine=web01), with its first step from `web01/auth.log` and its
+  second from `app01/auth.log`, and the AI review can relate alerts through the machine. Without it,
+  both halves are still found, and nothing joins them. The list is yours to keep right: a wrong or old
+  entry joins the wrong machines.
 - **The rules know nothing about your network.** A jump host, a vulnerability scanner of your own,
   or a backup to a cloud fires the new rules. Each needs a filter for that address.
 - **Measured on synthetic days only.** Over 25 seeds: 425 of 425 expected alerts, no unexpected

@@ -31,7 +31,7 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
 | 4 | SQLite/PostgreSQL/MariaDB storage, search, cases, timelines across runs | built and verified (2026-11-12) |
 | 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | built and verified (2026-11-12), with the checked AI review (`--analyze`); live model evaluation pending |
 | 6 | Local web UI on 127.0.0.1 over the store | built and verified (2026-11-12), initial investigation dashboard |
-| 7 | Full synthetic scenario across sources (SSH takeover, persistence, lateral movement), rehearsed demo | started (2026-11-12): campaign, nine network rules and the walk-through are built and measured; asset list, bundled analyst replay and a rehearsal are open |
+| 7 | Full synthetic scenario across sources (SSH takeover, persistence, lateral movement), rehearsed demo | started (2026-11-12): campaign, nine network rules and the walk-through are built and measured; the asset list joins the story (`--assets`); a bundled analyst replay, a forensic image of web01 and a rehearsal are open |
 
 ## Decisions
 
@@ -355,6 +355,33 @@ entity; the rules have no knowledge of the network and need filters for jump hos
 backups. Next: an asset list that gives events of a host its address (and the other way), a scripted
 analyst replay of the campaign, a forensic image of web01 that fits the same story, and a timed rehearsal.
 The Dashboard line of the home screen was tested through its backend, not by a person in a terminal.
+
+### Asset list (2026-11-12)
+
+`internal/assets` reads a YAML list of your machines (name, addresses). `detect --assets` and
+`analyze --assets` give every event `asset`, `src_asset` and `dst_asset` from that list. Correlations got
+Sigma's `aliases`, and a correlation hit now has every field on which all its kept events agree. One rule
+uses both: a host that was logged in to after guessing and then guesses inside (27 built-in rules).
+
+- Campaign with the list, 25 seeds: all expected alerts plus the joining alert, its two steps from the
+  logs of web01 and of app01, nothing unexpected, and no alert on days without the attack.
+  Without the list the result is as before.
+- Through the command line with seed 3: 20 alerts (3 critical). A scripted AI answer that relates the
+  takeover of web01 and the guessing from web01 through the machine is verified (21 findings) and
+  stored. The same answer without the list is refused for that one claim.
+- That test found a defect: the store kept its own copy of the list of entity kinds and refused the
+  finding that the checker had accepted. Both now ask one function.
+- A value under `asset`, `src_asset` or `dst_asset` that comes from a log line is removed, so a log
+  cannot say which of your machines it is about. A list with a name or an address twice is refused.
+- 15 mutations in a copy: 12 caught at once. Three survived and showed weak tests (a hit whose events
+  disagree, an alias with one rule too many, entity kinds); cases were added and all three are caught.
+- The asset parser was fuzzed for 15 seconds with no failure.
+
+Not done: `--assets` for forensics, the home screen and the dashboard; address ranges and addresses
+that change over time (DHCP); and the login to db01 with a stolen key is still not found.
+The correlation change (a hit has the fields its events agree on) applies to all rules. The existing
+measurements did not change, but your own rules with group-by over other correlations can now group
+hits that were left out before.
 
 ## Not decided yet
 

@@ -157,6 +157,30 @@ must be present and nonempty; incomplete hits are not counted. A distinct count
 also ignores hits whose counted field is missing or empty. Group values and
 distinct values are case-sensitive.
 
+A hit of a correlation has the fields that it was grouped by. It also has any
+other field that every event it kept has with one and the same value: ten failed
+logins on one host are a hit on that host, whatever they were grouped by. When
+the kept events disagree, or one lacks the field, the hit does not have it.
+
+`aliases` lets one group-by name stand for a different field in each rule of the
+list, as in Sigma. Every rule of the list needs a field:
+
+```yaml
+correlation:
+  type: temporal_ordered
+  rules: [ssh_brute_force_success, ssh_internal_guessing]
+  aliases:
+    machine:
+      ssh_brute_force_success: asset      # the host that was logged in to
+      ssh_internal_guessing: src_asset    # the host that guesses
+  group-by: [machine]
+  timespan: 6h
+```
+
+The fields `asset`, `src_asset` and `dst_asset` exist only when an asset list is
+given with `--assets` (see [demo.md](demo.md)). They are set from that list
+alone; a value under these names in a log line is removed.
+
 Events are sorted by time, preserving their input order for equal timestamps.
 Windows include the boundary: a hit exactly one minute later fits `1m`.
 Durations accept forms such as `30s`, `5m`, `2h` and `1d`, up to 30 days.
