@@ -22,12 +22,14 @@ scan, injection attempts). They belong to the day of web01 and have no link to t
 
 ```sh
 omamori scenario --campaign --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-campaign
-omamori detect ./demo-campaign/logs --assets ./demo-campaign/assets.yml --year 2026 --timezone Asia/Tokyo --store
+omamori detect ./demo-campaign/logs --assets ./demo-campaign/assets.yml --indicators ./demo-campaign/indicators.yml \\
+  --year 2026 --timezone Asia/Tokyo --store
 omamori dashboard ./demo-campaign/logs
 ```
 
-`detect` reads six files of three hosts and two sensors: 1,820 events, 27 rules, 20 alerts
-(3 critical, 9 high, 8 medium). Without `--assets` it is 19 alerts: the one that joins the story is missing. The report has one timeline for all sources. With `--store` the run
+`detect` reads six files of three hosts and two sensors: 1,820 events, 29 rules, 21 alerts
+(3 critical, 10 high, 8 medium). Without the two lists it is 19 alerts: the alert that joins the story
+and the alert for the known bad address are missing. The report has one timeline for all sources. With `--store` the run
 is in the local database, and the dashboard shows the alert queue with the evidence beside it.
 `./demo-campaign/expected.json` holds the story, the alerts that must fire and the known misses.
 
@@ -52,8 +54,29 @@ assets:
 A name is matched with the host name in a log (also with a domain after it, and without regard to
 case). An address is matched with the source and the destination of an event. Events then carry
 `asset` (the machine that wrote the log), `src_asset` and `dst_asset`. A name or an address that
-stands twice is refused, because one address must mean one machine. `detect` and `analyze` take
-`--assets`; the forensic triage, the home screen and the dashboard do not take it yet.
+stands twice is refused, because one address must mean one machine. `detect`, `analyze` and `forensics`
+take `--assets`; the home screen and the dashboard do not take it yet.
+
+## The indicator list
+
+```yaml
+indicators:
+  - type: ip          # ip, domain or sha256
+    value: 203.0.113.80
+    note: where it came from
+```
+
+An event is marked when its source or destination is a listed address, when a DNS query, an HTTP host
+or a TLS name is a listed domain or lies under one, when a hash field is a listed hash, or when a
+command, a URL or a referrer has a listed address or name inside it. The marks are `indicator`,
+`indicator_type` and `indicator_where`. One rule gives one alert for each indicator and burst.
+In the campaign, 203.0.113.80 is one alert with four events from two hosts: the cron job of web01 that
+downloads from it, and the upload of db01 to it. `detect`, `analyze` and `forensics` take
+`--indicators`. A list with an entry that cannot be used is refused, with the number of the entry.
+
+An event that names several indicators is marked with the first one found. Only the fields above are
+searched: an address in the free text of a syslog message is not found. The list is as good as its
+source: an old or wrong entry gives alerts of level high for ordinary traffic.
 
 ## What the demo must say out loud
 

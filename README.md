@@ -62,7 +62,7 @@ an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all
 
 `detect` reads sshd/Linux syslog, Apache/Nginx access logs, or JSON lines with a
 timestamp. It normalizes supported Suricata EVE, Zeek, Wazuh and Windows/Sysmon
-JSON exports into the shared event fields. It applies 26 built-in rules, including counts, distinct counts and
+JSON exports into the shared event fields. It applies 29 built-in rules, including counts, distinct counts and
 ordered sequences such as password guessing followed by a successful login.
 Rule evaluation uses no API key. The command stays local unless you enable
 storage on a configured database server.
@@ -308,6 +308,8 @@ AI is limited by the guard and can only use read-only tools.
   mixed-source demo.
 - [Storage and investigations](docs/storage.md): SQLite/PostgreSQL/MariaDB,
   persistent runs, search, cases, timelines and dashboard APIs.
+- [Toolkit map](docs/toolkit.md): the blue-team tool families Omamori is growing
+  toward, what exists for each and what is missing.
 - [Demo: one attack through three hosts](docs/demo.md): the synthetic campaign
   across host logs and network sensors, what is found and what is not.
 - [Forensic triage](docs/forensics.md): read-only collection of Linux artifacts,

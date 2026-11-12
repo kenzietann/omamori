@@ -383,6 +383,28 @@ The correlation change (a hit has the fields its events agree on) applies to all
 measurements did not change, but your own rules with group-by over other correlations can now group
 hits that were left out before.
 
+### Indicator list (2026-11-12)
+
+First piece chosen from the toolkit direction ([toolkit.md](toolkit.md)): the part of threat intelligence
+that MISP stands for. `internal/indicators` reads a YAML list of addresses, domains and SHA-256 hashes.
+`detect`, `analyze` and `forensics` take `--indicators` (and `forensics` now takes `--assets` too).
+Marked events carry `indicator`; two rules give one alert for each indicator and burst (29 built-in
+rules, 39 with the artifact rules); the AI review can relate alerts through an indicator.
+
+- Campaign with the list, 25 seeds: all expected alerts plus one for 203.0.113.80 with four events from
+  `web01/auth.log` and `sensor/conn.log`; nothing unexpected; no alert on days without the attack.
+- Command line, seed 3, both lists: 21 alerts (3 critical, 10 high, 8 medium). The forensic triage of
+  the synthetic system with the list: 27 alerts, the indicator alert citing the shell history, the
+  crontab and the log. A scripted AI answer that relates the cron job and the upload through the
+  indicator is verified (22 findings) and stored.
+- A negative test found a defect before any run: `1203.0.113.80` was taken to name `203.0.113.80`.
+  Addresses in text must now stand alone.
+- 15 mutations in a copy: 14 caught at once; one survived until a case with eight dotted numbers was added.
+- The matcher was fuzzed for 15 seconds: a mark is always an entry of the list, never text of an event.
+
+Not done: feeds and MISP formats, expiry and scores, address ranges, more than one mark for an event,
+free text of syslog messages, `--indicators` in the home screen and the dashboard.
+
 ## Not decided yet
 
 - Streaming (tail -f) evaluation. The engine is written so that state is per group, which is what a
