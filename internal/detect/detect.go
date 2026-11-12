@@ -115,11 +115,12 @@ func plain(text string, runes int) string {
 	return text
 }
 
-// row writes one row of a table. A "|" inside a cell would make a new column, so it is replaced.
+// row writes one row of a table. A "|" inside a cell would make a new column, so it is written as "¦".
+// It is not written as "/": in a shell command "curl x / sh" would read as something else than "curl x | sh".
 func row(out *strings.Builder, cells ...any) {
 	out.WriteString("|")
 	for _, cell := range cells {
-		out.WriteString(" " + strings.ReplaceAll(fmt.Sprint(cell), "|", "/") + " |")
+		out.WriteString(" " + strings.ReplaceAll(fmt.Sprint(cell), "|", "¦") + " |")
 	}
 	out.WriteString("\n")
 }
@@ -184,8 +185,45 @@ func (w *writer) describe(current event.Event) string {
 	return strings.Join(parts, " ")
 }
 
+// Extra changes the report for a run that is more than the detection in logs, such as the forensic triage.
+// The zero value gives the plain detection report.
+type Extra struct {
+	// Title replaces the title of the report.
+	Title string
+	// Intro lines are added to the list at the top.
+	Intro []string
+	// Sections gives Markdown that is put before the list of files. It gets the formatter of the report,
+	// so that its values pass the same filter and the placeholders keep their numbers.
+	Sections func(format *Formatter) string
+	// Limits are added to the limits at the end.
+	Limits []string
+	// OwnTimeline says that Sections has a timeline, so the plain one is left out.
+	OwnTimeline bool
+}
+
+// Formatter makes texts for a report in the same way as the report itself.
+type Formatter struct{ w *writer }
+
+// Value gives the text of a field. Free text passes the filter for secrets and personal numbers.
+func (format *Formatter) Value(field, text string) string { return format.w.value(field, text) }
+
+// Text gives free text, filtered, on one line and not longer than the number of characters.
+func (format *Formatter) Text(text string, runes int) string { return format.w.text(text, runes) }
+
+// Time gives a time in the zone of the report.
+func (format *Formatter) Time(moment time.Time) string { return format.w.time(moment) }
+
+// Group says who an alert is about.
+func (format *Formatter) Group(alert *rules.Alert) string { return format.w.group(alert) }
+
+// Row writes one row of a table.
+func (format *Formatter) Row(out *strings.Builder, cells ...any) { row(out, cells...) }
+
 // Markdown gives the report. It is also the input of the HTML page.
-func Markdown(outcome Outcome) string {
+func Markdown(outcome Outcome) string { return MarkdownWith(outcome, Extra{}) }
+
+// MarkdownWith gives the report with the additions of another kind of run.
+func MarkdownWith(outcome Outcome, extra Extra) string {
 	w := &writer{location: outcome.Location}
 	if w.location == nil {
 		w.location = time.UTC
@@ -198,11 +236,18 @@ func Markdown(outcome Outcome) string {
 		lines, events, malformed = lines+file.Lines, events+file.Events, malformed+file.Malformed
 	}
 
-	out.WriteString("# Omamori detection report\n\n")
+	title := "Omamori detection report"
+	if extra.Title != "" {
+		title = plain(extra.Title, maxCell)
+	}
+	out.WriteString("# " + title + "\n\n")
 	fmt.Fprintf(&out, "- Made: %s\n", w.time(outcome.Made))
 	fmt.Fprintf(&out, "- Read: %d files, %d lines, %d events, %d lines that could not be read\n", len(outcome.Intake.Files), lines, events, malformed)
 	fmt.Fprintf(&out, "- Rules: %d (%s)\n", outcome.Rules, plain(outcome.RulesFrom, 40))
 	fmt.Fprintf(&out, "- Alerts: %d\n", len(alerts))
+	for _, line := range extra.Intro {
+		out.WriteString("- " + plain(line, 400) + "\n")
+	}
 	out.WriteString("- No AI was used for this report. Every alert comes from a rule, and the lines that made it fire are listed.\n\n")
 
 	if len(outcome.Result.Cut) > 0 {
@@ -290,14 +335,19 @@ func Markdown(outcome Outcome) string {
 			out.WriteString("\n")
 		}
 
-		out.WriteString("## Timeline\n\n| Time | Level | Rule | Who |\n|---|---|---|---|\n")
-		for index, alert := range outcome.Result.Alerts {
-			if index == maxRows {
-				break
+		if !extra.OwnTimeline {
+			out.WriteString("## Timeline\n\n| Time | Level | Rule | Who |\n|---|---|---|---|\n")
+			for index, alert := range outcome.Result.Alerts {
+				if index == maxRows {
+					break
+				}
+				row(&out, w.time(alert.Time), alert.Rule.Level, plain(alert.Rule.Title, maxCell), w.group(alert))
 			}
-			row(&out, w.time(alert.Time), alert.Rule.Level, plain(alert.Rule.Title, maxCell), w.group(alert))
+			out.WriteString("\n")
 		}
-		out.WriteString("\n")
+	}
+	if extra.Sections != nil {
+		out.WriteString(extra.Sections(&Formatter{w}))
 	}
 
 	out.WriteString("## Files\n\n| File | Format | Lines | Events | Empty lines | Lines not read |\n|---|---|---|---|---|---|\n")
@@ -321,6 +371,10 @@ func Markdown(outcome Outcome) string {
 	out.WriteString("- Classic syslog lines have no year and no time zone. The year and the zone of this run were used for them.\n")
 	out.WriteString("- Values from the logs were passed through the filter for secrets and personal numbers. A placeholder like [SECRET:...] stands for a removed value.\n")
 	out.WriteString("- Compressed files are not read yet.\n")
+	out.WriteString("- In the tables, \"¦\" stands for the character \"|\" of the original text.\n")
+	for _, line := range extra.Limits {
+		out.WriteString("- " + plain(line, 400) + "\n")
+	}
 
 	return out.String()
 }

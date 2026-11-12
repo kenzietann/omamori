@@ -203,7 +203,7 @@ func (b *builder) attacks() ([]Expected, []string) {
 	}
 	b.syslog(at, "sshd", fmt.Sprintf("Accepted password for root from %s port %d ssh2", attacker, b.port()))
 	b.syslog(at, "sshd", "pam_unix(sshd:session): session opened for user root(uid=0) by (uid=0)")
-	b.syslog(at.Add(3*time.Minute), "useradd", "new user: name=support2, UID=1002, GID=1002, home=/home/support2, shell=/bin/bash, from=/dev/pts/1")
+	b.syslog(at.Add(3*time.Minute), "useradd", "new user: name=support2, UID=1004, GID=1004, home=/home/support2, shell=/bin/bash, from=/dev/pts/1")
 	b.syslog(at.Add(3*time.Minute+5*time.Second), "usermod", "add 'support2' to group 'sudo'")
 	b.syslog(at.Add(5*time.Minute), "crontab", "(root) REPLACE (root)")
 	for run := 0; run < 3; run++ {

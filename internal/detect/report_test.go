@@ -112,7 +112,7 @@ func TestHostileLogContentStaysTextAndSecretsStayOut(t *testing.T) {
 			t.Errorf("a row has a wrong number of cells: %s", line)
 		}
 	}
-	if tables < 4 || !strings.Contains(report, "user=<script>x</script>/pipe") || !strings.Contains(report, "| auth/audit.log |") {
+	if tables < 4 || !strings.Contains(report, "user=<script>x</script>¦pipe") || !strings.Contains(report, "| auth¦audit.log |") {
 		t.Error("the report did not exercise hostile user and file names in its tables")
 	}
 
