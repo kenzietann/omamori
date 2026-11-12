@@ -36,7 +36,10 @@ Commands:
   triage <log file>   Task B: triage an sshd auth.log for guessing and password spraying
   detect <logs>...    read logs, run local rules, write a report (no AI; optional SQL storage)
   analyze <logs>...   detect, ask the AI to review alerts, and verify its claims against the evidence
+  forensics <folder>  read the artifacts of a Linux system from a folder (read-only): hash them, run rules,
+                      write a report with a timeline. "forensics verify <manifest> <folder>" checks the hashes again
   scenario <folder>   write synthetic logs of one day with attacks into a new folder, for demos and tests
+                      (add --host for a whole synthetic system for forensics)
   store <command>    stored runs, event/alert search, cases and timelines (run "omamori store" for usage)
   ui <folder>         open the home screen, where you choose a task
   replay <recording> [folder or log file]
@@ -68,6 +71,12 @@ Flags for detect:
   --output folder     where the report folder is made (default ~/omamori-output)
   --store             persist the sanitized run for search, cases and timelines
   --db file           choose a SQLite file and enable storage (default ~/omamori-data/omamori.db)
+
+Flags for forensics (also --rules, --year, --timezone, --output, --store and --db, as for detect):
+  --processes file    saved output of "ps aux" or "ps -ef" from the system
+  --sockets file      saved output of "ss -tulpn" or "netstat -tulpn" from the system
+The evidence folder is the top of the system: a mounted image, an unpacked copy, or / itself.
+Nothing in it is changed or run. Password hashes and private keys are never read.
 
 SQL storage defaults to SQLite. For PostgreSQL or MariaDB, set OMAMORI_DB_DRIVER
 to postgres or mariadb and provide OMAMORI_DB_DSN in the environment. Database
@@ -152,6 +161,8 @@ func run(args []string, env environment) int {
 		return runPeek(rest, env)
 	case "detect":
 		return runDetect(rest, env)
+	case "forensics":
+		return runForensics(rest, env)
 	case "analyze":
 		return runAnalyze(rest, env)
 	case "scenario":

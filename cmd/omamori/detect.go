@@ -25,7 +25,7 @@ import (
 
 const (
 	usageDetect   = "usage: omamori detect [--rules folder] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
-	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] <new folder>"
+	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] [--host] <new folder>"
 )
 
 func (env environment) clock() time.Time {
@@ -213,6 +213,8 @@ func runScenario(args []string, env environment) int {
 	flags.StringVar(&date, "date", "", "day of the logs")
 	flags.StringVar(&zoneName, "timezone", "", "time zone of the server")
 	flags.BoolVar(&benign, "benign", false, "a day without attacks")
+	var host bool
+	flags.BoolVar(&host, "host", false, "write a whole synthetic system for the forensic triage")
 	positional, err := splitFlags(flags, args)
 	if err != nil || len(positional) != 1 {
 		fmt.Fprintln(env.stderr, usageScenario)
@@ -241,6 +243,9 @@ func runScenario(args []string, env environment) int {
 	}
 	if _, err := os.Lstat(directory); err == nil {
 		return fail(errors.New("the folder exists already. Give a new folder, so that nothing is written over"))
+	}
+	if host {
+		return writeHostScenario(env, directory, seed, day, location, benign)
 	}
 	writer, err := reportwriter.NewFolder(directory)
 	if err != nil {
