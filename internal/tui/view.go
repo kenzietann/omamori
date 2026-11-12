@@ -8,10 +8,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-// The pages before a run (the menu, the choices, the settings, and the dry run) are full-screen pages.
-// A run leaves the full-screen mode: its steps and its report are printed into the normal terminal,
-// so that the scrollback, the wheel, the selection and select-all of the terminal work on them.
-// Only one status line stays at the bottom while it runs.
 
 const (
 	selectMarker = "❯ "
@@ -80,7 +76,6 @@ func (model Model) accentLine(text string) string {
 	return styleAccent.Render(model.truncate(safeText(text), 0))
 }
 
-// visibleRange picks the lines of a long list that fit, with the cursor in the middle when it can.
 func visibleRange(cursor, total, room int) (first, last int) {
 	room = min(max(room, 1), total)
 	first = min(max(cursor-room/2, 0), total-room)
@@ -88,7 +83,6 @@ func visibleRange(cursor, total, room int) (first, last int) {
 	return first, first + room
 }
 
-// room is how many lines a list may have, when the page has this many other lines.
 func (model Model) room(otherLines int) int {
 	if model.height <= 0 {
 		return 1 << 20
@@ -97,8 +91,6 @@ func (model Model) room(otherLines int) int {
 	return max(model.height-otherLines, 3)
 }
 
-// choiceList draws a list with a marker at the cursor. Only the lines that fit are drawn.
-// A line whose number is in dim is drawn in the dim color.
 func (model Model) choiceList(labels []string, cursor, room int, dim ...int) []string {
 	first, last := visibleRange(cursor, len(labels), room)
 
@@ -127,8 +119,6 @@ func containsIndex(indexes []int, index int) bool {
 	return false
 }
 
-// page puts a page together: the lines before the list, the list (as many lines as fit), the lines
-// after it, a blank line, and the keys.
 func (model Model) page(lead []string, labels []string, cursor int, trail []string, keys string, dim ...int) string {
 	room := model.room(len(lead) + len(trail) + 2)
 
@@ -188,7 +178,6 @@ func providerStatus(choice Choice) string {
 	return "needs a key (" + choice.KeyEnv + ")"
 }
 
-// targetLine is the label and the folder. In a window that is narrower than the label, the label is cut too.
 func (model Model) targetLine(label string) string {
 	line := model.truncate(label+safeText(model.target), 0)
 	if rest, isLonger := strings.CutPrefix(line, label); isLonger {
@@ -199,7 +188,6 @@ func (model Model) targetLine(label string) string {
 }
 
 func (model Model) menuView() string {
-	// The names stand in one column, and what each one does stands after it.
 	width := 0
 	for _, item := range menuItems {
 		width = max(width, len([]rune(item.label)))
@@ -349,7 +337,6 @@ func (model Model) settingsView() string {
 		model.footer(hint{"up/down", "move"}, hint{"enter", "choose"}, hint{"esc", "back"}, hint{"q", "quit"}))
 }
 
-// shownLine is a piece of the dry run on the screen. A long line is wrapped into several pieces.
 type shownLine struct {
 	text string
 }

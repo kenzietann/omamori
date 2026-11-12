@@ -57,8 +57,6 @@ func isQuit(command tea.Cmd) bool {
 	return quits
 }
 
-// settle runs commands and feeds their messages back into the model, the way the Bubble Tea
-// program does, until no command is left.
 func settle(model Model, command tea.Cmd) Model {
 	queue := []tea.Cmd{command}
 
@@ -74,7 +72,6 @@ func settle(model Model, command tea.Cmd) Model {
 			queue = append(queue, batch...)
 			continue
 		}
-		// A sequence runs its commands one after the other, and before the commands that wait in the queue.
 		if fmt.Sprintf("%T", message) == "tea.sequenceMsg" {
 			list := reflect.ValueOf(message)
 			var ordered []tea.Cmd
@@ -93,7 +90,6 @@ func settle(model Model, command tea.Cmd) Model {
 	return model
 }
 
-// batchOf returns the batch of commands of the run, which may be inside a sequence.
 func batchOf(t testing.TB, command tea.Cmd) tea.BatchMsg {
 	t.Helper()
 
@@ -144,14 +140,11 @@ type fakeBackend struct {
 	summary    string
 	setups     []Setup
 	confirmed  int
-	// models is the list the provider gives. nil means a short default list, and an empty list means none.
 	models     []string
 	modelsErr  error
 	modelCalls []modelCall
-	// reasoning is what the model offers. nil means no choice, and then the step is skipped.
 	reasoning       []ReasoningChoice
 	reasoningModels []string
-	// keys and settings
 	canSaveKeys     bool
 	savedKeys       []modelCall
 	saveKeyErr      error
@@ -277,7 +270,6 @@ func startedRun(t testing.TB, runner Runner) (Model, tea.Cmd) {
 }
 
 func TestHomeMenuMovesAndGoesAroundTheEnds(t *testing.T) {
-	// The menu grows with the program, so the ends are counted and not written down.
 	last := len(menuItems) - 1
 	downs := func(count int) []string { return slices.Repeat([]string{"down"}, count) }
 	testCases := []struct {
@@ -316,7 +308,6 @@ func pressAll(t testing.TB, model Model, keys ...string) (Model, tea.Cmd) {
 	var command tea.Cmd
 	for _, key := range keys {
 		model, command = press(t, model, key)
-		// The list of models comes over the network. The fake answers at once, so it is applied here.
 		if model.modelsLoading {
 			model, command = settle(model, command), nil
 		}

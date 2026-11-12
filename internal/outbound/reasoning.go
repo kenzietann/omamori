@@ -2,15 +2,12 @@ package outbound
 
 import "strings"
 
-// ReasoningOption is one level a user may choose. Value is what goes to the provider.
-// An empty Value is the provider's own default, and nothing extra is sent for it.
 type ReasoningOption struct {
 	Value string
 	Label string
 }
 
 type reasoningRule struct {
-	// match is a part of the model name. The first rule that matches wins.
 	match   string
 	options []ReasoningOption
 }
@@ -57,13 +54,10 @@ var reasoningRules = map[string][]reasoningRule{
 	},
 }
 
-// defaultReasoningLabel names what happens when the user chooses nothing.
 var defaultReasoningLabel = map[string]string{
 	"anthropic": "default (medium)",
 }
 
-// ReasoningOptions lists the choices for this provider and model. The first one is always the default.
-// It returns nothing when the model has no documented choice, and then no step is shown.
 func ReasoningOptions(providerID, model string) []ReasoningOption {
 	model = strings.ToLower(model)
 
@@ -85,7 +79,6 @@ func ReasoningOptions(providerID, model string) []ReasoningOption {
 	return nil
 }
 
-// ValidReasoning says whether a value may be sent for this provider and model.
 func ValidReasoning(providerID, model, value string) bool {
 	if value == "" {
 		return true

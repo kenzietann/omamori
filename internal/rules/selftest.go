@@ -15,8 +15,6 @@ var builtinFiles embed.FS
 //go:embed forensic/*.yml
 var forensicFiles embed.FS
 
-// BuiltinForensics gives the built-in rules together with the rules for artifacts of a Linux system
-// (cron files, shell history, systemd units, accounts, snapshots). The forensic triage uses this set.
 func BuiltinForensics() (Set, error) {
 	var all []*Rule
 	for _, source := range []struct {
@@ -37,7 +35,6 @@ func BuiltinForensics() (Set, error) {
 	return NewSet(all)
 }
 
-// Builtin gives the rules that are inside the program.
 func Builtin() (Set, error) {
 	system, err := fs.Sub(builtinFiles, "builtin")
 	if err != nil {
@@ -47,7 +44,6 @@ func Builtin() (Set, error) {
 	return LoadFS(system)
 }
 
-// testStart is the time of the first event of a test that gives no times. Each next event is one second later.
 var testStart = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // runTests runs the tests that the rules carry. One failed test refuses the whole set, because a rule that
@@ -75,7 +71,6 @@ func (set Set) runTests() error {
 	return nil
 }
 
-// testEvents turns the events of a test into events. The key "time" is the time (RFC 3339), and every other key is a field.
 func testEvents(raw []map[string]any) ([]event.Event, error) {
 	events := make([]event.Event, 0, len(raw))
 	for index, item := range raw {

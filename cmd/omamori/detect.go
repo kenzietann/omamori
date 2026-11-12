@@ -48,7 +48,6 @@ func zone(name string) (*time.Location, error) {
 	return location, nil
 }
 
-// splitFlags lets flags stand before or after the other arguments.
 func splitFlags(flags *flag.FlagSet, args []string) ([]string, error) {
 	flags.SetOutput(io.Discard)
 	var positional []string
@@ -158,7 +157,6 @@ func runDetect(args []string, env environment) int {
 	if err != nil {
 		return fail(errors.New("the alerts could not be written"))
 	}
-	// Nothing was written until here. The folder is made only now, when there is a report to put into it.
 	writer, err := reportwriter.NewRun(sources, directory)
 	if err != nil {
 		return fail(err)
@@ -283,7 +281,6 @@ func runScenario(args []string, env environment) int {
 	return exitOK
 }
 
-// shellArgument keeps a copied command's values literal, including spaces, quotes and shell expansions.
 func shellArgument(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }

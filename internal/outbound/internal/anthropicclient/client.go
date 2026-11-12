@@ -51,7 +51,6 @@ type Client struct {
 	effort anthropic.OutputConfigEffort
 }
 
-// SetEffort sets the effort level. An empty text keeps the default.
 func (client *Client) SetEffort(effort string) error {
 	switch level := anthropic.OutputConfigEffort(effort); level {
 	case "":
@@ -133,7 +132,6 @@ func classify(err error) error {
 		return context.Canceled
 	}
 
-	// A timeout or a broken connection is worth another try.
 	return ErrRetryable
 }
 
@@ -151,7 +149,6 @@ func buildParams(model string, request Request) (anthropic.MessageNewParams, err
 		// Thinking is always on for this model, so only the effort is set, and it is set on purpose
 		// because the default changed between models.
 		OutputConfig: anthropic.OutputConfigParam{Effort: anthropic.OutputConfigEffortMedium},
-		// The system prompt, the tools and the earlier turns are the same on every request, so the provider can reuse them.
 		CacheControl: anthropic.NewCacheControlEphemeralParam(),
 	}
 	if request.System != "" {
@@ -185,7 +182,6 @@ func buildMessages(messages []Message) ([]anthropic.MessageParam, error) {
 			}
 			index++
 		case "tool":
-			// All results of one turn go in one user message, and the results come before any text.
 			var results, notes []anthropic.ContentBlockParamUnion
 			for ; index < len(messages) && messages[index].Role == "tool"; index++ {
 				if messages[index].ToolCallID != "" {
@@ -261,7 +257,6 @@ func parseResponse(message *anthropic.Message) (Response, error) {
 		}
 	}
 
-	// A cut-off answer may hold a tool call with an unfinished input, so it is not used.
 	if message.StopReason == anthropic.StopReasonMaxTokens && len(response.ToolCalls) > 0 {
 		return Response{}, ErrBadResponse
 	}
@@ -272,7 +267,6 @@ func parseResponse(message *anthropic.Message) (Response, error) {
 	return response, nil
 }
 
-// ListModels asks Anthropic which models the key can use. No project data is sent, only the key.
 func ListModels(ctx context.Context, apiKey, baseURL string, timeout time.Duration) ([]string, error) {
 	if apiKey == "" {
 		return nil, ErrNoKey

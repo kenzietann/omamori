@@ -197,7 +197,6 @@ func TestTheModelListMovesAndChooses(t *testing.T) {
 		t.Fatalf("models = %q, cursor = %d: the default model is added on top and selected", model.models, model.modelCursor)
 	}
 
-	// The lines are m, alpha, beta, gamma, and 4 is the line to type a name.
 	for name, testCase := range map[string]struct {
 		keys []string
 		want int

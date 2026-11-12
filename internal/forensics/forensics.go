@@ -29,7 +29,6 @@ import (
 	"github.com/kenzietann/omamori/internal/intake"
 )
 
-// Kinds of artifacts. They are also the "service" of the events, so that rules can ask for one kind.
 const (
 	KindLog       = "log"
 	KindCron      = "cron_file"
@@ -42,17 +41,13 @@ const (
 	KindSockets   = "socket_snapshot"
 )
 
-// Where the time of an event comes from. Only "recorded" is the time of the thing itself.
 const (
 	TimeRecorded = "recorded"
-	// TimeFileChange is the time the file was last changed. The entry in it can be older, and a copy of the
-	// file can have a newer time than the original.
 	TimeFileChange = "file_modified"
 	TimeField      = "time_source"
 )
 
 const (
-	// Source is the source of every artifact event.
 	Source = "forensics"
 
 	maxArtifactBytes = 8 << 20
@@ -62,7 +57,6 @@ const (
 	maxValueRunes    = 2048
 	maxNameRunes     = 64
 	maxMatches       = 2000
-	// ManifestVersion is the version of the manifest format.
 	ManifestVersion = 1
 )
 
@@ -72,50 +66,37 @@ var (
 	ErrInput  = errors.New("the settings of the collection are not valid")
 )
 
-// Options of a collection.
 type Options struct {
-	// Year and Location are for syslog lines, which have no year and no time zone.
 	Year     int
 	Location *time.Location
-	// Processes and Sockets are files with the output of "ps" and of "ss" or "netstat", taken on the system
-	// before it was shut down. They are optional and can be anywhere.
 	Processes string
 	Sockets   string
 }
 
-// Entry is one file of the manifest.
 type Entry struct {
-	// Path is relative to the evidence folder. A snapshot file has "snapshot:" before its name.
 	Path     string `json:"path"`
 	Kind     string `json:"kind"`
 	Size     int64  `json:"size"`
 	Mode     string `json:"mode"`
 	Modified string `json:"modified"`
 	SHA256   string `json:"sha256"`
-	// Events is the number of events that were made from the file.
 	Events int `json:"events"`
-	// Note says when only a part was looked at. The hash is always of the whole file.
 	Note string `json:"note,omitempty"`
 }
 
-// Manifest lists every file that was read, with its hash.
 type Manifest struct {
 	Version int     `json:"version"`
 	Note    string  `json:"note"`
 	Entries []Entry `json:"entries"`
-	// Skipped lists what was found and not read, with the reason.
 	Skipped []string `json:"skipped"`
 }
 
-// Collection is everything that was read.
 type Collection struct {
 	Events   []event.Event
 	Files    []intake.Stats
 	Manifest Manifest
 }
 
-// JSON gives the manifest as text, and the SHA-256 of that text. Keep the hash apart from the manifest:
-// whoever can change the manifest can change a hash that sits next to it.
 func (manifest Manifest) JSON() (text, digest string, err error) {
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
@@ -127,11 +108,9 @@ func (manifest Manifest) JSON() (text, digest string, err error) {
 	return string(data), hex.EncodeToString(sum[:]), nil
 }
 
-// pattern is one place to look. A "*" stands for one name in a folder.
 type pattern struct {
 	glob string
 	kind string
-	// format is the log format, for logs.
 	format string
 }
 
@@ -162,7 +141,6 @@ type collector struct {
 	seen    map[string]bool
 }
 
-// Collect reads the artifacts under the folder. The folder is the "/" of the system that is looked at.
 func Collect(folder string, options Options) (Collection, error) {
 	if options.Location == nil || options.Year < 1970 || options.Year > 2200 {
 		return Collection{}, ErrInput
@@ -209,7 +187,6 @@ func Collect(folder string, options Options) (Collection, error) {
 	return c.result, nil
 }
 
-// expand lists the names that fit a pattern. It gives them in a fixed order.
 func (c *collector) expand(glob string) []string {
 	names := []string{""}
 	for _, part := range strings.Split(glob, "/") {
@@ -254,7 +231,6 @@ func (c *collector) skip(name, reason string) {
 	c.result.Manifest.Skipped = append(c.result.Manifest.Skipped, name+": "+reason)
 }
 
-// file reads one file of the evidence folder. A file that is not there is not an error: no system has all of them.
 func (c *collector) file(name string, found pattern) error {
 	info, err := c.root.Lstat(name)
 	if err != nil {
@@ -344,7 +320,6 @@ func (c *collector) read(reader io.Reader, info fs.FileInfo, name string, found 
 		stats.Events = len(c.result.Events) - before
 		c.result.Files = append(c.result.Files, stats)
 	}
-	// The rest of the file is read too, so that the hash is of the whole file.
 	if _, err := io.Copy(io.Discard, tee); err != nil {
 		entry.Note = "could not be read to its end"
 	}
@@ -360,7 +335,6 @@ func (c *collector) read(reader io.Reader, info fs.FileInfo, name string, found 
 	return nil
 }
 
-// snapshot reads a file with the output of ps, ss or netstat. It is given by the user and is not in the evidence folder.
 func (c *collector) snapshot(file, kind string) error {
 	name := "snapshot:" + filepath.Base(file)
 	info, err := os.Lstat(file)
@@ -376,7 +350,6 @@ func (c *collector) snapshot(file, kind string) error {
 	return c.read(opened, info, name, pattern{kind: kind})
 }
 
-// add makes one event. Every text is cleaned and cut, whatever the parser gave.
 func (c *collector) add(kind, name string, line int, when time.Time, timeSource string, fields map[string]string) {
 	made := map[string]string{
 		event.Product: "linux", event.Category: "forensics", event.Service: kind, event.Collector: Source, TimeField: timeSource,
@@ -393,7 +366,6 @@ func (c *collector) add(kind, name string, line int, when time.Time, timeSource 
 	c.result.Events = append(c.result.Events, event.Event{Time: when, Source: Source, Ref: ref, Fields: made})
 }
 
-// tidy makes one line of clean text: no control characters, valid UTF-8, not too long.
 func tidy(text string, runes int) string {
 	text = strings.TrimSpace(strings.Map(func(character rune) rune {
 		if character < 0x20 || character == 0x7f || character == '\uFFFD' {
@@ -414,7 +386,6 @@ func tidy(text string, runes int) string {
 	return text
 }
 
-// owner gives the user whose home folder holds the file: "root/..." is root, "home/aiko/..." is aiko.
 func owner(name string) string {
 	parts := strings.Split(name, "/")
 	switch {
@@ -429,11 +400,9 @@ func owner(name string) string {
 	return ""
 }
 
-// Difference is one file that is not as the manifest says.
 type Difference struct {
 	Path   string
 	Reason string
-	// NotChecked says that the file could not be compared at all, which is not the same as "changed".
 	NotChecked bool
 }
 

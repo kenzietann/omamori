@@ -35,8 +35,6 @@ type Analysis struct {
 	RecordingStatus string         `json:"recording_status"`
 }
 
-// Coverage records what was read and what the detector retained. All intake
-// events are stored, while an alert's evidence links remain bounded by the engine.
 type Coverage struct {
 	Version              int      `json:"version"`
 	Rules                int      `json:"rules"`
@@ -95,9 +93,6 @@ func Save(ctx context.Context, writer Writer, outcome detect.Outcome, analysis *
 	return writer.SaveRun(ctx, input)
 }
 
-// Build captures every parsed event, including benign events and events beyond
-// an alert's evidence cap. IDs are deterministic within the run. Alert IDs match
-// the severity ordering used by reports and the AI snapshot.
 func Build(outcome detect.Outcome, analysis *Analysis) (store.RunInput, error) {
 	if outcome.Made.IsZero() || outcome.Rules < 0 {
 		return store.RunInput{}, ErrOutcome
@@ -165,8 +160,6 @@ func Build(outcome detect.Outcome, analysis *Analysis) (store.RunInput, error) {
 		}
 		payload := alertPayload{RuleID: builder.text(alert.Rule.ID, maxTextRunes), Description: builder.text(alert.Rule.Description, maxTextRunes),
 			Tags: builder.texts(alert.Rule.Tags, maxTextRunes), Values: builder.texts(alert.Values, maxTextRunes), AnalystEvidence: map[string]string{}}
-		// Use the core's selection rather than reproducing its sampling formula. These run-scoped
-		// links let a dashboard open the full stored event behind an opaque AI citation.
 		sampled, err := occurrenceLinks(analyst.SampleEvidence(alert.Events), identities)
 		if err != nil {
 			return store.RunInput{}, err
@@ -184,8 +177,6 @@ func Build(outcome detect.Outcome, analysis *Analysis) (store.RunInput, error) {
 			}
 			payload.Steps = append(payload.Steps, Step{Rule: builder.text(part.Rule.Name, maxTextRunes), Title: builder.text(part.Rule.Title, maxTextRunes),
 				Count: part.Count, First: part.First.UTC(), Last: part.Last.UTC(), EventIDs: partLinks})
-			// The combined alert can sample fewer events than its parts retain. A case timeline
-			// should include every retained step event, not only the combined report's sample.
 			links = unionLinks(links, partLinks)
 		}
 		payload.EvidenceOmitted = max(0, alert.Count-max(len(alert.Events), len(links)))
@@ -240,8 +231,6 @@ func evidenceLinks(events []event.Event, identities map[[32]byte][]string) ([]st
 	return unionLinks([]string{}, links), err
 }
 
-// occurrenceLinks retains one result per citation. Repeated citations can resolve
-// to the same event; deduplication belongs to the alert's relation table, not its citation map.
 func occurrenceLinks(events []event.Event, identities map[[32]byte][]string) ([]string, error) {
 	links := []string{}
 	used := map[[32]byte]int{}
@@ -253,8 +242,6 @@ func occurrenceLinks(events []event.Event, identities map[[32]byte][]string) ([]
 		}
 		position := used[key]
 		if position >= len(candidates) {
-			// Different correlation steps can retain the same underlying event. Keep one link,
-			// not a fabricated extra event. Truly repeated input records retain separate IDs.
 			position = 0
 		}
 		used[key]++

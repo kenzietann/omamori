@@ -85,7 +85,6 @@ func (b backend) prepareHome(setup tui.Setup) (tui.Plan, error) {
 			"Runs with an AI provider are started in the dashboard, and each one asks you there before anything is sent."
 		plan := localHomePlan("Dashboard", summary, func(ctx context.Context) (tui.Result, error) { return tui.Result{}, nil })
 		run := plan.Run
-		// The step function is needed to show the link while the server runs, so the run is wrapped.
 		plan.Run = func(ctx context.Context, step func(string)) (tui.Result, error) {
 			if _, err := run(ctx, nil); err != nil {
 				return tui.Result{}, err

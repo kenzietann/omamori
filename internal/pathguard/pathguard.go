@@ -121,7 +121,6 @@ func resolveLoosely(path string) (string, error) {
 	}
 }
 
-// isInside compares path parts, not text, so /a/project-reports is not inside /a/project.
 func isInside(parent, child string) bool {
 	relative, err := filepath.Rel(parent, child)
 	if err != nil {

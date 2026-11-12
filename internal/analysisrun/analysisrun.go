@@ -1,5 +1,3 @@
-// Package analysisrun runs a checked AI review of detected alerts. It has no terminal or web
-// dependencies: the CLI and a future local dashboard share this lifecycle and result envelope.
 package analysisrun
 
 import (
@@ -47,35 +45,24 @@ const (
 type Config struct {
 	Provider taskrun.Config
 	Sources  []string
-	// Store is optional. Both the CLI and local dashboard can persist the same frozen run.
 	Store runstore.Writer
-	// Base is optional. It is for a run that is more than detection in logs, such as the forensic triage.
 	Base Base
 }
 
-// Base replaces the plain detection report of a run and adds files to its output folder.
-// It is frozen at preparation like everything else.
 type Base struct {
-	// Report is the Markdown report of the run. Empty means the detection report.
 	Report string
-	// Files are written next to the reports, for example the evidence manifest. Names of the files that
-	// every analysis writes are refused.
 	Files map[string]string
-	// Prefix is the first part of the name of the output folder. Empty means "analyze".
 	Prefix string
 }
 
 var reservedFiles = []string{"report.md", "report.html", "alerts.json", "analysis.json", "events.jsonl", "recording.json"}
 
-// Progress is safe to show in a terminal, local dashboard, or event stream. Message is fixed text.
 type Progress struct {
 	Stage   string `json:"stage"`
 	Message string `json:"message"`
 	Attempt int    `json:"attempt,omitempty"`
 }
 
-// Result is the persisted dashboard-facing envelope. Analysis contains only checked claims;
-// transport failures and incomplete review stay visible independently of claim validity.
 type Result struct {
 	Version         int            `json:"version"`
 	Analysis        analyst.Result `json:"analysis"`
@@ -90,7 +77,6 @@ type Result struct {
 	RunID           string         `json:"run_id,omitempty"`
 }
 
-// Session freezes the evidence and request at preparation. It can run once.
 type Session struct {
 	mutex       sync.Mutex
 	confirmed   bool
@@ -176,7 +162,6 @@ func Prepare(ctx context.Context, config Config, outcome detect.Outcome, setup t
 
 	var provider outbound.Provider
 	if setup.Recording != nil {
-		// Freeze the full nested recording: a dashboard may retain and edit its setup DTO.
 		encoded, err := setup.Recording.JSON()
 		if err != nil {
 			return nil, ErrRecording
@@ -216,7 +201,6 @@ func Prepare(ctx context.Context, config Config, outcome detect.Outcome, setup t
 	return session, nil
 }
 
-// Preview is exactly the cleaned request that will be sent. It creates no output or network traffic.
 func (session *Session) Preview() (outbound.Request, error) {
 	if session.noAlerts {
 		return outbound.Request{System: "No alerts were detected. No AI request will be sent."}, nil
@@ -329,7 +313,6 @@ func (session *Session) review(ctx context.Context, log *eventlog.Log, progress 
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		// Metadata only: neither raw model text nor the evidence is copied into the event log.
 		return log.Record("provider_request", "", true, "prepared", fmt.Sprintf("attempt %d; %d messages; %d tools", attempt, len(request.Messages), len(request.Tools)))
 	})
 	response, err := session.sender.Send(ctx, session.request)

@@ -1,4 +1,3 @@
-// Package dashboard provides a loopback-only HTTP adapter over Omamori's shared services.
 package dashboard
 
 import (

@@ -22,7 +22,6 @@ type rule struct {
 	anchored bool
 }
 
-// Rules are the rules of one .gitignore file.
 type Rules struct {
 	rules []rule
 }
@@ -64,7 +63,6 @@ func parseLine(line string) (rule, bool) {
 		return rule{}, false
 	}
 
-	// A slash at the start or in the middle ties the rule to the folder of the .gitignore file.
 	current.anchored = strings.Contains(line, "/")
 	line = strings.TrimPrefix(line, "/")
 
@@ -77,7 +75,6 @@ func parseLine(line string) (rule, bool) {
 	return current, true
 }
 
-// trimTrailingSpaces removes spaces at the end, except a space that has a backslash before it.
 func trimTrailingSpaces(line string) string {
 	end := len(line)
 	for end > 0 && line[end-1] == ' ' {
@@ -169,7 +166,6 @@ func classOf(inside []rune) string {
 	return out.String()
 }
 
-// match says what the last matching rule of this file decides for one path, relative to the file's folder.
 func (parsed Rules) match(path string, isDir bool) (ignored, matched bool) {
 	name := path[strings.LastIndex(path, "/")+1:]
 	for index := len(parsed.rules) - 1; index >= 0; index-- {
@@ -189,15 +185,11 @@ func (parsed Rules) match(path string, isDir bool) (ignored, matched bool) {
 	return false, false
 }
 
-// Layer is the rules of the .gitignore file in one folder. Dir is that folder, relative to the project,
-// and it is empty for the project folder itself.
 type Layer struct {
 	Dir   string
 	Rules Rules
 }
 
-// Ignored says whether git would ignore a file. The layers go from the project folder to the deepest one,
-// and a deeper file wins over a shallower one. A file in an ignored folder is ignored, whatever the rules say.
 func Ignored(layers []Layer, path string) bool {
 	path = strings.Trim(path, "/")
 	if path == "" {
@@ -231,7 +223,6 @@ func Ignored(layers []Layer, path string) bool {
 	return false
 }
 
-// within gives the path relative to a folder, and false when the path is not inside that folder.
 func within(dir, path string) (string, bool) {
 	if dir == "" {
 		return path, true

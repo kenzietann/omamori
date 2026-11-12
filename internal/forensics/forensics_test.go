@@ -21,7 +21,6 @@ import (
 
 var changed = time.Date(2026, 11, 10, 2, 16, 0, 0, tokyo)
 
-// parseArtifact runs one parser over text, as Collect does after it has read and hashed a file.
 func parseArtifact(kind, name, text string) ([]event.Event, intake.Stats) {
 	c := &collector{}
 	stats := intake.Stats{File: name}
@@ -54,7 +53,6 @@ func TestCronFiles(t *testing.T) {
 		t.Errorf("ref %s, time %v, source %s", events[0].Ref, events[0].Time, events[0].Source)
 	}
 
-	// In the crontab of a user there is no user column: the name of the file is the user, and the first word is the program.
 	events, _ = parseArtifact(KindCron, "var/spool/cron/crontabs/aiko", "*/15 * * * * root-backup.sh --all\n")
 	wantFields(t, events[0], map[string]string{"user": "aiko", "command": "root-backup.sh --all"})
 }
@@ -68,7 +66,6 @@ func TestShellHistory(t *testing.T) {
 	wantFields(t, events[0], map[string]string{"command": "ls", "user": "aiko", TimeField: TimeFileChange, "action": "history_command"})
 	wantFields(t, events[1], map[string]string{"command": "whoami", TimeField: TimeRecorded})
 	wantFields(t, events[2], map[string]string{"command": "id", TimeField: TimeRecorded})
-	// A time belongs to the one command after it. The next command has no time of its own.
 	wantFields(t, events[3], map[string]string{"command": "uname -a", TimeField: TimeFileChange})
 	if !events[1].Time.Equal(time.Unix(1794244350, 0)) || !events[2].Time.Equal(time.Unix(1794244370, 0)) || !events[3].Time.Equal(changed) {
 		t.Errorf("times are %v, %v, %v", events[1].Time, events[2].Time, events[3].Time)
@@ -102,7 +99,6 @@ func TestAuthorizedKeys(t *testing.T) {
 	blob := strings.Fields(real)[1]
 	file := "# comment\n" + real + "\n" +
 		`command="/usr/bin/rrsync -ro /srv",no-pty ` + real + "\n" +
-		// The type is also written inside the option. The key after the real type is the key.
 		`command="echo ssh-ed25519 AAAAnotakey" ` + real + "\n" +
 		"ssh-ed25519 !!!notbase64 x\nssh-rsa " + blob + " type and key do not agree\njust text\n"
 	events, stats := parseArtifact(KindKeys, "root/.ssh/authorized_keys", file)
@@ -116,7 +112,6 @@ func TestAuthorizedKeys(t *testing.T) {
 	if !strings.HasPrefix(fingerprint, "SHA256:") || len(fingerprint) != 50 || events[1].Fields["fingerprint"] != fingerprint {
 		t.Errorf("fingerprint is %q", fingerprint)
 	}
-	// The key itself is not kept in any field.
 	for _, made := range events {
 		for name, value := range made.Fields {
 			if strings.Contains(value, blob) {
@@ -206,8 +201,6 @@ func snapshot(t *testing.T, folder string) map[string]string {
 	return state
 }
 
-// The first rule of forensics: the evidence is the same after the triage as before. Content, names, modes and
-// times of change are compared for every file and folder.
 func TestTheEvidenceFolderIsNotChanged(t *testing.T) {
 	folder := filepath.Join(t.TempDir(), "evidence")
 	if err := scenario.WriteHost(folder, scenario.GenerateHost(3, day(), true)); err != nil {
@@ -287,7 +280,6 @@ func TestManifestHashesEveryFileThatWasRead(t *testing.T) {
 		t.Error("the manifest holds the full path of the evidence folder")
 	}
 
-	// The same evidence gives the same manifest, byte for byte.
 	again, err := Collect(filepath.Join(folder, "root"), Options{Year: 2026, Location: tokyo, Processes: filepath.Join(folder, "snapshots/ps.txt"), Sockets: filepath.Join(folder, "snapshots/ss.txt")})
 	if err != nil {
 		t.Fatal(err)
@@ -315,7 +307,6 @@ func TestVerifyFindsEveryKindOfChange(t *testing.T) {
 		t.Fatalf("the two snapshot files must be named as not checked: %+v", differences)
 	}
 
-	// One byte changed with the same size and the same time, one file removed, one file replaced by a link.
 	history := filepath.Join(root, "root/.bash_history")
 	info, _ := os.Stat(history)
 	data, _ := os.ReadFile(history)
@@ -394,11 +385,11 @@ func TestLinksAndOddFilesAreNotFollowed(t *testing.T) {
 	os.WriteFile(filepath.Join(outside, "authorized_keys"), []byte("canary-outside-key\n"), 0o600)
 	os.WriteFile(filepath.Join(root, "etc/crontab"), []byte("* * * * * root /bin/true\n"), 0o600)
 	links := map[string]string{
-		"etc/passwd":                  filepath.Join(outside, "passwd"),      // absolute, out of the folder
-		"home/a/.ssh/authorized_keys": "../../../../outside/authorized_keys", // relative, out of the folder
-		"etc/cron.d/inside":           "../crontab",                          // inside the folder: still not followed
+		"etc/passwd":                  filepath.Join(outside, "passwd"),
+		"home/a/.ssh/authorized_keys": "../../../../outside/authorized_keys",
+		"etc/cron.d/inside":           "../crontab",
 		"home/b/.bash_history":        "/dev/null",
-		"home/c":                      outside, // a folder that is a link out of the evidence
+		"home/c":                      outside,
 	}
 	for name, target := range links {
 		if err := os.Symlink(target, filepath.Join(root, name)); err != nil {
@@ -444,7 +435,6 @@ func TestLinksAndOddFilesAreNotFollowed(t *testing.T) {
 	if strings.Contains(text, "canary-outside") {
 		t.Fatal("a file outside the evidence folder was read")
 	}
-	// The link of a history to /dev/null is itself a finding.
 	found := false
 	for _, made := range collected.Events {
 		if made.Fields[event.Action] == "history_link" && made.Fields["target"] == "/dev/null" && made.Fields[event.User] == "b" {
@@ -482,8 +472,6 @@ func TestPasswordHashesAndPrivateKeysAreNeverRead(t *testing.T) {
 			t.Errorf("%s has the secret from the history", name)
 		}
 	}
-	// The report names /etc/shadow in its limits, and a scanned URL can hold ".aws". The manifest is the list of
-	// what was opened, so the names are looked for there.
 	for _, name := range []string{"shadow", "id_ed25519", ".aws"} {
 		if strings.Contains(result.ManifestText, name) {
 			t.Errorf("the manifest lists %q", name)
@@ -515,7 +503,6 @@ func TestReportOfTheHostScenario(t *testing.T) {
 	if strings.Contains(report, "## Timeline\n") {
 		t.Error("the report has two timelines")
 	}
-	// The timeline is in the order of time: the guessing, the login, then what was done on the system.
 	timeline := report[strings.Index(report, "## Attack timeline"):]
 	order := []string{"SSH password guessing from one address", "SSH login succeeded after password guessing", "Shell history adds a key", "Shell history was turned off"}
 	last := -1
@@ -571,7 +558,6 @@ func TestCollectRefusals(t *testing.T) {
 			t.Errorf("the snapshot %s gave %v", snapshot, err)
 		}
 	}
-	// An empty folder is not an error of the collection. It has nothing, and it says so.
 	empty, err := Collect(folder, good)
 	if err != nil || len(empty.Manifest.Entries) != 0 || len(empty.Events) != 0 {
 		t.Errorf("an empty folder gave %d entries, %v", len(empty.Manifest.Entries), err)

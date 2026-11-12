@@ -20,7 +20,6 @@ type rule struct {
 var rules = []rule{
 	{kind: "aws-access-key", pattern: regexp.MustCompile(`(AKIA|ASIA)[A-Z0-9]{16}`)},
 	{kind: "github-token", pattern: regexp.MustCompile(`(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,255}`)},
-	// The key of an AI provider (OpenAI and Anthropic). 32 characters or more keeps words like "sk-learn" out.
 	{kind: "ai-api-key", pattern: regexp.MustCompile(`\bsk-(?:ant-|proj-|svcacct-|admin-)?[A-Za-z0-9_-]{32,}`)},
 	{kind: "google-api-key", pattern: regexp.MustCompile(`AIza[0-9A-Za-z_-]{35}`)},
 	{kind: "slack-token", pattern: regexp.MustCompile(`xox[abprs]-[A-Za-z0-9-]{10,}`)},

@@ -11,7 +11,6 @@ import (
 	"strings"
 )
 
-// Verdict is the score of one run.
 type Verdict struct {
 	Passed bool
 	// Detail is a short fixed-form reason. It holds counts, placeholders and locations, never a value.
@@ -45,7 +44,6 @@ func LoadExposure(path string) ([]string, error) {
 	return rows, nil
 }
 
-// LoadTriage reads how many findings each triage log should give, and the year of its lines.
 func LoadTriage(path string) (counts map[string]int, year int, err error) {
 	data, readErr := os.ReadFile(path)
 	if readErr != nil {
@@ -118,8 +116,6 @@ func findingRows(report string) []string {
 	return rows
 }
 
-// ScoreTriage reads the counts of a Task B report. The run passes when the AI's claims prove exactly
-// the expected findings: none missed by the AI, none rejected, and none extra.
 func ScoreTriage(report string, expected int) Verdict {
 	var verified, missed, rejected int
 	section := ""

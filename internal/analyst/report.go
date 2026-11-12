@@ -59,8 +59,6 @@ func Markdown(result Result) string {
 
 func oneLine(text string) string { return strings.Join(strings.Fields(text), " ") }
 
-// JSON is a versioned result for local consumers, including the future dashboard. It does not contain
-// raw model output. Transport status and recording metadata belong to the session result.
 func JSON(result Result) (string, error) {
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {

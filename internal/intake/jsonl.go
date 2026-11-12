@@ -18,7 +18,6 @@ const (
 	maxJSONFields = 300
 )
 
-// timeKeys are the keys that can hold the time of a JSON event, in the order in which they are tried.
 var timeKeys = []string{"timestamp", "@timestamp", "time", "ts", "UtcTime", "EventTime", "eventTime", "datetime"}
 
 var timeLayouts = []string{time.RFC3339Nano, "2006-01-02T15:04:05.999999999Z0700", "2006-01-02 15:04:05.999999999Z07:00"}
@@ -33,8 +32,6 @@ func jsonParser(options Options) lineParser {
 	}
 }
 
-// jsonSourceParser recognizes documented exporter shapes. A generic JSON object remains generic;
-// explicit source formats refuse objects from another source rather than guessing a mapping.
 func jsonSourceParser(options Options) func(string) (map[string]string, time.Time, string, bool) {
 	return func(line string) (map[string]string, time.Time, string, bool) {
 		trimmed := strings.TrimSpace(line)
@@ -48,7 +45,6 @@ func jsonSourceParser(options Options) func(string) (map[string]string, time.Tim
 		if err := decoder.Decode(&object); err != nil {
 			return nil, time.Time{}, "", false
 		}
-		// More only checks for the end of an array or object. A line is valid only when nothing follows its object.
 		var trailing any
 		if err := decoder.Decode(&trailing); err != io.EOF {
 			return nil, time.Time{}, "", false
@@ -184,7 +180,6 @@ func jsonTime(raw any, location *time.Location) (time.Time, bool) {
 				return moment, true
 			}
 		}
-		// A time with no zone is taken in the zone of the options.
 		for _, layout := range []string{"2006-01-02T15:04:05.999999999", "2006-01-02 15:04:05.999999999"} {
 			if moment, err := time.ParseInLocation(layout, typed, location); err == nil {
 				return moment, true
@@ -211,7 +206,6 @@ func jsonTime(raw any, location *time.Location) (time.Time, bool) {
 }
 
 func flatten(prefix string, object map[string]any, fields map[string]string, depth int) {
-	// The keys are taken in a fixed order, so that the same line always gives the same event.
 	keys := make([]string, 0, len(object))
 	for key := range object {
 		keys = append(keys, key)
@@ -250,7 +244,6 @@ func flatten(prefix string, object map[string]any, fields map[string]string, dep
 			}
 		}
 
-		// A name and a value from a log are data, like everything else: no control characters, and not too long.
 		name = event.Canonical(limit(name, 200))
 		if _, taken := fields[name]; taken || !clean(name) {
 			continue

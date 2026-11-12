@@ -54,7 +54,6 @@ type Event struct {
 }
 
 type Parsed struct {
-	// Events are sorted by time. Events with the same time keep the order of the lines.
 	Events []Event
 	Lines  int
 	// Ignored are lines that are fine but are not a failed or accepted password: other messages and blank lines.
@@ -118,7 +117,6 @@ func Parse(reader io.Reader, year int, location *time.Location) (Parsed, error) 
 	return parsed, nil
 }
 
-// readLine reads one line. A line longer than the limit is read to its end and reported as too long.
 func readLine(reader *bufio.Reader) (line string, tooLong bool, err error) {
 	var collected []byte
 	for {
@@ -160,7 +158,6 @@ func parseLine(line string, tooLong bool, number, year int, location *time.Locat
 	month, known := months[parts[1]]
 	day, hour, minute, second := atoi(parts[2]), atoi(parts[3]), atoi(parts[4]), atoi(parts[5])
 	moment := time.Date(year, month, day, hour, minute, second, 0, location)
-	// time.Date moves a date that does not exist (February 30) to another day. That is not a reading of the line.
 	if !known || hour > 23 || minute > 59 || second > 59 || moment.Day() != day || moment.Month() != month {
 		return Event{}, readMalformed
 	}

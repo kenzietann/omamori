@@ -31,7 +31,6 @@ func parseWebLine(line string) (map[string]string, time.Time, bool) {
 		event.Category: "webserver", event.SourceIP: ip, event.Status: parts[5],
 		event.Message: limit(parts[4], maxValueRunes),
 	}
-	// A request that is not "METHOD address PROTOCOL" (a TLS hello on a plain port, for example) keeps its text as the address.
 	if request := strings.Split(parts[4], " "); len(request) == 3 && strings.HasPrefix(request[2], "HTTP/") {
 		fields[event.Method], fields[event.URL] = limit(request[0], maxNameRunes), limit(request[1], maxValueRunes)
 	} else {

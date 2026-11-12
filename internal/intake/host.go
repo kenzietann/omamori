@@ -9,9 +9,6 @@ import (
 	"github.com/kenzietann/omamori/internal/event"
 )
 
-// normalizeHostJSON recognizes exporter schemas, not arbitrary objects with an EventID.
-// Original fields are retained by the caller under raw.*. Named event payloads are the only
-// source for behavior fields; localized messages, rule descriptions and audit keywords are not parsed.
 func normalizeHostJSON(object map[string]any, fields map[string]string) (jsonMapping, bool) {
 	if wazuhAlert(object) {
 		clearHostFields(fields)
@@ -58,8 +55,6 @@ func normalizeHostJSON(object map[string]any, fields map[string]string) (jsonMap
 		}
 	}
 
-	// NXLog im_msvistalog calls the provider SourceName and puts named event data at the top level.
-	// EventData containing XML is deliberately not decoded here.
 	shape := windowsRecord{
 		provider: hostJSONText(object, "SourceName"), channel: hostJSONText(object, "Channel"),
 		id: jsonValue(object, "EventID"), host: jsonValue(object, "Hostname"),
@@ -94,8 +89,6 @@ func putHostText(fields map[string]string, name string, value any) {
 	if text, ok := value.(string); ok {
 		switch name {
 		case event.User, event.Host, "target_user", "user_domain":
-			// Repairing an identity could make two different accounts or hosts equal.
-			// Keep malformed identity text only in raw evidence, not in correlation keys.
 			if strings.IndexFunc(text, unicode.IsControl) >= 0 || utf8.RuneCountInString(text) > maxValueRunes {
 				return
 			}

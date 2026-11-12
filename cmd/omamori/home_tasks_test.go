@@ -92,12 +92,9 @@ func TestHomeDashboardServesUntilCancelled(t *testing.T) {
 	if !plan.Local || !strings.Contains(plan.Summary, "127.0.0.1") || !strings.Contains(plan.Summary, filepath.Join(home, "omamori-data", "omamori.db")) {
 		t.Fatalf("the plan does not say what will be started: %q", plan.Summary)
 	}
-	// Preparing starts nothing and makes no database.
 	if _, err := os.Stat(filepath.Join(home, "omamori-data")); !os.IsNotExist(err) {
 		t.Fatal("preparing the dashboard made the database folder")
 	}
-	// With a deadline: if the check for the confirmation is ever lost, the server would start and this call
-	// would wait forever. The deadline turns that into a failure in a few seconds.
 	unconfirmed, stop := context.WithTimeout(context.Background(), 5*time.Second)
 	_, err = plan.Run(unconfirmed, func(string) { t.Error("the dashboard started without a confirmation") })
 	stop()

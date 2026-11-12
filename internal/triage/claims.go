@@ -27,7 +27,6 @@ const (
 	maxClaimText   = 200
 )
 
-// Claim is what the AI says. Nothing in it is trusted until Check has compared it with the log.
 type Claim struct {
 	Scenario    string   `json:"scenario"`
 	IP          string   `json:"ip"`
@@ -77,11 +76,9 @@ func ExtractClaims(text string) (claims []Claim, rest string, err error) {
 type Verdict struct {
 	Verified bool
 	Reasons  []string
-	// Finding is what the log proves. It is only set when Verified is true.
 	Finding Finding
 }
 
-// Checker compares claims with the parsed log.
 type Checker struct {
 	byLine map[int]authlog.Event
 	config Config
@@ -100,7 +97,6 @@ func normalize(stamp string) string {
 	return strings.Join(strings.Fields(stamp), " ")
 }
 
-// Check recomputes a claim from the log. A claim that fails any rule is rejected, with the reasons.
 func (checker *Checker) Check(claim Claim) Verdict {
 	var reasons []string
 	reject := func(reason string) { reasons = append(reasons, reason) }
@@ -217,7 +213,6 @@ func unique(reasons []string) []string {
 	return slices.Compact(reasons)
 }
 
-// Describe is a short text for a finding, for the report. It holds addresses, names and counts, no log line.
 func (finding Finding) Describe() string {
 	if finding.Scenario == GuessingThenSuccess {
 		return fmt.Sprintf("%d failed passwords, then success on line %d", finding.Count, finding.SuccessLine)

@@ -86,7 +86,6 @@ func runInjection(t *testing.T, answers []reply) *injectionRun {
 	run.setup.output = filepath.Join(t.TempDir(), "out")
 	run.setup.config.OutputBase = run.setup.output
 
-	// Any network use, other than the provider (which here is a fake), is an error.
 	run.transport = &refusingTransport{}
 	previousTransport, previousClient := http.DefaultTransport, http.DefaultClient
 	http.DefaultTransport = run.transport

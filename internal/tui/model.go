@@ -18,7 +18,6 @@ const (
 	runScreen
 )
 
-// The home screen has steps. They are dialogs of the home screen, so the program still has three screens.
 type homeStep int
 
 const (
@@ -31,8 +30,6 @@ const (
 	stepSettings
 )
 
-// menuItem is one line of the home screen. A task with ai false runs on this computer only, so it needs
-// no provider, no model and no key, and it goes straight to the page that asks for a confirmation.
 type menuItem struct {
 	label string
 	note  string
@@ -49,8 +46,6 @@ const (
 	menuLeave
 )
 
-// menuItems is the home screen: every feature of the program, in the order of a typical piece of work.
-// A feature that is not here can only be reached from the command line.
 var menuItems = []menuItem{
 	{label: "Task A: Exposure check", note: "secrets and personal data in a project, with AI", task: "", ai: true},
 	{label: "Task B: Log triage", note: "sshd auth.log, with AI", task: TaskTriage, ai: true},
@@ -99,7 +94,6 @@ type Choice struct {
 	Name     string
 	Local    bool
 	KeyFound bool
-	// KeySaved is true when a key of this provider is kept between runs.
 	KeySaved     bool
 	KeyEnv       string
 	DefaultModel string
@@ -110,29 +104,23 @@ func (choice Choice) HasKey() bool {
 	return choice.Local || choice.KeyFound || choice.KeySaved
 }
 
-// ErrKeyRejected is what a backend returns when the provider says the key is wrong.
 var ErrKeyRejected = errors.New("the provider rejected the key")
 
 type Setup struct {
-	// Task is empty for the exposure check, and TaskTriage for the log triage.
-	// It can also be one of the other Task names.
 	Task string
 	// Replay makes the run a replay of the recording that the backend holds. No provider, model or key is needed.
 	Replay     bool
 	ProviderID string
 	Model      string
 	Key        string
-	// Reasoning is empty for the provider's default.
 	Reasoning string
 }
 
-// ReasoningChoice is one level of reasoning. The first choice of a list is the default, with an empty Value.
 type ReasoningChoice struct {
 	Value string
 	Label string
 }
 
-// Names of the tasks in Setup. The empty name is the exposure check.
 const (
 	TaskTriage           = "triage"
 	TaskDetect           = "detect"
@@ -144,14 +132,11 @@ const (
 	TaskDashboard        = "dashboard"
 )
 
-// A Plan is what the user is asked to confirm. Nothing has been sent when a Plan exists.
 type Plan struct {
 	ConsentText string
-	// Title names the task, for example "Task A: Exposure check". Empty means the exposure check.
 	Title string
 	// Label is shown next to the title when the run is a replay, for example "REPLAY".
 	Label string
-	// Summary is the short form of Preview. It is shown first when it is there.
 	Summary string
 	Preview string
 	// MaxRequests and MaxTokens are the limits of the run. The progress bar shows how much of them is used.
@@ -169,12 +154,9 @@ type Plan struct {
 type Backend interface {
 	Providers() []Choice
 	Models(ctx context.Context, providerID, key string) ([]string, error)
-	// ReasoningChoices is empty when the model has no documented choice. Then the step is skipped.
 	ReasoningChoices(providerID, model string) []ReasoningChoice
 	Prepare(setup Setup) (Plan, error)
-	// TaskReady says whether a task has what it needs, for example the log of the triage. The error is shown to the user.
 	TaskReady(task string) error
-	// KeysCanBeSaved says whether a key can be kept between runs on this system.
 	KeysCanBeSaved() bool
 	SaveKey(ctx context.Context, providerID, key string) error
 	ForgetKey(providerID string) error
@@ -185,7 +167,6 @@ type Backend interface {
 type Defaults struct {
 	ProviderID string
 	Model      string
-	// Reasoning is empty for the provider's default.
 	Reasoning string
 }
 
@@ -249,8 +230,6 @@ type Model struct {
 	version        string
 	quitting       bool
 	frame          int
-	// leaveFullScreen and enterFullScreen ask Update to switch the terminal between the full-screen
-	// pages and the normal terminal, where a run prints its steps and its report.
 	leaveFullScreen bool
 	enterFullScreen bool
 	pending         Defaults
@@ -269,25 +248,20 @@ type Model struct {
 	height          int
 }
 
-// New makes the screen. It prints into the terminal like a normal program, and keeps only a small live
-// area at the bottom, so that the scrollback, the wheel and the selection of the terminal all work.
 func New(target string, backend Backend, defaults Defaults) Model {
 	return Model{target: target, backend: backend, defaults: defaults}
 }
 
-// WithVersion sets the version that the banner shows.
 func (model Model) WithVersion(version string) Model {
 	model.version = version
 
 	return model
 }
 
-// WithTaskA opens the screen at the setup of Task A, as if the user had chosen it in the menu.
 func (model Model) WithTaskA() Model {
 	return model.startTask("")
 }
 
-// WithTask opens the screen at the setup of a task: "" for Task A, or TaskTriage for Task B.
 func (model Model) WithTask(task string) Model {
 	return model.startTask(task)
 }
@@ -317,8 +291,6 @@ func (model Model) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles a message. Text that the model wants to show above the live area is collected
-// in the outbox, and is printed here, so that it stays in the scrollback of the terminal.
 func (model Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	updated, command := model.update(message)
 
@@ -394,7 +366,6 @@ func (model Model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
-// Printed is everything that was printed above the live area, and what waits to be printed.
 func (model Model) Printed() string {
 	return strings.Join(append(slices.Clone(model.transcript), model.outbox...), "\n")
 }
@@ -406,8 +377,6 @@ func (model Model) say(text string) Model {
 	return model
 }
 
-// resultsText is what the user reads when a run ends: the state, the saved folder, and the report.
-// sayRunStart is the first text of a run, printed in the normal terminal: what was confirmed.
 func (model Model) sayRunStart(plan *Plan) Model {
 	text := plan.Summary
 	if text == "" {
@@ -432,7 +401,6 @@ func (model Model) sayRunStart(plan *Plan) Model {
 	return model.say(strings.Join(lines, "\n"))
 }
 
-// titleText is the name of the task, for example "Task A: Exposure check".
 func (model Model) titleText() string {
 	if model.title == "" {
 		return "Task A: Exposure check"
@@ -441,14 +409,12 @@ func (model Model) titleText() string {
 	return safeText(model.title)
 }
 
-// shortTitle is the part before the colon, for example "Task A".
 func (model Model) shortTitle() string {
 	short, _, _ := strings.Cut(model.titleText(), ":")
 
 	return short
 }
 
-// runningTitle is the name of the task for the status line, for example "Task A, exposure check".
 func (model Model) runningTitle() string {
 	short, rest, found := strings.Cut(model.titleText(), ": ")
 	if !found {
@@ -498,7 +464,6 @@ func (model Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return model, tea.Quit
 	}
 
-	// While text is typed, q is a letter. Only ctrl+c quits.
 	if model.screen == homeScreen && (model.step == stepKey || model.step == stepModel && model.modelTyping) {
 		return model.handleEntryKey(message)
 	}
@@ -569,8 +534,6 @@ func (model Model) handleHomeKey(key string) (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
-// startLocal prepares a task that needs no AI provider. The backend looks at the folder and says what the
-// run will do. Nothing is done until the user has read that and agreed, as for every other task.
 func (model Model) startLocal(task string) Model {
 	model.settingsMode = false
 	model.task = task
@@ -585,7 +548,6 @@ func (model Model) startLocal(task string) Model {
 		model.notice = err.Error()
 		return model
 	}
-	// Whatever the backend says, a task from this path is shown as local. It was given no provider.
 	plan.Local = true
 	model.plan = &plan
 	model.consentFull = false
@@ -661,7 +623,6 @@ func (model Model) startTask(task string) Model {
 	return started
 }
 
-// savedProviderIndex is the place of the provider in the settings, or -1.
 func (model Model) savedProviderIndex() int {
 	if model.defaults.ProviderID == "" {
 		return -1
@@ -670,7 +631,6 @@ func (model Model) savedProviderIndex() int {
 	return slices.IndexFunc(model.choices, func(choice Choice) bool { return choice.ID == model.defaults.ProviderID })
 }
 
-// preselected is the provider named in the settings, or else the first one whose key is already set.
 func (model Model) preselected() int {
 	for index, choice := range model.choices {
 		if model.defaults.ProviderID != "" && choice.ID == model.defaults.ProviderID {
@@ -711,7 +671,6 @@ func (model Model) handleProviderKey(key string) (Model, tea.Cmd) {
 	return model, nil
 }
 
-// initialModel is the model from the settings for this provider, or else the provider's default.
 func (model Model) initialModel() string {
 	chosen := model.choices[model.providerCursor]
 	initial := chosen.DefaultModel
@@ -746,7 +705,6 @@ func (model Model) loadModels() (Model, tea.Cmd) {
 		defer cancel()
 		models, err := backend.Models(ctx, chosen.ID, key)
 
-		// A typed key is kept for the next runs only after the provider has accepted it.
 		saved := keyNotSaved
 		if err == nil && len(models) > 0 && key != "" && backend.KeysCanBeSaved() {
 			saved = keySaved
@@ -803,7 +761,6 @@ func (model Model) receiveModels(message modelsMsg) Model {
 	return model
 }
 
-// moveUp and moveDown go around the end of a list, so that a long list can be crossed fast.
 func moveUp(cursor, length int) int {
 	if cursor <= 0 {
 		return max(length-1, 0)
@@ -830,7 +787,6 @@ func moveUpInModels(cursor, models int) int {
 	return max(models-1, 0)
 }
 
-// A list has one more line than the models: the way to type a name.
 func (model Model) handleModelListKey(key string) (Model, tea.Cmd) {
 	if key == "esc" {
 		return model.goBack(), nil
@@ -912,7 +868,6 @@ func (model *Model) editInput(change func([]rune) []rune) {
 	model.setupError = ""
 }
 
-// goBack leaves the key behind. From a typed model name it goes to the list when there is one.
 func (model Model) goBack() Model {
 	model.setupError = ""
 	model.keyNotice = ""
@@ -1034,7 +989,6 @@ func (model Model) handleReasoningKey(key string) (Model, tea.Cmd) {
 	return model, nil
 }
 
-// prepare asks the backend for the plan. The key is passed on and wiped from this model once the plan exists.
 func (model Model) prepare() Model {
 	chosen := model.choices[model.providerCursor]
 
@@ -1092,7 +1046,6 @@ func (model Model) handleConsentKey(key string) (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
-// confirm is the only way to start a run: the user has read the dry run and agreed.
 func (model Model) confirm() (tea.Model, tea.Cmd) {
 	plan := model.plan
 	if plan == nil || plan.Confirm == nil || plan.Run == nil {
@@ -1106,7 +1059,6 @@ func (model Model) confirm() (tea.Model, tea.Cmd) {
 	model.step = stepMenu
 	plan.Confirm()
 
-	// The choices of a confirmed run are kept, so the next run needs no setup. A failure to save is not worth a stop.
 	if model.hasPending && model.pending != model.defaults && model.backend.SaveSettings(model.pending) == nil {
 		model.defaults = model.pending
 	}
@@ -1120,8 +1072,6 @@ func (model *Model) stopRun() {
 	}
 }
 
-// startRun starts the work. The steps and the end of the run go through one channel, so that the
-// reader sees them in the order in which they happened, and no step is printed after the results.
 func (model Model) startRun(runner Runner) (tea.Model, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	messages := make(chan tea.Msg, stepBuffer)
@@ -1152,7 +1102,6 @@ func (model Model) startRun(runner Runner) (tea.Model, tea.Cmd) {
 	return model, tea.Batch(runCommand, waitForMessage(messages), spinnerTick(runID))
 }
 
-// spinnerInterval is how often the mark in front of the running line changes.
 var spinnerInterval = 150 * time.Millisecond
 
 type spinnerMsg struct{ run int }
@@ -1185,7 +1134,6 @@ type settingsItem struct {
 	label      string
 }
 
-// settingsItems has one line to change the choices, one line for each saved key, and the way back.
 func (model Model) settingsItems() []settingsItem {
 	items := []settingsItem{{kind: itemChange, label: "Change provider, model and reasoning level"}}
 	for _, choice := range model.choices {

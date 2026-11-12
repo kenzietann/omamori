@@ -10,12 +10,9 @@ import (
 )
 
 var (
-	// "Nov 10 08:15:02 host sshd[812]: message" (no year, no zone) and "2026-11-10T08:15:02.123+09:00 host sshd[812]: message".
 	classicHeader = regexp.MustCompile(`^([A-Z][a-z]{2}) +(\d{1,2}) (\d{2}:\d{2}:\d{2}) (\S+) ([A-Za-z0-9_./()-]+?)(?:\[\d+\])?: ?(.*)$`)
 	isoHeader     = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T[0-9:.]+(?:Z|[+-]\d{2}:?\d{2})) (\S+) ([A-Za-z0-9_./()-]+?)(?:\[\d+\])?: ?(.*)$`)
 
-	// The user name is written by the other side and can hold spaces and even " from 1.2.3.4 port 22".
-	// The real address is always the last one of the line, so the name is everything before it.
 	sshFailed    = regexp.MustCompile(`^Failed (password|publickey|keyboard-interactive/pam|none) for (invalid user )?(.*) from (\S+) port \d{1,5}(?: ssh2)?(?:: .*)?$`)
 	sshAccepted  = regexp.MustCompile(`^Accepted (password|publickey|keyboard-interactive/pam|gssapi-with-mic|hostbased) for (.*) from (\S+) port \d{1,5}(?: ssh2)?(?:: .*)?$`)
 	sshInvalid   = regexp.MustCompile(`^Invalid user (.*) from (\S+)(?: port \d{1,5})?$`)
@@ -61,8 +58,6 @@ func newSyslogParser(options Options) lineParser {
 				candidateYear++
 				moment = time.Date(candidateYear, month, day, clock.Hour(), clock.Minute(), clock.Second(), 0, options.Location)
 			}
-			// time.Date moves a date that does not exist (February 30) to another day. That is not a reading of the line.
-			// Check in the inferred year: a leap day may be valid in only one of the two years.
 			if moment.Day() != day || moment.Month() != month {
 				return nil, time.Time{}, false
 			}
@@ -106,7 +101,6 @@ func newSyslogParser(options Options) lineParser {
 	}
 }
 
-// normalizeZone turns +0900 into +09:00, which is what the time parser wants.
 func normalizeZone(stamp string) string {
 	if length := len(stamp); length > 5 && (stamp[length-5] == '+' || stamp[length-5] == '-') {
 		return stamp[:length-2] + ":" + stamp[length-2:]
@@ -130,7 +124,6 @@ func serviceName(program string) string {
 	return name
 }
 
-// address gives an address in its short form, or false when the text is not an address.
 func address(text string) (string, bool) {
 	parsed, err := netip.ParseAddr(text)
 	if err != nil {
@@ -176,7 +169,6 @@ func sudoFields(message string, fields map[string]string) {
 	}
 
 	fields[event.Action], fields[event.User], fields[event.Outcome] = "sudo", limit(parts[1], maxNameRunes), "success"
-	// The command is the last part and can hold " ; " itself, so it is cut off first.
 	settings, command, _ := strings.Cut(parts[2], "COMMAND=")
 	fields[event.Command] = limit(command, maxValueRunes)
 	for _, part := range strings.Split(settings, " ; ") {

@@ -25,7 +25,6 @@ type descriptor struct {
 	keyEnv         string
 	baseURL        string
 	maxTokensField string
-	// reasoningFallback is explained at openaicompat.Config.
 	reasoningFallback string
 	defaultModel      string
 	kind              clientKind
@@ -46,12 +45,10 @@ var descriptors = []descriptor{
 	{id: "lmstudio", name: "LM Studio (on this computer)", baseURL: "http://127.0.0.1:1234/v1", kind: kindChatCompletions, local: true},
 }
 
-// Info is what a screen needs to let the user choose a provider.
 type Info struct {
 	ID    string
 	Name  string
 	Local bool
-	// KeyEnv is the environment variable that holds the key. It is empty when no key is needed.
 	KeyEnv string
 	// DefaultModel is empty when the user must choose the model.
 	DefaultModel string
@@ -117,7 +114,6 @@ func newAnthropicAt(apiKey, model, baseURL string) (Provider, error) {
 	return newAt("anthropic", apiKey, model, baseURL)
 }
 
-// newAt lets a test point a provider at a fake server. Only the tests pass a base URL.
 func newAt(id, apiKey, model, baseURL string) (Provider, error) {
 	return newWith(id, apiKey, model, baseURL, "")
 }
@@ -165,7 +161,6 @@ type wireProvider struct {
 	send func(ctx context.Context, request wire.Request) (wire.Response, error)
 }
 
-// String and GoString show the name and nothing else, so no setting can end up in a log line.
 func (provider *wireProvider) String() string   { return "provider{" + provider.name + "}" }
 func (provider *wireProvider) GoString() string { return provider.String() }
 
@@ -185,7 +180,6 @@ func (provider *wireProvider) Send(ctx context.Context, safe SafeRequest) (Respo
 	return converted, nil
 }
 
-// ProviderError is ErrProviderFailed with a safe detail, such as "status 404, code model_not_found".
 type ProviderError struct {
 	Detail string
 }
@@ -195,7 +189,6 @@ func (providerError *ProviderError) Error() string {
 }
 func (providerError *ProviderError) Unwrap() error { return ErrProviderFailed }
 
-// DetailOf returns the safe detail of a failed call, or an empty text.
 func DetailOf(err error) string {
 	var providerError *ProviderError
 	if errors.As(err, &providerError) {

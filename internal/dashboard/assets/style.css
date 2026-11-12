@@ -1199,7 +1199,6 @@ p {
   font-size: 12px;
 }
 
-/* Review corrections: keep selection and context in the same working frame. */
 @media (min-width: 901px) {
   .review-workspace {
     height: 640px;
@@ -1278,7 +1277,6 @@ p {
     height: auto;
   }
 }
-/* Fixed SVG viewport keeps bars and interval labels in separate rows. */
 .histogram svg {
   flex: 0 0 90px;
   height: 90px;
@@ -1288,7 +1286,6 @@ p {
   overflow: hidden;
 }
 
-/* Keep operational controls reachable and focus visible inside clipped panes. */
 .navigation {
   overflow-y: auto;
 }

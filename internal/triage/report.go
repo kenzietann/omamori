@@ -25,7 +25,6 @@ const (
 	maxListedUsers = 10
 )
 
-// Instruction is the task for the AI. The numbers are the settings, so the AI and the checker use the same rules.
 func Instruction(logName string, config Config) string {
 	minutes := int(config.Window.Minutes())
 
@@ -41,7 +40,6 @@ type Input struct {
 	LogName string
 	Parsed  authlog.Parsed
 	Config  Config
-	// Texts are the answers of the AI, in order.
 	Texts   []string
 	Outcome agent.Outcome
 }
@@ -117,7 +115,6 @@ func writeTable(report *strings.Builder, prefix string, findings []Finding) {
 	}
 }
 
-// covered says whether a verified finding is the same as one that Omamori found by itself.
 func covered(found Finding, verified []Finding) bool {
 	for _, finding := range verified {
 		if finding.Scenario != found.Scenario || finding.IP != found.IP {
@@ -254,7 +251,6 @@ const (
 	claimsUnreadable
 )
 
-// collectClaims takes the last list of claims from the answers of the AI. The rest of the answers are the notes.
 func collectClaims(texts []string) ([]Claim, claimsState, string) {
 	chosen := -1
 	for index := len(texts) - 1; index >= 0; index-- {
@@ -285,18 +281,15 @@ func collectClaims(texts []string) ([]Claim, claimsState, string) {
 	return claims, state, strings.Join(notes, "\n\n")
 }
 
-// Runner is the agent.
 type Runner interface {
 	Run(ctx context.Context, instruction string) agent.Outcome
 }
 
-// Source is the log: the file on disk, and the name that the AI is told (relative to the project folder).
 type Source struct {
 	Path string
 	Name string
 }
 
-// ReadLog parses the log file.
 func ReadLog(source Source, config Config) (authlog.Parsed, error) {
 	info, err := os.Lstat(source.Path)
 	if err != nil || !info.Mode().IsRegular() || info.Size() > maxLogFileSize {
@@ -316,7 +309,6 @@ func ReadLog(source Source, config Config) (authlog.Parsed, error) {
 	return parsed, nil
 }
 
-// Run asks the AI, and then checks the answer against the log that Omamori reads itself.
 func Run(ctx context.Context, runner Runner, source Source, config Config) (string, agent.Outcome, error) {
 	if err := config.Validate(); err != nil {
 		return "", agent.Outcome{}, err

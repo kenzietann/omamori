@@ -14,25 +14,18 @@ import (
 	"time"
 )
 
-// HostFile is one file of a synthetic system.
 type HostFile struct {
 	Text     string
 	Modified time.Time
-	// Link makes the file a link to this target, with no text.
 	Link string
 }
 
-// Host is the file system of the same small server as Generate makes logs for, after the same day:
-// its logs, and the artifacts that a forensic triage reads. Everything is made up.
 type Host struct {
-	// Files maps a path to a file. Paths under "root/" are the system. "snapshots/" holds the output of ps and ss.
 	Files    map[string]HostFile
 	Expected []Expected
-	// KnownMisses describes what is in the system and gives no alert.
 	KnownMisses []string
 }
 
-// fakeKey makes a public key line that has the right shape and belongs to nobody.
 func fakeKey(random *rand.Rand, comment string) string {
 	const kind = "ssh-ed25519"
 	blob := binary.BigEndian.AppendUint32(nil, uint32(len(kind)))
@@ -159,8 +152,6 @@ func GenerateHost(seed int64, day time.Time, attacks bool) Host {
 	return host
 }
 
-// WriteHost writes the system into a folder that does not exist yet. Nothing outside of it is touched,
-// and an existing folder is refused, so nothing is written over.
 func WriteHost(folder string, host Host) error {
 	if err := os.Mkdir(folder, 0o700); err != nil {
 		if errors.Is(err, fs.ErrExist) {
@@ -202,7 +193,6 @@ func WriteHost(folder string, host Host) error {
 		if closeErr := opened.Close(); writeErr != nil || closeErr != nil {
 			return fmt.Errorf("%s: the file cannot be written", name)
 		}
-		// The time of the last change is part of the scenario: the timeline of the triage is built from it.
 		if err := root.Chtimes(name, file.Modified, file.Modified); err != nil {
 			return fmt.Errorf("%s: the time cannot be set", name)
 		}

@@ -16,7 +16,6 @@ var tokyo = time.FixedZone("JST", 9*3600)
 
 func scenarioDay() time.Time { return time.Date(2026, 11, 10, 0, 0, 0, 0, tokyo) }
 
-// runScenario writes the logs of a scenario into a new folder and runs the real path: files, parsers, rules.
 func runScenario(t *testing.T, made scenario.Scenario) Outcome {
 	t.Helper()
 	folder := t.TempDir()

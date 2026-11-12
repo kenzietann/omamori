@@ -80,8 +80,6 @@ func TestCampaignDetectionAndFalsePositives(t *testing.T) {
 		seeds, detected, expected, extra, benignEvents, benignAlerts)
 }
 
-// The report of the campaign names evidence from every kind of source, and the alerts of the movement
-// inside the network stand in the order of the story.
 func TestCampaignReportCoversEverySource(t *testing.T) {
 	outcome := runCampaign(t, scenario.GenerateCampaign(3, scenarioDay(), true))
 	report := Markdown(outcome)

@@ -255,7 +255,6 @@ func TestNewFolderMakesANewFolderAndRefusesAnOldOne(t *testing.T) {
 		t.Fatal("the file of the first writer was changed")
 	}
 
-	// A link in the place of the folder is refused too, so nothing is written to where it points.
 	target, link := t.TempDir(), filepath.Join(t.TempDir(), "link")
 	if err := os.Symlink(target, link); err != nil {
 		t.Skip("links cannot be made here")

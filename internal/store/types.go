@@ -1,5 +1,3 @@
-// Package store is the shared SQL repository for local detection and analyst runs.
-// Its DTOs have no CLI, HTTP, detector or AI-provider dependencies.
 package store
 
 import (

@@ -249,7 +249,6 @@ func colorsIn(t testing.TB, line string) []rgb {
 	return colors
 }
 
-// The color library turns a hex color into numbers and may be one off from ours.
 func nearColor(first, second rgb) bool {
 	close := func(a, b int) bool { return a-b <= 1 && b-a <= 1 }
 
@@ -322,7 +321,6 @@ func TestWithColorTheWordmarkIsAGradientWithShadows(t *testing.T) {
 		t.Errorf("the last shadow is %+v, want the dark right end %+v", right, darken(gradientColor(1), shadowStrength))
 	}
 
-	// Row 2 has a block and a shadow side by side at columns 1 and 2: "██║". The shadow is darker.
 	row2 := colorsIn(t, lines[2])
 	block, shadow := row2[1], row2[2]
 	if shadow.red >= block.red && shadow.green >= block.green && shadow.blue >= block.blue {

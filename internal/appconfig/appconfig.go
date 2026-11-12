@@ -32,14 +32,12 @@ var (
 	reasoningPattern = regexp.MustCompile(`^[a-z]{3,10}$`)
 )
 
-// Settings is everything that is saved. There is no field for a key on purpose.
 type Settings struct {
 	Provider  string `json:"provider,omitempty"`
 	Model     string `json:"model,omitempty"`
 	Reasoning string `json:"reasoning,omitempty"`
 }
 
-// Path is the place of the file in the settings folder of the user.
 func Path() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil || base == "" {
@@ -62,7 +60,6 @@ func validModel(model string) bool {
 	return true
 }
 
-// Valid says whether every field is empty or well formed.
 func (settings Settings) Valid() bool {
 	return (settings.Provider == "" || providerPattern.MatchString(settings.Provider)) &&
 		validModel(settings.Model) &&
@@ -85,8 +82,6 @@ func (settings Settings) cleaned() Settings {
 	return settings
 }
 
-// Load reads the file. A file that is not there gives empty settings and no error.
-// A file that is broken gives empty settings and ErrCorrupt.
 func Load(path string) (Settings, error) {
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {

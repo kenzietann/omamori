@@ -38,8 +38,6 @@ func forensicsArgs(host, output string, more ...string) []string {
 		"--sockets", filepath.Join(host, "snapshots", "ss.txt"), "--output", output, filepath.Join(host, "root")}, more...)
 }
 
-// The path of the slice through the real command line: a system in, a report with a timeline, a manifest that
-// can be checked again, and a stored run whose events can be searched.
 func TestForensicsThroughTheCommandLine(t *testing.T) {
 	host := hostFixture(t, false)
 	before := snapshot(t, host)
@@ -85,7 +83,6 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 		}
 	}
 
-	// The evidence is as it was: content, modes and times.
 	after := snapshot(t, host)
 	if len(after) != len(before) {
 		t.Fatal("the run changed the number of files in the evidence")
@@ -96,7 +93,6 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 		}
 	}
 
-	// The stored run holds the artifacts next to the log events, and they can be searched by kind.
 	runs := decodeStored[[]store.Run](t, storedCommand(t, database, "runs"))
 	if len(runs) != 1 || runs[0].EventCount != 1331 || runs[0].AlertCount != 26 {
 		t.Fatalf("stored run: %#v", runs)
@@ -110,7 +106,6 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 		t.Fatalf("%d stored critical alerts", len(critical))
 	}
 
-	// The manifest still fits the evidence. After one byte is changed, it does not, and the command fails.
 	verified := runAt(t, detectNow, "forensics", "verify", filepath.Join(folder, "manifest.json"), filepath.Join(host, "root"))
 	if verified.code != exitOK || !strings.Contains(verified.stdout, "Checked 20 files. 0 are not as the manifest says.") {
 		t.Fatalf("verify: %d %q %q", verified.code, verified.stdout, verified.stderr)
@@ -173,7 +168,6 @@ func TestForensicsRefusals(t *testing.T) {
 			}
 		})
 	}
-	// Refused runs wrote nothing: not into the evidence and not into the report folder.
 	after := snapshot(t, host)
 	if len(after) != len(before) {
 		t.Fatalf("refused runs changed the evidence: %d entries before, %d after", len(before), len(after))
@@ -182,7 +176,6 @@ func TestForensicsRefusals(t *testing.T) {
 		t.Fatal("refused runs left a report folder")
 	}
 
-	// The same second again: the report of the first run is not written over.
 	first := runAt(t, detectNow, forensicsArgs(host, output)...)
 	second := runAt(t, detectNow, forensicsArgs(host, output)...)
 	if first.code != exitOK || second.code != exitFailed || !strings.Contains(second.stderr, "exists already") {
@@ -222,8 +215,6 @@ func forensicSnapshot(t *testing.T, host string) analyst.Snapshot {
 	return snapshot
 }
 
-// The December path for forensics: a system in, rules fire, the AI reviews the alerts through the guard, every
-// claim is checked, and the report, the manifest and the stored run come out. Then the same again offline.
 func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	host := hostFixture(t, false)
 	const awsKey = "AKIAIOSFODNN7EXAMPLE"
@@ -297,7 +288,6 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	if strings.Contains(report, awsKey) || strings.Contains(read("alerts.json"), awsKey) || strings.Contains(read("recording.json"), awsKey) {
 		t.Error("an output has the secret")
 	}
-	// The manifest is byte for byte the one of the triage, its hash fits, and the evidence still fits it.
 	sum := sha256.Sum256([]byte(manifest))
 	digest := hex.EncodeToString(sum[:])
 	if read("manifest.sha256") != digest+"  manifest.json\n" || !strings.Contains(live.stdout, "Manifest SHA-256: "+digest) || !strings.Contains(report, digest) {
@@ -318,12 +308,10 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 			weak++
 		}
 	}
-	// Seven alerts rest on a file time: the account, two cron entries, the unit, two processes and the history link.
 	if weak != 7 {
 		t.Errorf("%d findings are marked as having weak times, want 7", weak)
 	}
 
-	// The stored run has the analysis, and it keeps the note about weak times.
 	runs := decodeStored[[]store.Run](t, storedCommand(t, database, "runs"))
 	if len(runs) != 1 || runs[0].AlertCount != 26 || runs[0].EventCount != 1331 {
 		t.Fatalf("stored runs: %#v", runs)
@@ -333,7 +321,6 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 		t.Fatalf("the stored run does not hold the checked analysis: %d %s", shown.code, shown.stderr)
 	}
 
-	// Offline: the recording is checked against the same evidence, and no provider is made.
 	noProvider := func(_, _, _, _ string) (outbound.Provider, error) {
 		t.Fatal("replay created a live provider")
 		return nil, nil
@@ -343,7 +330,6 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	if replayed.code != exitOK || !strings.Contains(replayed.stdout, "REPLAY") || !strings.Contains(replayed.stdout, "26 verified findings") {
 		t.Fatalf("replay: %d %s %s", replayed.code, replayed.stdout, replayed.stderr)
 	}
-	// After the evidence changes, the recording no longer fits and the run says so. It does not show old findings.
 	passwd := filepath.Join(host, "root", "etc", "passwd")
 	original, _ := os.ReadFile(passwd)
 	passwdInfo, _ := os.Stat(passwd)

@@ -13,8 +13,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-// effectsOf runs a command and lists what it asks the terminal to do, in order: "exit-alt", "enter-alt",
-// and "print:<text>". A command that waits for the next message of a run does not end, so it is left alone.
 func effectsOf(command tea.Cmd) []string {
 	var effects []string
 

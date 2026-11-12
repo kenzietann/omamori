@@ -30,7 +30,6 @@ func TestStoredAnalysisUsesFrozenEvidence(t *testing.T) {
 	sink := &captureStore{}
 	f.config.Store = sink
 	session := f.prepare(t)
-	// The caller may reuse its original buffers while a dashboard run is in progress.
 	f.outcome.Intake.Events[0].Fields["user"] = "changed after preparation"
 	f.outcome.Result.Alerts[0].Count = 99
 	session.Confirm()

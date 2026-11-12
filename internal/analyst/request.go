@@ -33,8 +33,6 @@ The application will check every claim and construct all displayed explanations 
 Free text you supply will not become a finding. Return at most 200 claims.
 `
 
-// forensicNote is added only when the snapshot holds artifacts of a system. A snapshot of logs alone gives
-// the same request as before this note existed.
 const forensicNote = `
 
 Some evidence comes from files of a system, not from logs (collector "forensics"). Its field time_source says
@@ -54,8 +52,6 @@ func hasArtifacts(snapshot Snapshot) bool {
 	return false
 }
 
-// Request is deterministic for a snapshot. Only the guarded outbound sender may turn it into a provider
-// request. The service previews this exact content before it authorizes sending.
 func Request(snapshot Snapshot) (outbound.Request, error) {
 	if _, valid := indexSnapshot(snapshot); !valid {
 		return outbound.Request{}, ErrSnapshot

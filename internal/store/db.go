@@ -140,7 +140,6 @@ func (db *DB) bind(query string) string {
 	}
 	var out strings.Builder
 	n := 0
-	// All SQL is internal and contains no question-mark literals; user text is a parameter.
 	for _, r := range query {
 		if r == '?' {
 			n++

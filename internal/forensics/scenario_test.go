@@ -14,7 +14,6 @@ var tokyo = time.FixedZone("JST", 9*3600)
 
 func day() time.Time { return time.Date(2026, 11, 10, 0, 0, 0, 0, tokyo) }
 
-// triage writes a synthetic system into a new folder and runs the real path over it: files, hashes, parsers, rules.
 func triage(t *testing.T, host scenario.Host) (Result, string) {
 	t.Helper()
 	folder := filepath.Join(t.TempDir(), "evidence")

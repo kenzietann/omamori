@@ -18,21 +18,15 @@ const (
 	maxManifestRows = 300
 )
 
-// Result is one forensic triage: what was read, what the rules found, and the manifest.
-// Outcome is the same type as the result of the detection in logs, so the store, the JSON of the alerts
-// and the AI analyst take it as it is.
 type Result struct {
 	Outcome  detect.Outcome
 	Manifest Manifest
-	// ManifestText is the manifest as it is written to a file, and ManifestSHA256 is the hash of that text.
 	ManifestText   string
 	ManifestSHA256 string
 	// Label is the name of the evidence folder, without the folders above it.
 	Label string
 }
 
-// Run reads the evidence folder, runs the rules over the artifacts and the logs in it, and gives the result.
-// It writes nothing. This is the one function that the command line and the local dashboard call.
 func Run(folder string, set rules.Set, rulesFrom string, options Options, now time.Time) (Result, error) {
 	collected, err := Collect(folder, options)
 	if err != nil {
@@ -52,7 +46,6 @@ func Run(folder string, set rules.Set, rulesFrom string, options Options, now ti
 	}, nil
 }
 
-// timeNote says in words where the time of an alert comes from.
 func timeNote(alert *rules.Alert) string {
 	if len(alert.Events) == 0 {
 		return "-"
@@ -68,7 +61,6 @@ func timeNote(alert *rules.Alert) string {
 	return "last change of the file (the entry can be older)"
 }
 
-// Markdown gives the report of the triage.
 func Markdown(result Result) string {
 	return detect.MarkdownWith(result.Outcome, detect.Extra{
 		Title: "Omamori forensic triage report",

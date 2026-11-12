@@ -1,8 +1,3 @@
-// Package event is the common shape of a log event. Every parser turns its lines into these, and the rule
-// engine reads only these, so a rule does not care if an event came from sshd, a web server or Suricata.
-//
-// The field names are the same everywhere (action, outcome, user, src_ip, ...), as in the Elastic Common Schema
-// but flat and short. A parser fills the fields it knows and leaves the others out.
 package event
 
 import (
@@ -11,7 +6,6 @@ import (
 	"time"
 )
 
-// Field names that parsers and rules share.
 const (
 	Action     = "action"
 	Outcome    = "outcome"
@@ -40,7 +34,6 @@ const (
 	Protocol   = "protocol"
 )
 
-// Event is one thing that happened. Ref says where it came from, for example "auth.log:12".
 type Event struct {
 	Time   time.Time
 	Source string
@@ -48,14 +41,12 @@ type Event struct {
 	Fields map[string]string
 }
 
-// Get returns a field and whether the event has it. The name can be a name that Sigma rules use.
 func (event Event) Get(name string) (string, bool) {
 	value, found := event.Fields[Canonical(name)]
 
 	return value, found
 }
 
-// aliases maps the field names of shared Sigma rules to the names of this package. Keys are lower case.
 var aliases = map[string]string{
 	"c-ip": SourceIP, "sourceip": SourceIP, "source_ip": SourceIP, "src": SourceIP, "clientip": SourceIP, "remote_addr": SourceIP,
 	"destinationip": DestIP, "dest_ip": DestIP, "dst": DestIP,
@@ -66,7 +57,6 @@ var aliases = map[string]string{
 	"eventid": EventID, "sourceport": SourcePort, "destinationport": DestPort,
 }
 
-// Canonical gives the name under which a field is kept.
 func Canonical(name string) string {
 	if alias, found := aliases[strings.ToLower(name)]; found {
 		return alias
@@ -75,7 +65,6 @@ func Canonical(name string) string {
 	return name
 }
 
-// Sort puts events in the order of time. Events with the same time keep their order.
 func Sort(events []Event) {
 	sort.SliceStable(events, func(first, second int) bool { return events[first].Time.Before(events[second].Time) })
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/kenzietann/omamori/internal/event"
 )
 
-// Formats of log files.
 const (
 	FormatAuto     = ""
 	FormatSyslog   = "syslog"
@@ -51,31 +50,24 @@ var (
 
 // Options say how to read lines that do not say everything themselves.
 type Options struct {
-	// Year and Location are for syslog lines, which have no year and no time zone.
 	Year     int
 	Location *time.Location
-	// Format is one of the Format constants. Empty means: look at the first lines of each file.
 	Format string
 }
 
-// Stats says what happened to the lines of one file.
 type Stats struct {
 	File   string
 	Format string
-	// Sources lists the recognized event sources in this file; a JSON file can mix several.
 	Sources []string
 	Lines   int
 	Events  int
-	// Blank counts empty lines. Malformed counts lines that could not be read as the format of the file.
 	Blank     int
 	Malformed int
 }
 
-// Result is everything that was read.
 type Result struct {
 	Events []event.Event
 	Files  []Stats
-	// Skipped names files that were not read, each with the reason.
 	Skipped []string
 }
 
@@ -91,12 +83,10 @@ func (options Options) valid() error {
 	return ErrFormat
 }
 
-// Read reads files and folders. A folder is read with the folders in it. Links are not followed.
 func Read(paths []string, options Options) (Result, error) {
 	return ReadContext(context.Background(), paths, options)
 }
 
-// ReadContext checks cancellation during directory discovery and between buffered file reads.
 func ReadContext(ctx context.Context, paths []string, options Options) (Result, error) {
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
@@ -256,10 +246,8 @@ func compressed(name string) bool {
 	return false
 }
 
-// lineParser reads one line. It gives false when the line is not in its format.
 type lineParser func(line string) (fields map[string]string, moment time.Time, ok bool)
 
-// Parse reads one log. name is used for the reference of each event ("name:line") and is not opened.
 func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats, error) {
 	if reader == nil {
 		return nil, Stats{}, ErrBadInput
@@ -338,7 +326,6 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 	return events, stats, nil
 }
 
-// sniff looks at the first lines and says which format reads most of them.
 func sniff(head string, options Options) string {
 	lines := strings.Split(head, "\n")
 	if len(lines) > sniffLines {
@@ -372,7 +359,6 @@ func sniff(head string, options Options) string {
 	return best
 }
 
-// readLine reads one line. A line longer than the limit is read to its end and reported as too long.
 func readLine(reader *bufio.Reader) (line string, tooLong bool, err error) {
 	var collected []byte
 	for {
@@ -391,7 +377,6 @@ func readLine(reader *bufio.Reader) (line string, tooLong bool, err error) {
 	}
 }
 
-// clean says that a line is text: valid UTF-8 with no control character other than the tab.
 func clean(line string) bool {
 	if !utf8.ValidString(line) {
 		return false
@@ -405,7 +390,6 @@ func clean(line string) bool {
 	return true
 }
 
-// limit cuts a value that is too long. Cutting is safer than dropping: a dropped event is an event that no rule sees.
 func limit(text string, runes int) string {
 	if utf8.RuneCountInString(text) <= runes {
 		return text

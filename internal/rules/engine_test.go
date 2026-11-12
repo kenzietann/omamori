@@ -229,7 +229,6 @@ func TestEventCount(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			// Only the alerts of the count rule are looked at. The rule "ok" is counted by nothing here, so it gives its own.
 			var alerts []*Alert
 			for _, alert := range set.Evaluate(testCase.events).Alerts {
 				if alert.Rule.Name == "burst" {
@@ -356,7 +355,6 @@ func TestOrderedSequence(t *testing.T) {
 	}
 }
 
-// One event that fits both rules of a sequence is one thing that happened, not two things in order.
 func TestOrderedSequenceNeedsTwoEvents(t *testing.T) {
 	set := mustSet(t, "title: A\nname: a\ndetection:\n  s: {x: 1}\n  condition: s\n---\ntitle: B\nname: b\ndetection:\n  s: {y: 1}\n  condition: s\n---\n"+
 		"title: Seq\nname: seq\ncorrelation: {type: temporal_ordered, rules: [a, b], group-by: [user], timespan: 60s}")
@@ -366,7 +364,6 @@ func TestOrderedSequenceNeedsTwoEvents(t *testing.T) {
 	if got := len(set.Evaluate([]event.Event{at(0, "x", "1", "user", "u"), at(0, "y", "1", "user", "u")}).Alerts); got != 1 {
 		t.Fatalf("%d alerts from two events in the same second, want 1", got)
 	}
-	// An event may finish an earlier sequence even when it also matches the first step.
 	if got := len(set.Evaluate([]event.Event{at(0, "x", "1", "user", "u"), at(1, "x", "1", "y", "1", "user", "u")}).Alerts); got != 1 {
 		t.Fatalf("%d alerts when the second event matches both steps, want 1", got)
 	}
@@ -398,7 +395,6 @@ func TestQuietAndLoudRules(t *testing.T) {
 		return strings.Join(list, " ")
 	}
 
-	// The single failures and the success are counted and give no alert. The burst is counted too, and still gives its own.
 	if got := names(mustSet(t, sequenceRules)); got != "burst takeover" {
 		t.Fatalf("alerts are %q", got)
 	}

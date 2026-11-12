@@ -1,6 +1,3 @@
-// Package taskrun runs Task A from start to finish: it sets up the provider, shows what will be
-// sent, waits for the user's confirmation, runs the guarded agent, and saves the report and the
-// event log in a new folder outside the project. It knows nothing about the screen.
 package taskrun
 
 import (
@@ -52,14 +49,12 @@ var (
 
 type ProviderFactory func(id, apiKey, model, reasoning string) (outbound.Provider, error)
 
-// Task is the work that a run does.
 type Task string
 
 const (
 	TaskExposure Task = "exposure"
 	TaskTriage   Task = "triage"
 
-	// DefaultLog is the log that the triage reads when none is named, relative to the project folder.
 	DefaultLog = "auth.log"
 )
 
@@ -67,7 +62,6 @@ var logNamePattern = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,200}$`)
 
 type ModelLister func(ctx context.Context, id, apiKey string) ([]string, error)
 
-// KeyStore keeps API keys between runs. The keystore package is the real one.
 type KeyStore interface {
 	Available() bool
 	Get(ctx context.Context, providerID string) (string, error)
@@ -81,7 +75,6 @@ type Config struct {
 	Limits     agent.Limits
 	// Triage holds the settings of the log triage. Without it, the defaults are used.
 	Triage *triage.Config
-	// LookupEnv, Now, NewProvider and ListModels default to the real ones. Tests replace them.
 	LookupEnv   func(string) string
 	Now         func() time.Time
 	NewProvider ProviderFactory
@@ -101,26 +94,21 @@ type Choice struct {
 }
 
 type Setup struct {
-	// Task is empty for the exposure check.
 	Task Task
-	// Log is the log of the triage, relative to the project folder. Empty means auth.log.
 	Log string
 	// Recording makes the run a replay: the answers come from the recording, and nothing is sent.
 	Recording  *replay.Recording
 	ProviderID string
 	Model      string
 	Key        string
-	// Reasoning is empty for the provider's default.
 	Reasoning string
 }
 
-// ReasoningChoice is one level for the user to pick. The first choice is always the default.
 type ReasoningChoice struct {
 	Value string
 	Label string
 }
 
-// ReasoningChoices lists the documented levels for this model. It is empty when the model has none.
 func ReasoningChoices(providerID, model string) []ReasoningChoice {
 	var choices []ReasoningChoice
 	for _, option := range outbound.ReasoningOptions(providerID, strings.TrimSpace(model)) {
@@ -168,8 +156,6 @@ func (config Config) lister() ModelLister {
 	return outbound.ListModels
 }
 
-// Models asks the provider which models it offers. It sends the key and nothing else.
-// An empty key means the key from the environment.
 func (config Config) Models(ctx context.Context, providerID, apiKey string) ([]string, error) {
 	chosen := config.choice(providerID)
 	if chosen == nil {
@@ -215,7 +201,6 @@ func (config Config) choice(providerID string) *Choice {
 	return nil
 }
 
-// resolveKey picks the key: the one just typed, else the one in the environment, else the saved one.
 func (config Config) resolveKey(ctx context.Context, chosen *Choice, typed string) (string, error) {
 	if chosen.Local {
 		return "", nil
@@ -236,8 +221,6 @@ func (config Config) resolveKey(ctx context.Context, chosen *Choice, typed strin
 	return "", ErrNeedsKey
 }
 
-// Providers lists the providers and says for each one whether its key is already in the environment
-// or saved.
 func (config Config) Providers() []Choice {
 	var choices []Choice
 	for _, info := range outbound.Providers() {
@@ -252,7 +235,6 @@ func (config Config) Providers() []Choice {
 	return choices
 }
 
-// KeysCanBeSaved says whether a key can be kept between runs on this system.
 func (config Config) KeysCanBeSaved() bool {
 	return config.Keys != nil && config.Keys.Available()
 }
@@ -273,7 +255,6 @@ func (config Config) SaveKey(ctx context.Context, providerID, key string) error 
 	return nil
 }
 
-// ForgetKey removes the saved key of a provider.
 func (config Config) ForgetKey(ctx context.Context, providerID string) error {
 	if config.choice(providerID) == nil {
 		return ErrUnknownProvider
@@ -302,7 +283,6 @@ type Session struct {
 	confirmed    bool
 }
 
-// Prepare builds everything except the run itself. It sends nothing and creates no file.
 func Prepare(config Config, setup Setup) (*Session, error) {
 	root, err := pathguard.NewRoot(config.Target)
 	if err != nil {
@@ -371,8 +351,6 @@ func prepareReplay(config Config, root *pathguard.Root, recording replay.Recordi
 	return &Session{task: task, log: log, logPath: logPath, triage: triageConfig, replay: player, providerName: player.Name(), model: recording.Model, config: config, gateway: toolGateway, sender: sender, specs: agent.SpecsFromGateway(toolGateway.Specs())}, nil
 }
 
-// prepareTask checks what the task needs. The exposure check needs nothing. The triage needs a log file
-// inside the project folder, and its settings.
 func prepareTask(config Config, root *pathguard.Root, task Task, logName string, recorded *replay.Settings) (log, logPath string, settings triage.Config, err error) {
 	if task != TaskTriage {
 		return "", "", triage.Config{}, nil
@@ -392,7 +370,6 @@ func prepareTask(config Config, root *pathguard.Root, task Task, logName string,
 		return "", "", triage.Config{}, ErrLogFile
 	}
 
-	// The settings of the user come first, then the ones in the recording, then the defaults.
 	settings = triage.Defaults(config.now())
 	switch {
 	case config.Triage != nil:
@@ -411,7 +388,6 @@ func prepareTask(config Config, root *pathguard.Root, task Task, logName string,
 	return logName, resolved, settings, nil
 }
 
-// TriageFromRecording turns the settings in a recording into the settings of a run.
 func TriageFromRecording(recorded replay.Settings) (triage.Config, error) {
 	location, err := time.LoadLocation(recorded.TimeZone)
 	if err != nil {
@@ -423,12 +399,10 @@ func TriageFromRecording(recorded replay.Settings) (triage.Config, error) {
 	return config, config.Validate()
 }
 
-// ValidLogName says whether a name can be the log of the triage.
 func ValidLogName(name string) bool {
 	return logNamePattern.MatchString(name)
 }
 
-// CheckTask says whether a task has what it needs in the project folder. The exposure check needs nothing.
 func (config Config) CheckTask(task Task, logName string) error {
 	root, err := pathguard.NewRoot(config.Target)
 	if err != nil {
@@ -456,7 +430,6 @@ func (session *Session) Budget() (requests, tokens int) {
 	return session.config.Limits.MaxSteps, session.config.Limits.MaxTokens
 }
 
-// Title names the task for the screen.
 func (session *Session) Title() string {
 	if session.task == TaskTriage {
 		return "Task B: Log triage"
@@ -482,8 +455,6 @@ func (session *Session) ConsentText() string {
 	return session.sender.ConsentText()
 }
 
-// Preview is the dry run: the first request exactly as it would be sent, after cleaning.
-// It sends nothing.
 func (session *Session) Preview() (string, error) {
 	cleaned, err := session.sender.Preview(agent.FirstRequest(session.instruction(), session.specs))
 	if err != nil {
@@ -516,8 +487,6 @@ func (session *Session) Preview() (string, error) {
 	return preview.String(), nil
 }
 
-// Summary is the short form of the dry run: what is chosen, the limits, and the instruction.
-// The fixed system prompt and the tool list are left out. Preview has them.
 func (session *Session) Summary() (string, error) {
 	cleaned, err := session.sender.Preview(agent.FirstRequest(session.instruction(), session.specs))
 	if err != nil {
@@ -582,7 +551,6 @@ func (recorder *stepRecorder) Record(kind, tool string, allowed bool, reason, no
 	return nil
 }
 
-// Run does the task. The report and the event log go to a new folder, and nothing is overwritten.
 func (session *Session) Run(ctx context.Context, step func(string)) (Result, error) {
 	if !session.confirmed {
 		return Result{}, ErrNotConfirmed

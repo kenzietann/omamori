@@ -46,7 +46,6 @@ func shorten(line string) string {
 	return string(runes[:maxLineLength]) + "..."
 }
 
-// binaryProbeBytes is how much of the start of a file is checked for a zero byte.
 const binaryProbeBytes = 8000
 
 func (gateway *Gateway) readTextFile(resolvedPath string) (string, error) {
@@ -73,7 +72,6 @@ func (gateway *Gateway) readTextFile(resolvedPath string) (string, error) {
 		return "", ErrLimitExceeded
 	}
 
-	// A file with a zero byte near the start is binary (an image, an archive). Digits in it are not text.
 	if bytes.IndexByte(data[:min(len(data), binaryProbeBytes)], 0) >= 0 {
 		return "", errBinary
 	}
@@ -245,7 +243,6 @@ func runDetectors(ctx context.Context, gateway *Gateway, arguments map[string]st
 	return gateway.scan(ctx, resolved, &gateway.sanitizer, gateway.limits.MaxResults, gateway.limits.MaxFiles)
 }
 
-// fullScanFiles and fullScanResults are the caps of FullScan. They only stop a runaway scan.
 const (
 	fullScanFiles   = 200000
 	fullScanResults = 100000

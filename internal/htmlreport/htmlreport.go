@@ -1,6 +1,3 @@
-// Package htmlreport turns the Markdown report into one static HTML page (FR-17).
-// Text from scanned files can reach the report (file names, AI notes), so every character is escaped.
-// The page has no script, no link, no image and no form, and a policy that blocks all of them.
 package htmlreport
 
 import (
@@ -29,7 +26,6 @@ pre{background:#f6f6f6;padding:.75rem;overflow-x:auto;white-space:pre-wrap;overf
 <body>
 `
 
-// Render makes the page. The input is the report of Omamori. Anything it does not know is shown as plain text.
 func Render(report string) string {
 	var out strings.Builder
 	out.WriteString(page)

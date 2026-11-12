@@ -107,7 +107,6 @@ func runAnalyze(args []string, env environment) int {
 	return reviewOutcome(env, flags, chosen, review, database, outcome, sources, target, analysisrun.Base{}, summary)
 }
 
-// analystFlags are the choices of one AI review, from the command line.
 type analystFlags struct {
 	reasoning, recordingPath string
 	confirmed, dryRun        bool

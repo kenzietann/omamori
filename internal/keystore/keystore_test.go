@@ -224,8 +224,6 @@ func TestTheServiceNameIsChecked(t *testing.T) {
 	}
 }
 
-// This test uses the real Keychain of the person who runs it, with a throwaway name that it deletes.
-// It runs only when OMAMORI_KEYCHAIN_TEST=1.
 func TestTheRealKeychain(t *testing.T) {
 	if os.Getenv("OMAMORI_KEYCHAIN_TEST") != "1" {
 		t.Skip("set OMAMORI_KEYCHAIN_TEST=1 to use the real Keychain")

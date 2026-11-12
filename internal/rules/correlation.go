@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// Kinds of correlation, with the names of the Sigma correlation format.
 const (
 	eventCount      = "event_count"
 	valueCount      = "value_count"
@@ -20,15 +19,6 @@ const (
 	maxThreshold  = 1_000_000
 )
 
-// correlation counts the hits of other rules.
-//
-//   - event_count: at least threshold hits in the timespan.
-//   - value_count: at least threshold different values of a field in the timespan.
-//   - temporal: every rule of the list has a hit, each not later than the timespan after the others.
-//   - temporal_ordered: the same, in the order of the list.
-//
-// For the two temporal kinds the timespan is the longest wait between the end of one step and the next step.
-// A burst of failed logins that lasts an hour, and a success one minute after it, fit a timespan of ten minutes.
 type correlation struct {
 	kind       string
 	references []string
@@ -36,7 +26,6 @@ type correlation struct {
 	timespan   time.Duration
 	threshold  int
 	field      string
-	// generate says that the rules of the list also give their own alerts.
 	generate bool
 }
 

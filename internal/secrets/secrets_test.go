@@ -13,7 +13,6 @@ func TestFindSecrets(t *testing.T) {
 		inputText   string
 		wantMatches []Match
 	}{
-		// AKIAIOSFODNN7EXAMPLE is the example key in the AWS documentation. It is fake.
 		{"AWS example key alone", "AKIAIOSFODNN7EXAMPLE", []Match{{0, 20, "aws-access-key"}}},
 		{"key in a sentence", "key AKIAIOSFODNN7EXAMPLE ok", []Match{{4, 24, "aws-access-key"}}},
 		{"temporary key", "ASIAIOSFODNN7EXAMPLE", []Match{{0, 20, "aws-access-key"}}},
@@ -32,8 +31,6 @@ func TestFindSecrets(t *testing.T) {
 		{"unknown GitHub prefix", "ghx_" + fakeGitHubToken[4:], nil},
 		// The GitHub rule is the second row of the table, so its match must still come first.
 		{"GitHub token before AWS key", fakeGitHubToken + " AKIAIOSFODNN7EXAMPLE", []Match{{0, 40, "github-token"}, {41, 61, "aws-access-key"}}},
-		// Open question: with 17 characters after the prefix we match the first 20.
-		// A false positive costs less than a missed key.
 		{"17 characters after the prefix", "AKIAIOSFODNN7EXAMPLEX", []Match{{0, 20, "aws-access-key"}}},
 	}
 

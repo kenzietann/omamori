@@ -10,8 +10,6 @@ import (
 	"github.com/kenzietann/omamori/internal/rules"
 )
 
-// artifactOutcome has one alert from a log line, one from a history entry with a time of its own, and one
-// from a cron file whose only time is the last change of the file. All three are about the user root.
 func artifactOutcome() detect.Outcome {
 	one := func(name string, seconds int, ref string, fields map[string]string) *rules.Alert {
 		moment := start.Add(time.Duration(seconds) * time.Second)
@@ -52,8 +50,6 @@ func TestLogOnlyRequestIsUnchangedAndArtifactsAddTheNote(t *testing.T) {
 	}
 }
 
-// Whether a finding rests on weak times is decided by code from the cited evidence. The model has no field
-// to say it, and none to deny it.
 func TestFindingsSayWhenTheirTimesAreWeak(t *testing.T) {
 	snapshot := snapshotFor(t, artifactOutcome())
 	byRule := map[string]Alert{}

@@ -69,7 +69,6 @@ func New(sender Sender, tools Tools, recorder Recorder, limits Limits, specs []o
 	return &Agent{sender: sender, tools: tools, recorder: recorder, limits: limits, specs: specs}, nil
 }
 
-// FirstRequest is the request that starts a run. The dry run shows it before anything is sent.
 func FirstRequest(instruction string, specs []outbound.ToolSpec) outbound.Request {
 	return outbound.Request{System: systemPrompt, Messages: []outbound.Message{{Role: "user", Text: instruction}}, Tools: specs}
 }

@@ -423,8 +423,6 @@ func TestConcurrentRunCallsSendAtMostOnce(t *testing.T) {
 	}
 }
 
-// A caller can add files to the output folder, such as an evidence manifest. They are written as given,
-// and a name that the analysis itself writes is refused, so that no added file can stand in for a report.
 func TestBaseReportAndAddedFiles(t *testing.T) {
 	for _, name := range reservedFiles {
 		f := newFixture(t)
@@ -443,7 +441,6 @@ func TestBaseReportAndAddedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// What the caller does with its map after preparation changes nothing.
 	f.config.Base.Files["manifest.json"] = "changed later"
 	session.Confirm()
 	result, err := session.Run(context.Background(), nil)

@@ -39,9 +39,7 @@ var evidenceFields = []string{
 }
 
 const (
-	// TimeSourceField says where the time of an artifact comes from. It is the name that internal/forensics uses.
 	TimeSourceField = "time_source"
-	// WeakTimeSource marks a time that is only the last change of the file that holds the entry.
 	WeakTimeSource = "file_modified"
 )
 
@@ -148,8 +146,6 @@ func BuildSnapshot(outcome detect.Outcome) (Snapshot, error) {
 		// Spread evidence across the retained events: a sequence's final success must not disappear behind
 		// a long first step. The engine already retains a bounded share from every sequence part.
 		selected := SampleEvidence(alert.Events)
-		// Nested correlations count hits, while their evidence can include many events per hit.
-		// The larger number is a lower bound: earlier engine evidence limits may already have removed more.
 		current.OmittedEvidence = max(alert.Count, len(alert.Events)) - len(selected)
 		for number, original := range selected {
 			if original.Time.IsZero() {
@@ -207,8 +203,6 @@ func BuildSnapshot(outcome detect.Outcome) (Snapshot, error) {
 
 func stamp(moment time.Time) string { return moment.UTC().Format(time.RFC3339Nano) }
 
-// SampleEvidence returns the deterministic evidence selection used by AI snapshots.
-// Persistence uses the same selection to map opaque AI citations to stored event IDs.
 func SampleEvidence(events []event.Event) []event.Event {
 	if len(events) <= MaxEvidence {
 		return events
@@ -221,8 +215,6 @@ func SampleEvidence(events []event.Event) []event.Event {
 }
 
 func (builder *snapshotBuilder) reference(reference string) string {
-	// The final suffix is the line number. Opaque source IDs keep same-named files distinct
-	// while dropping all parent folders from the displayed reference.
 	file, line := reference, ""
 	if split := strings.LastIndex(reference, ":"); split >= 0 {
 		if number, err := strconv.Atoi(reference[split+1:]); err == nil && number > 0 {

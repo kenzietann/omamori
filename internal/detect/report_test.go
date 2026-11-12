@@ -35,7 +35,6 @@ func TestReportOfTheScenario(t *testing.T) {
 			t.Errorf("the report does not have %q", want)
 		}
 	}
-	// The critical alert is first, and the timeline is in the order of time.
 	if strings.Index(report, "| 1 | critical") > strings.Index(report, "| 2 | high") {
 		t.Error("the most serious alert is not first")
 	}
@@ -97,8 +96,6 @@ func TestHostileLogContentStaysTextAndSecretsStayOut(t *testing.T) {
 	if !strings.Contains(page, "&lt;script&gt;") {
 		t.Error("the text of the log line is not in the page as text")
 	}
-	// Check every table, including the user and file cells that contain hostile pipes.
-	// URLs only appear in detail paragraphs, so checking their source IP alone would miss this bug.
 	columns, tables := 0, 0
 	for _, line := range strings.Split(report, "\n") {
 		if !strings.HasPrefix(line, "|") {

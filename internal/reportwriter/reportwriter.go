@@ -77,8 +77,6 @@ func NewRun(sourceDirectories []string, outputDirectory string) (*Writer, error)
 	return writer, nil
 }
 
-// NewFolder makes a writer for a folder that does not exist yet. It is for output that has no source folder
-// to stay away from. An existing folder is refused, so nothing in it can be written over.
 func NewFolder(outputDirectory string) (*Writer, error) {
 	if err := os.MkdirAll(filepath.Dir(outputDirectory), 0o700); err != nil {
 		return nil, ErrOutputFolder

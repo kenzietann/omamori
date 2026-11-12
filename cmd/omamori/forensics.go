@@ -28,8 +28,6 @@ const (
 	maxManifestBytes = 64 << 20
 )
 
-// runForensics reads the artifacts of a Linux system from a folder, hashes what it reads, runs the rules and
-// writes a report with a timeline. It only reads the evidence folder. It uses no AI and no network.
 func runForensics(args []string, env environment) int {
 	if len(args) > 0 && args[0] == "verify" {
 		return runForensicsVerify(args[1:], env)
@@ -114,7 +112,6 @@ func runForensics(args []string, env environment) int {
 	}
 	directory := filepath.Join(chosen.output, "forensics-"+now.UTC().Format("20060102-150405"))
 
-	// The place of the report is checked before anything is read, and again when the folder is made.
 	for _, source := range sources {
 		if err := pathguard.CheckOutputFolder(source, directory); err != nil {
 			return fail(errors.New("the report folder must be new, and it must not be inside the evidence folder or around it"))
@@ -143,8 +140,6 @@ func runForensics(args []string, env environment) int {
 	read := fmt.Sprintf("Read and hashed %d files: %d log events and %d artifacts. %d rules. %d alerts",
 		len(result.Manifest.Entries), len(result.Outcome.Intake.Events)-artifacts, artifacts, result.Outcome.Rules, len(result.Outcome.Result.Alerts))
 	if analyze {
-		// The analyst service writes the folder: the same reports and manifest, with the checked review added.
-		// A preview writes nothing at all.
 		base := analysisrun.Base{Report: report, Prefix: "forensics", Files: map[string]string{
 			"manifest.json": result.ManifestText, "manifest.sha256": result.ManifestSHA256 + "  manifest.json\n",
 		}}
@@ -201,7 +196,6 @@ func runForensics(args []string, env environment) int {
 	return exitOK
 }
 
-// runForensicsVerify hashes the files of a manifest again. It says which files are not as they were.
 func runForensicsVerify(args []string, env environment) int {
 	flags := flag.NewFlagSet("forensics verify", flag.ContinueOnError)
 	paths, err := splitFlags(flags, args)
@@ -243,7 +237,6 @@ func runForensicsVerify(args []string, env environment) int {
 	return exitOK
 }
 
-// writeHostScenario writes a synthetic system for the forensic triage into a new folder.
 func writeHostScenario(env environment, directory string, seed int64, day time.Time, location *time.Location, benign bool) int {
 	fail := func(err error) int {
 		fmt.Fprintln(env.stderr, "omamori:", err)

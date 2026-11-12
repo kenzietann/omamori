@@ -1,5 +1,3 @@
-// Package detect is the detection run: log files in, events, rules, alerts, and a report. It connects
-// intake, rules and the report, and it sends nothing anywhere. The AI is not part of this package.
 package detect
 
 import (
@@ -26,23 +24,19 @@ const (
 	maxCell     = 160
 )
 
-// Outcome is the result of one run.
 type Outcome struct {
 	Intake intake.Result
 	Result rules.Result
 	Rules  int
-	// RulesFrom says where the rules came from, for the report: "built-in" or "folder".
 	RulesFrom string
 	Made      time.Time
 	Location  *time.Location
 }
 
-// Run reads the logs and evaluates the rules.
 func Run(paths []string, set rules.Set, rulesFrom string, options intake.Options, now time.Time) (Outcome, error) {
 	return RunContext(context.Background(), paths, set, rulesFrom, options, now)
 }
 
-// RunContext supports dashboard cancellation while reading input; rule evaluation is a bounded batch.
 func RunContext(ctx context.Context, paths []string, set rules.Set, rulesFrom string, options intake.Options, now time.Time) (Outcome, error) {
 	read, err := intake.ReadContext(ctx, paths, options)
 	if err != nil {
@@ -57,7 +51,6 @@ func RunContext(ctx context.Context, paths []string, set rules.Set, rulesFrom st
 
 var levelRank = map[string]int{"critical": 4, "high": 3, "medium": 2, "low": 1, "informational": 0}
 
-// bySeverity gives the alerts with the most serious first, and the earliest first among equals.
 func (outcome Outcome) bySeverity() []*rules.Alert {
 	sorted := append([]*rules.Alert{}, outcome.Result.Alerts...)
 	sort.SliceStable(sorted, func(first, second int) bool {
@@ -100,7 +93,6 @@ func (w *writer) time(moment time.Time) string {
 	return moment.In(w.location).Format("2006-01-02 15:04:05 -07:00")
 }
 
-// plain makes text safe for one line of the report: no control characters, not too long.
 func plain(text string, runes int) string {
 	text = strings.Map(func(character rune) rune {
 		switch {
@@ -121,8 +113,6 @@ func plain(text string, runes int) string {
 	return text
 }
 
-// row writes one row of a table. A "|" inside a cell would make a new column, so it is written as "¦".
-// It is not written as "/": in a shell command "curl x / sh" would read as something else than "curl x | sh".
 func row(out *strings.Builder, cells ...any) {
 	out.WriteString("|")
 	for _, cell := range cells {
@@ -173,7 +163,6 @@ func (w *writer) refs(alert *rules.Alert, limit int) string {
 	return text
 }
 
-// describe gives the fields of one event that matter most to a reader, in a fixed order.
 func (w *writer) describe(current event.Event) string {
 	var parts []string
 	for _, field := range []string{event.Collector, event.Service, event.EventID, event.Action, event.Outcome, event.User, event.SourceIP, event.SourcePort,
@@ -191,44 +180,29 @@ func (w *writer) describe(current event.Event) string {
 	return strings.Join(parts, " ")
 }
 
-// Extra changes the report for a run that is more than the detection in logs, such as the forensic triage.
-// The zero value gives the plain detection report.
 type Extra struct {
-	// Title replaces the title of the report.
 	Title string
-	// Intro lines are added to the list at the top.
 	Intro []string
-	// Sections gives Markdown that is put before the list of files. It gets the formatter of the report,
-	// so that its values pass the same filter and the placeholders keep their numbers.
 	Sections func(format *Formatter) string
-	// Limits are added to the limits at the end.
 	Limits []string
-	// OwnTimeline says that Sections has a timeline, so the plain one is left out.
 	OwnTimeline bool
 }
 
-// Formatter makes texts for a report in the same way as the report itself.
 type Formatter struct{ w *writer }
 
 // Value gives the text of a field. Free text passes the filter for secrets and personal numbers.
 func (format *Formatter) Value(field, text string) string { return format.w.value(field, text) }
 
-// Text gives free text, filtered, on one line and not longer than the number of characters.
 func (format *Formatter) Text(text string, runes int) string { return format.w.text(text, runes) }
 
-// Time gives a time in the zone of the report.
 func (format *Formatter) Time(moment time.Time) string { return format.w.time(moment) }
 
-// Group says who an alert is about.
 func (format *Formatter) Group(alert *rules.Alert) string { return format.w.group(alert) }
 
-// Row writes one row of a table.
 func (format *Formatter) Row(out *strings.Builder, cells ...any) { row(out, cells...) }
 
-// Markdown gives the report. It is also the input of the HTML page.
 func Markdown(outcome Outcome) string { return MarkdownWith(outcome, Extra{}) }
 
-// MarkdownWith gives the report with the additions of another kind of run.
 func MarkdownWith(outcome Outcome, extra Extra) string {
 	w := &writer{location: outcome.Location}
 	if w.location == nil {
@@ -328,7 +302,6 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 			}
 			shown := alert.Events
 			if len(alert.Parts) > 0 {
-				// For a sequence the last event of the last step is the one to read first: it is the success after the failures.
 				final := alert.Parts[len(alert.Parts)-1].Events
 				shown = append(append([]event.Event{}, final...), shown...)
 			}
@@ -410,7 +383,6 @@ type jsonAlert struct {
 	EventsShown int               `json:"events_shown"`
 }
 
-// JSON gives the alerts for other tools, in the same order and with the same numbers as the report.
 func JSON(outcome Outcome) (string, error) {
 	w := &writer{location: outcome.Location}
 	if w.location == nil {
@@ -437,7 +409,6 @@ func JSON(outcome Outcome) (string, error) {
 			current.Steps = append(current.Steps, part.Rule.Name)
 		}
 		for _, item := range alert.Events {
-			// The names are taken in a fixed order, so that the placeholders get the same numbers in every run.
 			names := make([]string, 0, len(item.Fields))
 			for name := range item.Fields {
 				names = append(names, name)

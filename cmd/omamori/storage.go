@@ -78,7 +78,6 @@ func (chosen storageFlags) config(env environment) (store.Config, error) {
 		}
 		dsn = filepath.Join(home, "omamori-data", "omamori.db")
 	}
-	// The CLI uses durable files. In-memory stores remain available to library callers and tests.
 	if dsn == ":memory:" || strings.HasPrefix(dsn, "file:") || strings.ContainsAny(dsn, "?\x00") {
 		return store.Config{}, store.ErrConfig
 	}

@@ -68,7 +68,6 @@ func WithAnalysis(input store.RunInput, attached *Analysis) (store.RunInput, err
 		} else {
 			finding.Summary = analyst.RelatedSummary(len(finding.Alerts), *finding.Entity)
 		}
-		// Whether the times are weak is read from the evidence again, not taken from the caller.
 		finding.WeakTimes = analyst.HasWeakTimes(finding.Evidence)
 		finding.Summary += analyst.WeakTimeNote(finding.WeakTimes)
 		for number, action := range finding.Actions {

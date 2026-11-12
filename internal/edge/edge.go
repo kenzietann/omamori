@@ -1,6 +1,3 @@
-// Package edge decides if a run of digits that a detector found is only a part of something longer.
-// The digits of a decimal fraction (0.0643290124), a hex id or a name with digits in it
-// (abc0312345678, x_03123456789) are not a phone number or a My Number.
 package edge
 
 import (
@@ -9,8 +6,6 @@ import (
 	"unicode/utf8"
 )
 
-// Embedded says whether text[start:end] is a part of a decimal number, or touches a letter or an underscore.
-// Only an edge that is a digit counts: a number that starts with a bracket or a plus sign can follow a word (TEL(06)...).
 func Embedded(text string, start, end int) bool {
 	if start < 0 || end > len(text) || start >= end {
 		return false
@@ -59,7 +54,6 @@ func digit(character rune) bool {
 
 var uuidPattern = regexp.MustCompile(`[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}`)
 
-// InUUID says whether text[start:end] is a part of a UUID (00000000-0000-0000-0000-000000000000).
 func InUUID(text string, start, end int) bool {
 	if start < 0 || end > len(text) || start >= end {
 		return false
@@ -75,8 +69,6 @@ func InUUID(text string, start, end int) bool {
 	return false
 }
 
-// InChain says whether text[start:end] is one group in a row of digit groups, like a hex dump or a table
-// (0024 8000 0014 0000 0000 0000), or sits between two colons like the account number in an AWS ARN.
 func InChain(text string, start, end int) bool {
 	if start < 0 || end > len(text) || start >= end {
 		return false
@@ -112,8 +104,6 @@ func digitRunAfter(text string, start int) int {
 	return count
 }
 
-// Trivial says whether the digits of a value are the same digit again and again, or count up or down by one
-// (0123456789, 9876543210, 0000000000). Nobody has that number. It is a test value.
 func Trivial(value string) bool {
 	var digits []byte
 	for _, character := range value {

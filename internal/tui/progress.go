@@ -11,8 +11,6 @@ var (
 	answerStep  = regexp.MustCompile(`^answer received \(step \d+, (\d+) tokens used in total\)$`)
 )
 
-// progress is what the live line shows. The limits are the limits of the run, so the bar shows
-// how much of the allowed budget is used. It is not a promise of how long the run takes.
 type progress struct {
 	requests    int
 	tokens      int
@@ -39,7 +37,6 @@ func (current *progress) read(text string) bool {
 	return text == "run started" || text == "run finished: finished"
 }
 
-// percent is the larger of the two shares of the budget that are used.
 func (current progress) percent() int {
 	share := 0
 	if current.maxRequests > 0 {
@@ -63,7 +60,6 @@ func (current progress) bar() string {
 	return "[" + strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled) + "]"
 }
 
-// summary is the text after the bar.
 func (current progress) summary() string {
 	if current.requests == 0 {
 		return "starting"

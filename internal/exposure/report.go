@@ -157,7 +157,6 @@ func Render(findings []Finding, stats Stats, outcome agent.Outcome) (string, err
 	return text, nil
 }
 
-// keptOutText explains the section. It says that the git history was checked only when it was, for all the files.
 func keptOutText(keptOut []Finding) string {
 	clean, unchecked := 0, 0
 	for _, finding := range keptOut {
@@ -180,7 +179,6 @@ func keptOutText(keptOut []Finding) string {
 	return lead + "The AI did not see the .gitignore files or the git history, so if a note below calls one of these keys exposed, this section is the checked answer.\n\n"
 }
 
-// renderNotYours folds the matches of one type on one line into one bullet.
 func renderNotYours(findings []Finding) string {
 	var out strings.Builder
 	for index := 0; index < len(findings); {

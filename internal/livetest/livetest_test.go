@@ -16,7 +16,6 @@ import (
 
 const fixtures = "../../testdata/fixtures"
 
-// fakeAI answers like a good AI, or like a lazy one that finds nothing.
 type fakeAI struct {
 	lazy   bool
 	tokens int

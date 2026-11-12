@@ -85,7 +85,6 @@ func snapshot(t *testing.T, folder string) map[string]string {
 	return files
 }
 
-// The demo path of the slice, through the real command line: synthetic logs in, alerts and three report files out.
 func TestScenarioThenDetect(t *testing.T) {
 	base := t.TempDir()
 	logs, output := filepath.Join(base, "logs"), filepath.Join(base, "out")
@@ -135,7 +134,6 @@ func TestScenarioThenDetect(t *testing.T) {
 		t.Error("the report does not name the file that was skipped")
 	}
 
-	// The logs are only read.
 	after := snapshot(t, logs)
 	if len(after) != len(before) {
 		t.Fatal("the run changed the number of files in the logs folder")
@@ -146,7 +144,6 @@ func TestScenarioThenDetect(t *testing.T) {
 		}
 	}
 
-	// The same second again: the old report is not written over.
 	again := runAt(t, detectNow, "detect", logs, "--year", "2026", "--timezone", "Asia/Tokyo", "--output", output)
 	if again.code != exitFailed || !strings.Contains(again.stderr, "exists already") {
 		t.Errorf("a second run in the same second gave %d %q", again.code, again.stderr)
@@ -201,7 +198,6 @@ func TestDetectRefusals(t *testing.T) {
 		})
 	}
 
-	// A refused run leaves nothing behind in the chosen output folder.
 	if _, err := os.Stat(output); err == nil {
 		entries, _ := os.ReadDir(output)
 		t.Fatalf("refused runs left %d entries in the output folder", len(entries))
@@ -217,7 +213,6 @@ func TestDetectWithRulesFromAFolder(t *testing.T) {
 	if err := os.Mkdir(rulesFolder, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	// A rule as it is written for shared Sigma rule sets, with the field names of web logs.
 	rule := "title: Health check seen\nid: 11111111-2222-3333-4444-555555555555\nlevel: low\nlogsource:\n  category: webserver\n" +
 		"detection:\n  selection:\n    cs-uri-stem|endswith: '/healthz'\n    sc-status: 200\n  condition: selection\n---\n" +
 		"title: Many health checks\nlevel: informational\ncorrelation:\n  type: event_count\n  rules:\n    - 11111111-2222-3333-4444-555555555555\n  group-by:\n    - c-ip\n  timespan: 1h\n  condition:\n    gte: 10\n"
@@ -307,8 +302,6 @@ func TestHelpNamesTheNewCommands(t *testing.T) {
 	}
 }
 
-// Slice 7 through the real command line: the campaign is written, detect reads the folders of three hosts
-// and two sensors, and every expected alert is in alerts.json.
 func TestCampaignScenarioThenDetect(t *testing.T) {
 	base := t.TempDir()
 	campaign, output := filepath.Join(base, "campaign"), filepath.Join(base, "out")

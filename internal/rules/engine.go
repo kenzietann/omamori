@@ -9,44 +9,32 @@ import (
 )
 
 const (
-	// MaxEvidence is how many events one alert keeps. Count says how many there were.
 	MaxEvidence = 50
 	maxValuesIn = 200
-	// maxHits is how many hits one rule may have in one evaluation. More than that is cut and reported.
 	maxHits = 500_000
 )
 
-// Pair is one group-by field and its value.
 type Pair struct {
 	Field string
 	Value string
 }
 
-// Alert is what a rule gives. For a detection rule it is one event. For a correlation rule it is a burst:
-// Time is the moment the limit was reached, First and Last are the first and the last event of the burst.
 type Alert struct {
 	Rule  *Rule
 	Time  time.Time
 	First time.Time
 	Last  time.Time
 	Group []Pair
-	// Count is the number of events (or hits) in the alert. Events holds the first MaxEvidence of them.
 	Count  int
 	Events []event.Event
-	// Values are the different values that a value_count rule saw, at most 200.
 	Values []string
-	// Parts are the steps of a temporal alert, in the order in which they happened.
 	Parts []*Alert
 
-	// order is the place, among the sorted events, of the event that made the alert fire.
 	order int
 }
 
-// Result is the outcome of one evaluation.
 type Result struct {
-	// Alerts are in the order of time.
 	Alerts []*Alert
-	// Cut names the rules that had more hits than the limit. Their counts are too low.
 	Cut []string
 }
 
@@ -75,7 +63,6 @@ func (alert *Alert) addEvents(events []event.Event) {
 	alert.Events = append(alert.Events, events...)
 }
 
-// Evaluate runs every rule over the events. The events need not be sorted, and they are not changed.
 func (set Set) Evaluate(events []event.Event) Result {
 	hits, cut := set.evaluate(events)
 
@@ -99,7 +86,6 @@ func (set Set) evaluate(events []event.Event) (map[*Rule][]*Alert, []string) {
 
 	hits := make(map[*Rule][]*Alert, len(set.rules))
 	var cut []string
-	// set.ordered has every rule after the rules that it refers to.
 	for _, rule := range set.ordered {
 		var found []*Alert
 		if rule.detection != nil {
@@ -135,7 +121,6 @@ func (rule *Rule) detect(sorted []event.Event) []*Alert {
 	return found
 }
 
-// fitsSource compares the logsource of the rule with the event. A key that the rule does not set fits everything.
 func (rule *Rule) fitsSource(candidate event.Event) bool {
 	for key, wanted := range rule.LogSource {
 		if value, found := candidate.Fields[key]; !found || !strings.EqualFold(value, wanted) {
@@ -146,13 +131,11 @@ func (rule *Rule) fitsSource(candidate event.Event) bool {
 	return true
 }
 
-// step is one hit of a rule that a correlation refers to. index is the place of that rule in the list.
 type step struct {
 	hit   *Alert
 	index int
 }
 
-// merge gives the hits of the rules that a correlation refers to, in the order of time.
 func (set Set) merge(rule *Rule, hits map[*Rule][]*Alert) []step {
 	var steps []step
 	for index, reference := range rule.correlation.references {
@@ -173,7 +156,6 @@ func (set Set) merge(rule *Rule, hits map[*Rule][]*Alert) []step {
 	return steps
 }
 
-// groupOf gives the group of a hit. A hit that lacks one of the group-by fields belongs to no group and is not counted.
 func (rule *Rule) groupOf(hit *Alert) (key string, group []Pair, complete bool) {
 	var builder strings.Builder
 	for _, field := range rule.correlation.groupBy {
@@ -220,20 +202,15 @@ func (rule *Rule) correlate(steps []step) []*Alert {
 	return found
 }
 
-// groupState is what a correlation remembers for one group.
 type groupState struct {
 	group []Pair
-	// window holds the hits of the last timespan, and burst is the alert that is open (count rules).
 	window []*Alert
 	burst  *Alert
 	values map[string]bool
-	// latest holds, for each rule of the list, its last hit (temporal), or the chain that ends with it (temporal_ordered).
 	latest []*Alert
 	chains [][]*Alert
 }
 
-// count handles event_count and value_count. It gives an alert at the moment the limit is reached.
-// Hits that follow inside the timespan go into the same alert, so that one burst is one alert.
 func (rule *Rule) count(state *groupState, hit *Alert) *Alert {
 	settings := rule.correlation
 	value := ""
@@ -297,7 +274,6 @@ func (rule *Rule) count(state *groupState, hit *Alert) *Alert {
 	return alert
 }
 
-// together handles temporal: every rule of the list has a hit, and none ended longer ago than the timespan.
 func (rule *Rule) together(state *groupState, current step) *Alert {
 	state.latest[current.index] = current.hit
 	for _, earlier := range state.latest {
@@ -314,7 +290,6 @@ func (rule *Rule) together(state *groupState, current step) *Alert {
 	return rule.joined(state.group, parts)
 }
 
-// inOrder handles temporal_ordered. chains[i] is the newest chain of hits for the first i+1 rules of the list.
 func (rule *Rule) inOrder(state *groupState, current step) *Alert {
 	last := len(rule.correlation.references) - 1
 	if state.chains == nil {

@@ -19,7 +19,6 @@ func testConfig() Config {
 	return Config{Window: 10 * time.Minute, FailureThreshold: 5, SprayThreshold: 5, Year: 2026, Location: time.UTC, ZoneName: "UTC"}
 }
 
-// entry makes one log line.
 func entry(clock, kind, user, ip string) string {
 	text := "Failed password for " + user
 	if kind == "A" {
@@ -197,7 +196,7 @@ func TestGuessingNeedsFiveFailuresInTheWindowAndASuccessThatFollows(t *testing.T
 
 func TestTheGuessingFindingNamesTheCountedFailuresAndTheSuccess(t *testing.T) {
 	parsed := parseLines(t,
-		entry("08:00:00", "F", "admin", "203.0.113.5"), // too early: more than 10 minutes before the last failure
+		entry("08:00:00", "F", "admin", "203.0.113.5"),
 		entry("09:00:00", "F", "admin", "203.0.113.5"), entry("09:00:10", "F", "admin", "203.0.113.5"), entry("09:00:20", "F", "admin", "203.0.113.5"),
 		entry("09:00:30", "F", "admin", "203.0.113.5"), entry("09:00:40", "F", "admin", "203.0.113.5"), entry("09:01:00", "A", "admin", "203.0.113.5"))
 

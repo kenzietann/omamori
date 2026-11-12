@@ -13,7 +13,6 @@ import (
 	"github.com/kenzietann/omamori/internal/intake"
 )
 
-// lines cuts the data into lines and counts them. A line that is not text is counted as not read.
 func lines(data []byte, stats *intake.Stats, each func(number int, line string)) {
 	text := string(data)
 	for number := 1; text != "" && number <= maxLinesPerFile; number++ {
@@ -37,7 +36,6 @@ func (c *collector) parse(kind, name string, data []byte, modified time.Time, st
 	case KindCron:
 		c.cron(name, data, modified, stats)
 	case KindCronJob:
-		// A script is listed with its hash. Its lines are not turned into events: a script is a program, not a list of jobs.
 		stats.Lines = strings.Count(string(data), "\n")
 		c.add(kind, name, 0, modified, TimeFileChange, map[string]string{event.Action: "cron_script", "file": name})
 	case KindHistory:
@@ -78,7 +76,6 @@ func (c *collector) cron(name string, data []byte, modified time.Time, stats *in
 		}
 		user, command := owner(name), parts[2]
 		if system {
-			// The user and the command are divided by spaces or by tabs.
 			named := cronUser.FindStringSubmatch(command)
 			if named == nil {
 				stats.Malformed++
@@ -121,7 +118,6 @@ func (c *collector) history(name string, data []byte, modified time.Time, stats 
 	})
 }
 
-// unit reads a systemd unit. Each line that starts a program becomes an event.
 func (c *collector) unit(name string, data []byte, modified time.Time, stats *intake.Stats) {
 	unit := name[strings.LastIndex(name, "/")+1:]
 	runAs := "root"
@@ -152,7 +148,6 @@ func (c *collector) unit(name string, data []byte, modified time.Time, stats *in
 		case key == "Description":
 			description = value
 		case strings.HasPrefix(key, "ExecStart") || strings.HasPrefix(key, "ExecStop") || key == "ExecReload":
-			// "-", "@", "+", "!" and ":" before the program change how systemd starts it. They are not part of the path.
 			starts = append(starts, start{number, key, strings.TrimLeft(value, "-@+!:")})
 		}
 	})
@@ -168,7 +163,6 @@ var keyTypes = map[string]bool{
 	"sk-ssh-ed25519@openssh.com": true, "sk-ecdsa-sha2-nistp256@openssh.com": true,
 }
 
-// keys reads an authorized_keys file. The key itself is not kept: its fingerprint, as "ssh-keygen -l" prints it, is.
 func (c *collector) keys(name string, data []byte, modified time.Time, stats *intake.Stats) {
 	user := owner(name)
 	lines(data, stats, func(number int, line string) {
@@ -177,10 +171,7 @@ func (c *collector) keys(name string, data []byte, modified time.Time, stats *in
 			stats.Blank++
 			return
 		}
-		// Options can stand before the key type and can hold spaces inside quotes, so the type is looked for from the left.
 		fields := strings.Fields(line)
-		// A key type can also be written inside an option (command="echo ssh-rsa ..."). The real key is the first
-		// place where the type is followed by a key of that same type, which the key says about itself.
 		at := -1
 		var blob []byte
 		for index := 0; index+1 < len(fields) && at < 0; index++ {
@@ -209,8 +200,6 @@ func (c *collector) keys(name string, data []byte, modified time.Time, stats *in
 	})
 }
 
-// keyOfType says that a decoded key starts with its own type, as every SSH public key does:
-// four bytes with the length of the name, then the name.
 func keyOfType(blob []byte, keyType string) bool {
 	size := len(keyType)
 	if len(blob) < 4+size+4 || blob[0] != 0 || blob[1] != 0 || blob[2] != 0 || int(blob[3]) != size {
@@ -249,7 +238,6 @@ func (c *collector) accounts(name string, data []byte, modified time.Time, stats
 	})
 }
 
-// processes reads the output of "ps aux" or "ps -ef". The first line names the columns, and the command is the last one.
 func (c *collector) processes(name string, data []byte, modified time.Time, stats *intake.Stats) {
 	columns := -1
 	userAt, pidAt := -1, -1
@@ -266,7 +254,6 @@ func (c *collector) processes(name string, data []byte, modified time.Time, stat
 					columns = index
 				}
 			}
-			// The command is the last column in the output of ps. A heading that has it elsewhere is not from ps.
 			if columns < 0 || userAt < 0 || pidAt < 0 || userAt > columns || pidAt > columns {
 				columns = -2
 				stats.Malformed++
@@ -295,27 +282,22 @@ var (
 	netstatProcess = regexp.MustCompile(`^(\d{1,10})/(\S{1,64})`)
 )
 
-// sockets reads the listening sockets from "ss -tulpn" or "netstat -tulpn".
 func (c *collector) sockets(name string, data []byte, modified time.Time, stats *intake.Stats) {
 	lines(data, stats, func(number int, line string) {
 		fields := strings.Fields(line)
 		if len(fields) < 5 || !(strings.HasPrefix(fields[0], "tcp") || strings.HasPrefix(fields[0], "udp")) {
-			// Headings and other kinds of sockets are not listening network sockets.
 			stats.Blank++
 			return
 		}
 		made := map[string]string{event.Action: "listening_socket", event.Protocol: strings.TrimRight(fields[0], "46")}
 		local := ""
 		if strings.EqualFold(fields[1], "LISTEN") || strings.EqualFold(fields[1], "UNCONN") {
-			// ss: Netid State Recv-Q Send-Q Local:Port Peer:Port Process
 			local = fields[4]
 			if parts := ssProcess.FindStringSubmatch(line); parts != nil {
 				made[event.Process], made["pid"] = parts[1], parts[2]
 			}
 		} else {
-			// netstat: Proto Recv-Q Send-Q Local Foreign [State] PID/Program
 			local = fields[3]
-			// The name of the program can have spaces ("nginx: master"), so it is not always the last word.
 			for _, field := range fields[4:] {
 				if parts := netstatProcess.FindStringSubmatch(field); parts != nil {
 					made["pid"], made[event.Process] = parts[1], parts[2]

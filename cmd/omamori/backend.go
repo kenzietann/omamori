@@ -13,13 +13,10 @@ import (
 
 const keyActionWait = 15 * time.Second
 
-// backend connects the screen to the core. It only converts types and holds no rules.
 type backend struct {
 	config taskrun.Config
 	env    environment
-	// settingsPath is where the choices are kept. Empty means that they are not kept.
 	settingsPath string
-	// log is the log of the triage, relative to the project folder. Empty means auth.log.
 	log string
 	// recording is what a replay plays back. Without it, there is no replay.
 	recording *replay.Recording
@@ -27,7 +24,6 @@ type backend struct {
 
 var errNoRecording = errors.New("there is no recording to replay")
 
-// TaskReady says in plain words what a task is missing.
 func (backend backend) TaskReady(task string) error {
 	if task != tui.TaskTriage {
 		return nil

@@ -30,12 +30,10 @@ var (
 	ErrNoReport  = errors.New("no report was found there")
 	ErrNoMatches = errors.New("the report lists no matches")
 
-	// "- path:line [LABEL:001]" or "- path:line [LABEL:001]–[LABEL:005] (5 phone matches)".
 	bulletPattern      = regexp.MustCompile(`^- (.+):(\d+) \[((?:SECRET|EXAMPLE):[a-z0-9-]+|MYNUMBER|PHONE|NUMBERLIKE):(\d{3,})\](?:–\[[A-Za-z:0-9-]+:(\d{3,})\])?`)
 	placeholderPattern = regexp.MustCompile(`^\[(.+):(\d{3,})\]$`)
 )
 
-// Item is one match that the report lists.
 type Item struct {
 	Placeholder string
 	File        string
@@ -44,17 +42,13 @@ type Item struct {
 	number      int
 }
 
-// Shown is a match with its excerpt. Value and Context are masked unless the user asked to reveal them.
 type Shown struct {
 	Item
 	Value   string
 	Context string
-	// Problem is set when the match could not be shown, with a fixed reason.
 	Problem string
 }
 
-// ReadReport finds the matches in the text of a Markdown report. The same match can be listed in
-// more than one section; it is returned once.
 func ReadReport(report string) ([]Item, error) {
 	var items []Item
 	seen := map[string]bool{}
@@ -205,7 +199,6 @@ func describe(item Item, view *fileView, current location, reveal bool) Shown {
 	return Shown{Item: item, Value: shownValue, Context: contextAround(view, current, reveal)}
 }
 
-// contextAround is the text near the match on its line. Every match in it is masked, except the match itself with reveal.
 func contextAround(view *fileView, target location, reveal bool) string {
 	from := max(target.start-contextBytes, 0)
 	to := min(target.end+contextBytes, len(view.text))
@@ -264,7 +257,6 @@ func contextAround(view *fileView, target location, reveal bool) string {
 
 func isRuneStart(character byte) bool { return character&0xC0 != 0x80 }
 
-// clean makes text safe to print: no control characters that could move the cursor or hide text.
 func clean(text string) string {
 	return strings.Map(func(character rune) rune {
 		switch {
@@ -278,7 +270,6 @@ func clean(text string) string {
 	}, text)
 }
 
-// Mask hides the middle of a value and keeps its shape. "090-1234-5678" becomes "090-****-**78".
 func Mask(value string) string {
 	runes := []rune(value)
 	front, back := 0, 0

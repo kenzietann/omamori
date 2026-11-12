@@ -228,8 +228,6 @@ func TestClosedLogStopsTheGateway(t *testing.T) {
 func TestEscapingCannotCreateAFinding(t *testing.T) {
 	log, logDirectory, _ := makeLog(t)
 
-	// Only 8 digits here, so nothing is cleaned. But JSON writes the control character as
-	// \u0000, and its 4 zeros join the 8 to make a 12-digit number-shaped text.
 	err := log.Record("", "", true, "", "\x00"+"00000000A")
 	if err != nil {
 		t.Fatal(err)

@@ -18,19 +18,15 @@ const (
 	maxValueBytes = 2000
 )
 
-// detection is the "detection" part of a Sigma rule: named selections and a condition over them.
 type detection struct {
 	selections map[string]selection
 	condition  node
 }
 
-// selection matches when one of its alternatives matches. A map in the rule is one alternative,
-// a list of maps is several, and a list of words is one alternative of keywords.
 type selection struct {
 	alternatives []alternative
 }
 
-// alternative matches when all its field matches fit, and one of its keywords (when it has any) is in the event.
 type alternative struct {
 	fields   []fieldMatch
 	keywords []func(string) bool
@@ -124,7 +120,6 @@ func parseDetection(raw map[string]any) (*detection, error) {
 	return &detection{selections: selections, condition: condition}, nil
 }
 
-// conditionOf reads the condition. Sigma also allows a list of conditions, and one of them is enough.
 func conditionOf(raw any) (string, error) {
 	switch typed := raw.(type) {
 	case string:
@@ -219,9 +214,7 @@ func parseFields(raw map[string]any) (alternative, error) {
 	return option, nil
 }
 
-// modifiers that this engine knows. Any other modifier stops the load of the rule.
 type modifiers struct {
-	// shape is "", contains, startswith, endswith, re, cidr, exists, gt, gte, lt or lte.
 	shape           string
 	all, cased      bool
 	regexIgnoreCase bool
@@ -362,7 +355,6 @@ func valueMatcher(raw any, mods modifiers) (func(string, bool) bool, error) {
 	return func(value string, present bool) bool { return present && matcher(value) }, nil
 }
 
-// scalarText turns a YAML value into text. A map or a list is not a value.
 func scalarText(raw any) (string, error) {
 	switch typed := raw.(type) {
 	case string:

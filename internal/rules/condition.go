@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// node is one part of a condition like "selection and not filter" or "1 of sel_*".
 type node interface {
 	eval(results func(string) bool) bool
 }
@@ -18,7 +17,6 @@ type (
 	orNode   struct{ left, right node }
 	notNode  struct{ inner node }
 	nameNode struct{ name string }
-	// ofNode is "1 of pattern" (any) or "all of pattern". The names were found when the rule was read.
 	ofNode struct {
 		all   bool
 		names []string
@@ -52,7 +50,6 @@ type parser struct {
 	depth      int
 }
 
-// parseCondition reads a condition: or, and, not, brackets, a selection name, "1 of x*", "all of x*", "1 of them".
 func parseCondition(text string, selections map[string]selection) (node, error) {
 	if len(text) > maxCondition {
 		return nil, errors.New("the condition is too long")

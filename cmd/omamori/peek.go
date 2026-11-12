@@ -16,7 +16,6 @@ const (
 	maxReportBytes = 4 << 20
 )
 
-// runPeek shows what a report matched, on the screen only. It writes no file and sends nothing.
 func runPeek(args []string, env environment) int {
 	flags := flag.NewFlagSet("omamori peek", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)

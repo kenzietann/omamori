@@ -8,14 +8,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// shadowStrength is how bright the shadow lines are next to the solid blocks.
 const shadowStrength = 0.6
 
 type rgb struct {
 	red, green, blue int
 }
 
-// Sky blue, then the brand blue, then violet.
 var gradientStops = []rgb{{56, 189, 248}, {58, 127, 246}, {155, 107, 255}}
 
 func (color rgb) hex() string {

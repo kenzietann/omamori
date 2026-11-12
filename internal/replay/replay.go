@@ -26,7 +26,6 @@ import (
 
 const (
 	Version = 1
-	// SourceLive is a recording of a real run. SourceScripted is written by hand, and the screen says so.
 	SourceLive     = "live"
 	SourceScripted = "scripted"
 
@@ -64,7 +63,6 @@ type Answer struct {
 }
 
 type Step struct {
-	// RequestHash is empty only in a scripted recording, where nobody can compute it by hand.
 	RequestHash string `json:"request_hash,omitempty"`
 	Answer      Answer `json:"answer"`
 }
@@ -91,14 +89,11 @@ type Recording struct {
 	Task     string `json:"task"`
 	Provider string `json:"provider,omitempty"`
 	Model    string `json:"model,omitempty"`
-	// Log is the log file of a log triage, relative to the project folder.
 	Log string `json:"log,omitempty"`
-	// Triage holds the settings of a log triage. It is empty for the exposure check.
 	Triage *Settings `json:"triage,omitempty"`
 	Steps  []Step    `json:"steps"`
 }
 
-// Fingerprint is the hash of a cleaned request. It covers the system prompt, every message, and the tools.
 func Fingerprint(request outbound.Request) string {
 	encoded, _ := json.Marshal(request)
 	sum := sha256.Sum256(encoded)
@@ -106,7 +101,6 @@ func Fingerprint(request outbound.Request) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Validate checks a recording against the schema. A recording from a file is not trusted.
 func (recording Recording) Validate() error {
 	if recording.Version != Version || (recording.Source != SourceLive && recording.Source != SourceScripted) ||
 		!taskPattern.MatchString(recording.Task) || len(recording.Steps) == 0 || len(recording.Steps) > maxSteps {
@@ -145,7 +139,6 @@ func (recording Recording) Validate() error {
 	return nil
 }
 
-// Parse reads a recording from JSON and validates it.
 func Parse(data []byte) (Recording, error) {
 	if len(data) > maxFileBytes {
 		return Recording{}, ErrBadRecording
@@ -168,7 +161,6 @@ func Parse(data []byte) (Recording, error) {
 	return recording, nil
 }
 
-// Load reads a recording file.
 func Load(path string) (Recording, error) {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Size() > maxFileBytes {
@@ -188,7 +180,6 @@ func Load(path string) (Recording, error) {
 	return Parse(data)
 }
 
-// JSON is the text of the recording, ready to be written to a new file.
 func (recording Recording) JSON() (string, error) {
 	if err := recording.Validate(); err != nil {
 		return "", err
@@ -201,7 +192,6 @@ func (recording Recording) JSON() (string, error) {
 	return string(encoded) + "\n", nil
 }
 
-// Recorder is a provider that passes every request to another provider and records the answers.
 type Recorder struct {
 	inner     outbound.Provider
 	mutex     sync.Mutex
@@ -214,7 +204,6 @@ func NewRecorder(inner outbound.Provider, task, model, log string) *Recorder {
 
 func (recorder *Recorder) Name() string { return recorder.inner.Name() }
 
-// SetTriage keeps the settings of the log triage in the recording.
 func (recorder *Recorder) SetTriage(settings Settings) {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
@@ -235,7 +224,6 @@ func (recorder *Recorder) Send(ctx context.Context, safe outbound.SafeRequest) (
 	return response, nil
 }
 
-// Recording is a copy of what was recorded so far.
 func (recorder *Recorder) Recording() Recording {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
@@ -274,7 +262,6 @@ func cleanAnswer(response outbound.Response) Answer {
 	return answer
 }
 
-// Player is a provider that answers from a recording. It has no network code.
 type Player struct {
 	recording Recording
 	next      int
@@ -290,7 +277,6 @@ func NewPlayer(recording Recording) (*Player, error) {
 
 func (player *Player) Name() string { return "REPLAY" }
 
-// Source says if the recording is live or scripted.
 func (player *Player) Source() string { return player.recording.Source }
 
 func (player *Player) Send(ctx context.Context, safe outbound.SafeRequest) (outbound.Response, error) {

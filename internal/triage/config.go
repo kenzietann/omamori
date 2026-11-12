@@ -16,20 +16,16 @@ var ErrConfig = errors.New("the triage settings cannot be used")
 
 const maxConfigBytes = 4096
 
-// Config holds the numbers of the two scenarios. They are test values, so they are settings and not facts.
 type Config struct {
-	// Window is inclusive: exactly this long is inside, one second more is outside.
 	Window           time.Duration
 	FailureThreshold int
 	SprayThreshold   int
 	// Year and Location are needed because the log lines have no year and no time zone.
 	Year     int
 	Location *time.Location
-	// ZoneName is the name of Location, for the report.
 	ZoneName string
 }
 
-// Defaults are the values of the PRD: 10 minutes, 5 failures, 5 different user names.
 func Defaults(now time.Time) Config {
 	return Config{Window: 10 * time.Minute, FailureThreshold: 5, SprayThreshold: 5, Year: now.Year(), Location: time.Local, ZoneName: "Local"}
 }
@@ -43,7 +39,6 @@ func (config Config) Validate() error {
 	return nil
 }
 
-// fileConfig is the JSON file. A missing setting keeps its default.
 type fileConfig struct {
 	WindowMinutes    *int    `json:"window_minutes"`
 	FailureThreshold *int    `json:"failure_threshold"`
@@ -52,7 +47,6 @@ type fileConfig struct {
 	TimeZone         *string `json:"time_zone"`
 }
 
-// LoadConfig reads the settings file. A file that is not there gives the defaults.
 func LoadConfig(path string, now time.Time) (Config, error) {
 	config := Defaults(now)
 	if path == "" {

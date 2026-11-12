@@ -33,7 +33,6 @@ func (server *apiServer) requestBodies() []string {
 	return append([]string(nil), server.bodies...)
 }
 
-// newAPIServer answers every request with the next scripted handler, and the last one repeats.
 func newAPIServer(t testing.TB, handlers ...http.HandlerFunc) *apiServer {
 	t.Helper()
 

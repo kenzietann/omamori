@@ -17,7 +17,6 @@ import (
 	"unicode/utf8"
 )
 
-// MaxResponseBytes stops a server from filling the memory with one answer.
 const MaxResponseBytes = 8 << 20
 
 var (
@@ -86,7 +85,6 @@ func StatusError(status int) error {
 type Rejection struct {
 	Status int
 	Code   string
-	// Param names the field of the request that the provider did not accept, for example "model".
 	Param string
 }
 
@@ -112,8 +110,6 @@ var (
 	paramPattern = regexp.MustCompile(`^[A-Za-z0-9_.\[\]-]{1,64}$`)
 )
 
-// StatusErrorWithBody is StatusError for a failed answer. For a rejection it adds the error code
-// from the body, but only when the code looks like a code.
 func StatusErrorWithBody(status int, body []byte) error {
 	err := StatusError(status)
 	if err != ErrRejected {
@@ -148,7 +144,6 @@ func StatusErrorWithBody(status int, body []byte) error {
 	return rejection
 }
 
-// SafeBaseURL accepts https, and plain http only to the same machine.
 func SafeBaseURL(raw string) bool {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" || parsed.User != nil {
@@ -187,8 +182,6 @@ func NonEmpty(text string) string {
 	return text
 }
 
-// ParseArguments reads a tool input. The tools take only text, so a value of another type is
-// kept as its JSON text and the gateway, which checks every argument, decides what to do with it.
 func ParseArguments(raw string) map[string]string {
 	var decoded map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
@@ -215,8 +208,6 @@ const (
 // notChat are parts of a name that belong to models which cannot answer a chat.
 var notChat = []string{"embed", "whisper", "tts", "dall-e", "moderation", "transcribe", "realtime", "image", "audio", "guard", "rerank"}
 
-// CleanModelIDs makes a list from a provider safe to show: the provider is not trusted
-// with what appears on the screen. It drops odd names and non-chat models, removes doubles, and sorts.
 func CleanModelIDs(ids []string) []string {
 	seen := make(map[string]bool, len(ids))
 	var cleaned []string

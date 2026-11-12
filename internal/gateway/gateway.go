@@ -18,7 +18,6 @@ var (
 	ErrPathNotAllowed   = errors.New("path not allowed")
 	ErrToolFailed       = errors.New("tool failed")
 	ErrCancelled        = errors.New("cancelled")
-	// errBinary is only used inside a scan, to count binary files. A tool that is asked to read one says ErrToolFailed.
 	errBinary    = errors.New("the file is binary")
 	ErrLogFailed = errors.New("the event could not be logged")
 )
@@ -42,8 +41,6 @@ var DefaultLimits = Limits{
 type Result struct {
 	Text      string
 	Truncated bool
-	// Skipped counts files that were too large or could not be read. Binary counts files that are not text
-	// (images, archives, fonts), which a scan leaves out on purpose.
 	Skipped int
 	Binary  int
 }

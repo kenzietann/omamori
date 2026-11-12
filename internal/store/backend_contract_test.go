@@ -297,7 +297,6 @@ func TestSaveRunRollsBackAfterADatabaseWriteFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close()
-	// Fail the second event after the run, first event and its field index have been inserted.
 	if _, err := database.sql.ExecContext(ctx, `CREATE TRIGGER contract_refuse_event BEFORE INSERT ON omamori_events WHEN NEW.event_id='e2' BEGIN SELECT RAISE(ABORT,'contract write failure'); END`); err != nil {
 		t.Fatal(err)
 	}

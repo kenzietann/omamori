@@ -1,5 +1,3 @@
-// Package analyst checks an AI's review of detected alerts. It holds no UI, provider setup,
-// file access or network code; the CLI and a local dashboard can share these types and checks.
 package analyst
 
 import "errors"
@@ -15,14 +13,11 @@ const (
 
 var ErrSnapshot = errors.New("the alert evidence cannot be prepared for analysis")
 
-// Coverage makes a partial review explicit. A rule alert is evidence of a match, not proof of compromise.
 type Coverage struct {
 	TotalAlerts    int `json:"total_alerts"`
 	IncludedAlerts int `json:"included_alerts"`
 	OmittedAlerts  int `json:"omitted_alerts"`
-	// OmittedEvidence is a lower bound; a nested correlation can hide earlier engine evidence limits.
 	OmittedEvidence int `json:"omitted_evidence"`
-	// TruncatedFields counts selected evidence fields shortened or omitted by display budgets.
 	TruncatedFields int `json:"truncated_fields"`
 	MalformedLines  int `json:"malformed_lines"`
 	SkippedFiles    int `json:"skipped_files"`
@@ -94,8 +89,6 @@ type Finding struct {
 	Last     string     `json:"last"`
 	Entity   *Entity    `json:"entity,omitempty"`
 	Actions  []Action   `json:"suggested_actions"`
-	// WeakTimes says that a cited item has only the time of the last change of its file. First, Last and the
-	// order of the evidence are then not times of actions. The summary says so in words.
 	WeakTimes bool `json:"weak_times,omitempty"`
 }
 
@@ -116,8 +109,6 @@ const (
 	StatusNotRun   = "not_run"
 )
 
-// Result contains only checked findings and fixed rejection reasons. Unreviewed includes every included
-// alert not covered by a verified claim. Status describes claim checking, not the provider transport.
 type Result struct {
 	Version    int         `json:"version"`
 	Status     string      `json:"status"`
@@ -127,7 +118,6 @@ type Result struct {
 	Unreviewed []string    `json:"unreviewed_alerts"`
 }
 
-// NotRun preserves coverage and unreviewed alerts when the service could not obtain an answer.
 func NotRun(snapshot Snapshot) Result {
 	result := Result{Version: Version, Status: StatusNotRun, Coverage: snapshot.Coverage,
 		Verified: []Finding{}, Rejected: []Rejection{}, Unreviewed: []string{}}

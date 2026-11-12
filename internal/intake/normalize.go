@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// A source can carry the original event time as well as a collector's timestamp.
-// Ordered candidates prefer the event's time; UTC marks zone-less Sysmon times.
 type jsonTimestamp struct {
 	Value any
 	UTC   bool
@@ -19,8 +17,6 @@ type jsonMapping struct {
 	Times  []jsonTimestamp
 }
 
-// jsonValue uses explicit path components; a single component may contain dots,
-// as Zeek's literal "id.orig_h" key does.
 func jsonValue(object map[string]any, keys ...string) any {
 	var value any = object
 	for _, key := range keys {

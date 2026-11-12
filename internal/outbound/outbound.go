@@ -212,10 +212,6 @@ func (sender *Sender) prepare(request Request) (SafeRequest, error) {
 		return SafeRequest{request: safe}, nil
 	}
 
-	// A character like & or < is written as \u0026 or \u003c in JSON. Its digits can join the digits next to it
-	// and make a number that the text did not have. Text of code (a minified script) does this often. Those
-	// characters are replaced by a space where they touch a digit, and the request is checked again. If it still
-	// has a finding, the request is refused.
 	safe = sender.clean(request, true)
 	if encodingHasFindings(safe) {
 		return SafeRequest{}, ErrUnsafeRequest
@@ -262,8 +258,6 @@ func (sender *Sender) clean(request Request, neutralize bool) Request {
 	return safe
 }
 
-// neutralizeEscapes replaces the characters that JSON writes as \uXXXX (the ones that have digits in their escape)
-// by a space, where they touch a digit.
 func neutralizeEscapes(text string) string {
 	runes := []rune(text)
 	for index, character := range runes {

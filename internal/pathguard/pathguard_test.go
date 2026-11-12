@@ -27,7 +27,6 @@ func makeSymlink(t testing.TB, target, link string) {
 	}
 }
 
-// makeWorkspace returns a folder that holds "project" and "outside" side by side.
 func makeWorkspace(t testing.TB) (workspace, project, outside string) {
 	t.Helper()
 

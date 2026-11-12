@@ -12,8 +12,6 @@ import (
 	"github.com/kenzietann/omamori/internal/secrets"
 )
 
-// NumberLike is the label of digits that look like a phone number or a My Number but sit inside a longer
-// number or a name.
 const NumberLike = "NUMBERLIKE"
 
 type Finding struct {

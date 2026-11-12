@@ -23,7 +23,6 @@ func triageConfig() *triage.Config {
 	return &triage.Config{Window: 10 * time.Minute, FailureThreshold: 5, SprayThreshold: 5, Year: 2026, Location: time.UTC, ZoneName: "UTC"}
 }
 
-// triageSetup makes a project folder that holds an auth.log, and a scripted AI that reads it and answers.
 func triageSetup(t *testing.T, final string) testSetup {
 	t.Helper()
 
@@ -285,7 +284,6 @@ func TestAReplayReadsTheLogWithTheSettingsOfTheRecordingUnlessTheUserGivesOthers
 		t.Fatalf("the settings were not recorded: %+v, %v", recording.Triage, err)
 	}
 
-	// The year of this computer is another one, and the user gives no settings.
 	config := replayConfig(setup)
 	config.Triage = nil
 	config.Now = func() time.Time { return time.Date(2031, 1, 2, 3, 4, 5, 0, time.UTC) }

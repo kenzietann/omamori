@@ -202,8 +202,6 @@ func uniqueKeys(decoder *json.Decoder, depth int) error {
 	return err
 }
 
-// AlertSummary, RelatedSummary and WeakTimeNote are the only texts of a finding. The checker and the store
-// both use them, so a stored finding reads the same as a checked one and holds no text from the model.
 func AlertSummary(id, title string, count int) string {
 	return fmt.Sprintf("%s: the rule %q matched %d events or hits. A rule match alone does not prove compromise.", id, title, count)
 }
@@ -212,7 +210,6 @@ func RelatedSummary(alerts int, entity Entity) string {
 	return fmt.Sprintf("%d alerts share %s=%s within 24 hours. A shared entity is a review lead, not proof of one attacker or a causal chain.", alerts, entity.Field, entity.Value)
 }
 
-// HasWeakTimes says that an item has only the time of the last change of its file.
 func HasWeakTimes(evidence []Evidence) bool {
 	for _, item := range evidence {
 		if item.Fields[TimeSourceField] == WeakTimeSource {

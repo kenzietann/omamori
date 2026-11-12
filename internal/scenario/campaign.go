@@ -62,7 +62,6 @@ func GenerateCampaign(seed int64, day time.Time, attacks bool) Host {
 			when.Format("2006-01-02T15:04:05.000000-0700"), 900000+connections, from, port(), to, toPort, 9000000+severity, signature, severity)})
 	}
 
-	// The ordinary day of app01 and db01: people from the office, deployments, and cron.
 	servers := []struct{ file, host, address string }{{"app01/auth.log", "app01", AppAddress}, {"db01/auth.log", "db01", DataAddress}}
 	for number, server := range servers {
 		for index, user := range []string{"aiko", "kenji", "deploy"} {
@@ -84,22 +83,18 @@ func GenerateCampaign(seed int64, day time.Time, attacks bool) Host {
 	syslog("app01/auth.log", "app01", hop.Add(20*time.Second), "sshd", fmt.Sprintf("Accepted password for aiko from %s port %d ssh2", WebAddress, port()))
 	conn(hop, WebAddress, AppAddress, 22, "SF", "ssh", 5200, 18000)
 
-	// The monitoring host connects to every server every ten minutes, and every connection is answered.
 	for minute := 0; minute < 24*60; minute += 10 {
 		for _, target := range []string{WebAddress, AppAddress, DataAddress} {
 			conn(at(0, minute, 2+random.Intn(5)), monitorAddress, target, 9100, "SF", "http", 300, 4200)
 		}
 	}
-	// app01 keeps trying an address that is gone: many unanswered connections, and one address.
 	for try := 0; try < 30; try++ {
 		conn(at(11, try*2, random.Intn(60)), AppAddress, "10.0.2.99", 6379, "S0", "-", 0, 0)
 	}
-	// The night backup of db01 is large and stays inside. The application sends small reports outside.
 	conn(at(1, 0, 4), DataAddress, backupAddress, 873, "SF", "rsync", 3_200_000_000+int64(random.Intn(100_000_000)), 60000)
 	for index := 0; index < 6; index++ {
 		conn(at(8+index*2, 30, random.Intn(60)), AppAddress, "198.51.100.200", 443, "SF", "ssl", int64(2_000_000+random.Intn(6_000_000)), 9000)
 	}
-	// The sensor has its usual notes of low severity.
 	for index := 0; index < 8; index++ {
 		sensor(at(3+index*2, random.Intn(60), random.Intn(60)), fmt.Sprintf("198.51.100.%d", 20+index), WebAddress, 443, 3, "SYNTHETIC POLICY outdated TLS client")
 	}
@@ -120,7 +115,6 @@ func GenerateCampaign(seed int64, day time.Time, attacks bool) Host {
 			sensor(sweep.Add(time.Duration(20+index*25)*time.Second), WebAddress, fmt.Sprintf("10.0.2.%d", 9+index*10), 22, 1, "SYNTHETIC SCAN many SSH connection attempts from one host")
 		}
 
-		// Step 3: seven guesses for deploy on app01, then a login.
 		guess := at(2, 31, 0)
 		for try := 0; try < 7; try++ {
 			syslog("app01/auth.log", "app01", guess, "sshd", fmt.Sprintf("Failed password for deploy from %s port %d ssh2", WebAddress, port()))
@@ -129,12 +123,10 @@ func GenerateCampaign(seed int64, day time.Time, attacks bool) Host {
 		syslog("app01/auth.log", "app01", guess, "sshd", fmt.Sprintf("Accepted password for deploy from %s port %d ssh2", WebAddress, port()))
 		conn(guess, WebAddress, AppAddress, 22, "SF", "ssh", 48000, 310000)
 
-		// Step 4: with a key found on app01, a login to db01. One accepted key, like every other login.
 		key := at(2, 41, 10+random.Intn(40))
 		syslog("db01/auth.log", "db01", key, "sshd", fmt.Sprintf("Accepted publickey for deploy from %s port %d ssh2: ED25519 SHA256:Zm9yLXRlc3RzLW9ubHktbm90LWEtcmVhbC1rZXk", AppAddress, port()))
 		conn(key, AppAddress, DataAddress, 22, "SF", "ssh", 61000, 2_500_000_000)
 
-		// Step 5: 2.4 GB leave db01 to an address outside.
 		conn(at(2, 52, random.Intn(60)), DataAddress, dropAddress, 443, "SF", "ssl", 2_400_000_000+int64(random.Intn(50_000_000)), 120000)
 
 		campaign.Expected = append(campaign.Expected,
@@ -160,7 +152,6 @@ func GenerateCampaign(seed int64, day time.Time, attacks bool) Host {
 	return campaign
 }
 
-// Story gives the steps of the campaign in words, for the file that is written next to the logs.
 func Story() []string {
 	return strings.Split(strings.TrimSpace(`
 02:10 an outside address guesses the password of root on web01 and logs in (web01/auth.log)

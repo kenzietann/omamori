@@ -116,7 +116,6 @@ func TestSyslogTimes(t *testing.T) {
 	}
 }
 
-// The classic format has no year. A file that goes from December to January is in two years.
 func TestSyslogYearGoesUpAtNewYear(t *testing.T) {
 	log := "Dec 31 23:59:58 h sshd[1]: a\nJan  1 00:00:03 h sshd[1]: b\nJan  1 00:00:04 h sshd[1]: c\n"
 	events, _, err := Parse(strings.NewReader(log), "x.log", Options{Year: 2026, Location: tokyo, Format: FormatSyslog})
@@ -381,7 +380,6 @@ func TestReadAFolder(t *testing.T) {
 	if len(result.Files) != 2 || len(result.Events) != 2 {
 		t.Fatalf("%d files and %d events were read: %+v", len(result.Files), len(result.Events), result.Files)
 	}
-	// Events of all files are in the order of time, and the reference names the file inside the folder.
 	if result.Events[0].Ref != "nginx/access.log:1" || result.Events[1].Ref != "auth.log:1" {
 		t.Fatalf("refs are %s, %s", result.Events[0].Ref, result.Events[1].Ref)
 	}
@@ -405,7 +403,6 @@ func TestReadAFolder(t *testing.T) {
 	}
 }
 
-// CLI inputs can overlap (for example, a folder and one of its files). Those are one log, not extra events.
 func TestReadOverlappingPathsOnlyOnce(t *testing.T) {
 	folder := t.TempDir()
 	file := filepath.Join(folder, "auth.log")

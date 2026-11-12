@@ -18,7 +18,6 @@ const (
 type Finding struct {
 	Scenario string
 	IP       string
-	// Users has one name for guessing, and the different names for spraying, sorted.
 	Users []string
 	// FailureLines are the failed password lines that count, in time order.
 	FailureLines []int
@@ -30,7 +29,6 @@ type Finding struct {
 	LastStamp   string
 }
 
-// Detect finds both scenarios in the parsed log. The result is sorted, so the same log gives the same list.
 func Detect(parsed authlog.Parsed, config Config) []Finding {
 	findings := append(detectGuessing(parsed.Events, config), detectSpraying(parsed.Events, config)...)
 
@@ -76,7 +74,6 @@ func detectGuessing(events []authlog.Event, config Config) []Finding {
 
 			if cluster := countedFailures(failures, event, config); cluster != nil {
 				findings = append(findings, guessingFinding(key, cluster, event))
-				// These failures are used. Another success needs failures of its own.
 				failures = nil
 			}
 		}
@@ -85,7 +82,6 @@ func detectGuessing(events []authlog.Event, config Config) []Finding {
 	return findings
 }
 
-// countedFailures picks the last failure that the success may follow, and the failures in the window that ends there.
 func countedFailures(failures []authlog.Event, success authlog.Event, config Config) []authlog.Event {
 	for last := len(failures) - 1; last >= 0; last-- {
 		end := failures[last]

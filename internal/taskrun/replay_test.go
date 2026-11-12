@@ -23,7 +23,6 @@ func (transport *refusingTransport) RoundTrip(*http.Request) (*http.Response, er
 	return nil, errors.New("the network must not be used")
 }
 
-// liveRecording runs the exposure check with a scripted provider and returns the recording that the run saved.
 func liveRecording(t *testing.T, setup testSetup) (replay.Recording, Result) {
 	t.Helper()
 

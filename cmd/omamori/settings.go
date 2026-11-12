@@ -28,9 +28,7 @@ type settings struct {
 	model     string
 	maxSteps  int
 	maxTokens int
-	// log is the log of the triage, relative to the target folder.
 	log string
-	// year and zone are the settings of the triage from the command line. Zero and empty mean "not given".
 	year       int
 	zone       string
 	triageFile string
@@ -109,8 +107,6 @@ func (parsed *settings) chooseOutput(homeDirectory func() (string, error)) error
 	return nil
 }
 
-// parseSettings reads the command line of check and ui: one project folder. A setting from the command line
-// wins over one from the environment.
 func parseSettings(args []string, lookupEnv func(string) string, homeDirectory func() (string, error)) (settings, error) {
 	parsed, positional, err := parseFlags("omamori", args, lookupEnv, errUsage)
 	if err != nil {
@@ -137,7 +133,6 @@ func parseSettings(args []string, lookupEnv func(string) string, homeDirectory f
 	return parsed, nil
 }
 
-// parseTriage reads the command line of triage: one log file. The folder around it is the project folder.
 func parseTriage(args []string, lookupEnv func(string) string, homeDirectory func() (string, error)) (settings, error) {
 	parsed, positional, err := parseFlags("omamori triage", args, lookupEnv, errUsageTriage)
 	if err != nil {

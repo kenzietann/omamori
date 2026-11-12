@@ -27,23 +27,18 @@ type Case struct {
 	Rows     []string
 }
 
-// Options is everything a series needs. Config holds the target and the output folder of no run: they are set per run.
 type Options struct {
 	Config     taskrun.Config
 	ProviderID string
 	Model      string
 	Fixtures   string
-	// Runs is the number of runs for each case.
 	Runs int
 	// TokenCap is the most tokens that the whole series may use. It is the cost cap.
 	TokenCap int
-	// OutputBase is the folder for the runs of this series. It is created.
 	OutputBase string
-	// Progress is called after each run with a short line. It is optional.
 	Progress func(string)
 }
 
-// RunResult is one run, as numbers and a verdict. It holds no report text.
 type RunResult struct {
 	Verdict  Verdict
 	Requests int
@@ -51,14 +46,12 @@ type RunResult struct {
 	Error    string
 }
 
-// CaseResult is all the runs of one case.
 type CaseResult struct {
 	Case    Case
 	Runs    []RunResult
 	Skipped int
 }
 
-// Summary is the series.
 type Summary struct {
 	Model       string
 	Provider    string
@@ -182,7 +175,6 @@ func oneRun(ctx context.Context, options Options, current Case, year, number, re
 	return run
 }
 
-// Markdown is the table for the README. It holds numbers and fixed words only.
 func (summary Summary) Markdown(date time.Time) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "# Omamori live test results\n\nDate: %s  \nProvider: %s  \nModel: %s\n\n", date.UTC().Format("2006-01-02"), summary.Provider, summary.Model)

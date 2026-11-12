@@ -33,11 +33,7 @@ type Config struct {
 	// MaxTokensField is the name of the output limit. Newer OpenAI models want
 	// max_completion_tokens, and most other providers still want max_tokens.
 	MaxTokensField string
-	// ReasoningFallback is a value for reasoning_effort. It is used only when the provider rejects
-	// a request and names reasoning_effort as the cause. Some OpenAI models reason by default and
-	// then refuse tools on this protocol, unless reasoning is turned off.
 	ReasoningFallback string
-	// Reasoning is a level the user chose. It is sent as reasoning_effort on every request.
 	Reasoning string
 	Timeout   time.Duration
 }
@@ -129,7 +125,6 @@ func (client *Client) Send(ctx context.Context, request wire.Request) (wire.Resp
 		return response, err
 	}
 
-	// The same cleaned request is sent again, with one setting added.
 	client.effort = client.fallbackEffort
 	response, err = client.exchange(ctx, request)
 	if err != nil {
@@ -161,7 +156,6 @@ func (client *Client) exchange(ctx context.Context, request wire.Request) (wire.
 			return wire.Response{}, context.Canceled
 		}
 
-		// A timeout or a broken connection is worth another try.
 		return wire.Response{}, wire.ErrRetryable
 	}
 	defer httpResponse.Body.Close()
@@ -308,7 +302,6 @@ func parseResponse(answer []byte) (wire.Response, error) {
 		response.ToolCalls = append(response.ToolCalls, wire.ToolCall{ID: call.ID, Name: call.Function.Name, Arguments: wire.ParseArguments(call.Function.Arguments)})
 	}
 
-	// A cut-off answer may hold a tool call with an unfinished input, so it is not used.
 	if choice.FinishReason == "length" && len(response.ToolCalls) > 0 {
 		return wire.Response{}, wire.ErrBadResponse
 	}
@@ -316,7 +309,6 @@ func parseResponse(answer []byte) (wire.Response, error) {
 	return response, nil
 }
 
-// ListModels asks the provider which models it offers. No project data is sent, only the key.
 func ListModels(ctx context.Context, baseURL, apiKey string, timeout time.Duration) ([]string, error) {
 	parsed, err := url.Parse(baseURL)
 	if err != nil || !wire.SafeBaseURL(baseURL) {

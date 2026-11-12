@@ -25,7 +25,6 @@ type Expected struct {
 
 // Scenario is the logs of one day and what must be found in them.
 type Scenario struct {
-	// Files maps a file name to its text.
 	Files    map[string]string
 	Expected []Expected
 	// KnownMisses describes attacks that are in the logs and that the built-in rules do not find, by design
@@ -112,7 +111,6 @@ func (b *builder) ordinaryLogins() {
 		ip := fmt.Sprintf("198.51.100.%d", 10+index)
 		sessions := 3 + b.random.Intn(4)
 		for session := 0; session < sessions; session++ {
-			// Sessions of one person are at least 90 minutes apart.
 			at := b.at(8+session*2-session/2, b.random.Intn(25)+index*7, b.random.Intn(60))
 			method := "password"
 			if b.random.Intn(2) == 0 {
@@ -139,7 +137,6 @@ func (b *builder) ordinaryLogins() {
 	}
 }
 
-// ordinaryHost: cron jobs that every server has, one of them with curl (a health ping, not piped anywhere).
 func (b *builder) ordinaryHost() {
 	for hour := 0; hour < 24; hour++ {
 		b.syslog(b.at(hour, 17, 1), "CRON", "(root) CMD (   cd / && run-parts --report /etc/cron.hourly)")
@@ -148,8 +145,6 @@ func (b *builder) ordinaryHost() {
 	b.syslog(b.at(6, 25, 1), "CRON", "(root) CMD (test -x /usr/sbin/anacron || { cd / && run-parts --report /etc/cron.daily; })")
 }
 
-// internetNoise: what every server on the internet sees all day. Many addresses, each with a few tries.
-// Every address stays far under the limits, and the addresses are spread over the day.
 func (b *builder) internetNoise() {
 	for index := 0; index < 30; index++ {
 		ip := fmt.Sprintf("192.0.2.%d", 20+index)
@@ -166,7 +161,6 @@ func (b *builder) internetNoise() {
 	}
 }
 
-// ordinaryWeb: visitors, a monitoring check, and a search robot that follows some dead links.
 func (b *builder) ordinaryWeb() {
 	pages := []string{"/", "/about", "/blog/", "/blog/how-to-sleep-better", "/blog/environment-tips", "/static/app.js?v=3", "/static/site.css",
 		"/api/items?page=2", "/search?q=student+union+selection+results", "/search?q=select+a+plan", "/contact", "/docs/../index.html", "/login", "/pricing"}
@@ -185,7 +179,6 @@ func (b *builder) ordinaryWeb() {
 	for minute := 0; minute < 24*60; minute += 5 {
 		b.request(b.at(0, minute, 3), "198.51.100.5", "GET", "/healthz", 200, "curl/8.5.0")
 	}
-	// 20 dead links in one hour: far under 30 different missing paths in five minutes.
 	for index := 0; index < 20; index++ {
 		b.request(b.at(10, index*3, b.random.Intn(60)), "198.51.100.200", "GET", fmt.Sprintf("/old/page-%d.html", index), 404, crawler)
 	}
@@ -222,7 +215,6 @@ func (b *builder) attacks() ([]Expected, []string) {
 	}
 	expected = append(expected, Expected{"ssh_password_spray", sprayer}, Expected{"ssh_brute_force", sprayer})
 
-	// 3. Guessing for one account from ten addresses, two tries each.
 	at = b.at(13, 5, 0)
 	for index := 0; index < 10; index++ {
 		ip := fmt.Sprintf("203.0.113.%d", 101+index)
@@ -232,7 +224,6 @@ func (b *builder) attacks() ([]Expected, []string) {
 	}
 	expected = append(expected, Expected{"ssh_distributed_guessing", "deploy"})
 
-	// 4. Slow guessing: one try every 150 seconds for two hours. At most five tries are in any ten minutes.
 	slow := "203.0.113.60"
 	for try := 0; try < 48; try++ {
 		b.failed(b.at(20, 0, 0).Add(time.Duration(try*150)*time.Second), "root", slow, false)

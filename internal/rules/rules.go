@@ -37,10 +37,8 @@ var (
 	ErrInvalid = errors.New("a rule is not valid")
 )
 
-// Level is how serious an alert is.
 var levels = []string{"informational", "low", "medium", "high", "critical"}
 
-// Rule is one rule, a detection rule or a correlation rule.
 type Rule struct {
 	Name        string
 	ID          string
@@ -65,7 +63,6 @@ type Test struct {
 	Alerts int
 }
 
-// File is the YAML of one rule, with the keys that this engine reads.
 type document struct {
 	Name        string         `yaml:"name"`
 	ID          string         `yaml:"id"`
@@ -85,20 +82,15 @@ type document struct {
 	} `yaml:"tests"`
 }
 
-// Set is a group of rules that was checked: names are unique, references exist, and every test of every rule passes.
 type Set struct {
 	rules  []*Rule
 	byName map[string]*Rule
-	// ordered has every rule after the rules that it refers to.
 	ordered []*Rule
-	// quiet rules are counted by a correlation and give no alert of their own.
 	quiet map[*Rule]bool
 }
 
-// Rules lists the rules in the order in which they were loaded.
 func (set Set) Rules() []*Rule { return set.rules }
 
-// Parse reads the rules of one file. A file can hold several rules, divided by "---".
 func Parse(data []byte, file string) ([]*Rule, error) {
 	if len(data) > maxFileBytes {
 		return nil, ErrTooBig
@@ -193,13 +185,10 @@ func build(doc document, file string) (*Rule, error) {
 	return rule, nil
 }
 
-// Load reads every .yml and .yaml file in a folder, and the folders in it.
 func Load(directory string) (Set, error) {
 	return LoadFS(os.DirFS(directory))
 }
 
-// LoadFS reads every .yml and .yaml file of a file system. It checks that a correlation rule refers to
-// rules that exist, that no two rules have the same name, and that the tests of every rule pass.
 func LoadFS(system fs.FS) (Set, error) {
 	all, err := parseFS(system)
 	if err != nil {
@@ -209,7 +198,6 @@ func LoadFS(system fs.FS) (Set, error) {
 	return NewSet(all)
 }
 
-// parseFS reads the rule files of a file system, in the order of their names.
 func parseFS(system fs.FS) ([]*Rule, error) {
 	var files []string
 	err := fs.WalkDir(system, ".", func(path string, entry fs.DirEntry, walkErr error) error {
@@ -245,7 +233,6 @@ func parseFS(system fs.FS) ([]*Rule, error) {
 	return all, nil
 }
 
-// NewSet makes a set from parsed rules and checks it.
 func NewSet(parsed []*Rule) (Set, error) {
 	set := Set{byName: map[string]*Rule{}, quiet: map[*Rule]bool{}}
 	for _, rule := range parsed {
@@ -272,7 +259,6 @@ func (set *Set) add(rule *Rule) error {
 	return nil
 }
 
-// keys are the names by which other rules can refer to a rule.
 func (rule *Rule) keys() []string {
 	var keys []string
 	for _, key := range []string{rule.Name, rule.ID, rule.Title} {
@@ -284,8 +270,6 @@ func (rule *Rule) keys() []string {
 	return keys
 }
 
-// link checks the references and puts the rules in an order in which each rule comes after the rules it counts.
-// A correlation can count another correlation, but not in a circle.
 func (set *Set) link() error {
 	const (
 		visiting = 1
@@ -371,7 +355,6 @@ func truncate(text string, limit int) string {
 	return text[:limit] + "..."
 }
 
-// parseDuration reads 30s, 10m, 2h and 1d. The longest timespan is 30 days.
 func parseDuration(text string) (time.Duration, error) {
 	unit := time.Duration(1)
 	if days, isDays := strings.CutSuffix(text, "d"); isDays {
@@ -397,5 +380,4 @@ func compileRegex(pattern string) (*regexp.Regexp, error) {
 	return compiled, nil
 }
 
-// IsCorrelation says that the rule counts the hits of other rules.
 func (rule *Rule) IsCorrelation() bool { return rule.correlation != nil }

@@ -46,7 +46,6 @@ type Store struct {
 	system  string
 }
 
-// New makes a store for the Keychain of this machine.
 func New(service string) (*Store, error) {
 	return newStore(service, runSecurity, runtime.GOOS)
 }
@@ -59,7 +58,6 @@ func newStore(service string, run Runner, system string) (*Store, error) {
 	return &Store{service: service, run: run, system: system}, nil
 }
 
-// Available says whether keys can be saved here.
 func (store *Store) Available() bool {
 	return store.system == "darwin"
 }
@@ -98,9 +96,6 @@ func validKey(key string) bool {
 	return true
 }
 
-// Set saves the key for a provider. An older key of the same provider is replaced.
-// The key goes to the tool through its standard input, in hexadecimal form, so it is not visible
-// in the list of running programs and needs no quoting.
 func (store *Store) Set(ctx context.Context, providerID, key string) error {
 	if !store.Available() {
 		return ErrUnavailable
@@ -118,7 +113,6 @@ func (store *Store) Set(ctx context.Context, providerID, key string) error {
 	return nil
 }
 
-// Get returns the saved key of a provider, or ErrNotFound.
 func (store *Store) Get(ctx context.Context, providerID string) (string, error) {
 	if !store.Available() {
 		return "", ErrUnavailable
@@ -145,7 +139,6 @@ func (store *Store) Get(ctx context.Context, providerID string) (string, error) 
 	return key, nil
 }
 
-// Delete removes the saved key of a provider. A key that is not there is not an error.
 func (store *Store) Delete(ctx context.Context, providerID string) error {
 	if !store.Available() {
 		return ErrUnavailable

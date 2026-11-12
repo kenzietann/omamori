@@ -414,7 +414,6 @@ func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 	respond(w, j.view)
 }
 
-// Expired previews release captured evidence and no longer block a new run.
 func (s *Server) expireLocked() {
 	for _, j := range s.jobs {
 		if j.view.State == "ready" && j.ctx.Err() != nil {

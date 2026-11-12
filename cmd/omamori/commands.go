@@ -18,7 +18,6 @@ import (
 	"github.com/kenzietann/omamori/internal/tui"
 )
 
-// version is set when building: go build -ldflags "-X main.version=v1.0.0"
 var version = "dev"
 
 const (
@@ -108,19 +107,15 @@ type environment struct {
 	home           func() (string, error)
 	openScreen     func(tui.Model) error
 
-	// listModels replaces the real request in tests.
 	listModels taskrun.ModelLister
 	// keys keeps API keys between runs. Without it, keys are not saved.
 	keys taskrun.KeyStore
 	// settingsPath says where the choices are kept. Without it, they are not kept.
 	settingsPath func() (string, error)
-	// now and newProvider replace the clock and the real provider in tests. Nil means the real ones.
 	now         func() time.Time
 	newProvider taskrun.ProviderFactory
 }
 
-// mergeDefaults gives the command line and the environment the first word, then the saved choices.
-// A saved model is used only with the saved provider, and a saved level only with both.
 func mergeDefaults(chosen settings, saved appconfig.Settings) tui.Defaults {
 	defaults := tui.Defaults{ProviderID: chosen.provider, Model: chosen.model}
 

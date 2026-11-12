@@ -21,12 +21,8 @@ const Instruction = `Check this project for exposed secrets and personal data. `
 
 var detectorLine = regexp.MustCompile(`^(.*):(\d+): (\[((?:SECRET|EXAMPLE):[a-z0-9-]+|MYNUMBER|PHONE|NUMBERLIKE):\d{3,}\])$`)
 
-// SeverityKeptOut is for a key in an env file that .gitignore keeps out of git. It is the normal setup,
-// so it is listed in its own section and is not counted as a finding.
 const SeverityKeptOut = "kept-out"
 
-// SeverityNotYours is for a match in a library or in a file that a tool made. Code of other people is
-// not the responsibility of the project, and a phone-like number in it is nearly always sample text.
 const SeverityNotYours = "not-yours"
 
 // SeverityDoubtful is for a match that is most likely not real: digits inside a decimal number, a UUID or a name
@@ -61,7 +57,6 @@ type Collector struct {
 	history  HistoryReader
 }
 
-// HistoryReader tells which commits touched a file. The githistory package is the real one.
 type HistoryReader interface {
 	Commits(ctx context.Context, path string) githistory.Answer
 }
@@ -96,9 +91,6 @@ func (collector *Collector) Stats() Stats {
 	return collector.stats
 }
 
-// A file that is scanned twice gives the same lines twice. The key makes the second copy
-// count as the first one. A second finding of the same type on the same line has its own
-// occurrence number, so it is not lost.
 func (collector *Collector) absorb(text string) {
 	occurrences := make(map[string]int)
 
@@ -135,7 +127,6 @@ func parseDetectorLine(line string) (Finding, bool) {
 	}
 
 	findingType, severity, advice := describe(parts[4])
-	// A key in a local .env file is the usual place for it. It is exposed only if the file leaves the computer.
 	if strings.HasPrefix(parts[4], "SECRET:") && dotenvFile(parts[1]) {
 		advice = "A key in a local .env file is the normal place for it. It is exposed only if the file is committed, shared, or copied into a build or an image. Check that .gitignore lists it and that it was never committed (git log --all on the file). If it ever left your computer, revoke the key and create a new one with the smallest rights."
 	}
@@ -185,7 +176,6 @@ func describe(label string) (findingType, severity, advice string) {
 	return "phone", "medium", "This looks like a Japanese phone number. Remove it if it belongs to a person."
 }
 
-// dotenvFile says whether a path is an environment file like .env or .env.production.
 func dotenvFile(path string) bool {
 	name := path[strings.LastIndex(path, "/")+1:]
 
@@ -200,12 +190,10 @@ var libraryFolders = map[string]bool{
 	".turbo": true, ".gradle": true,
 }
 
-// Folders of AI coding tools hold plugins and skills that other people wrote. Their settings files stay yours.
 var toolFolders = map[string]bool{".agents": true, ".claude": true, ".codex": true, ".gemini": true, ".cursor": true, ".windsurf": true}
 
 var toolPluginFolders = map[string]bool{"skills": true, "plugins": true, "extensions": true, "marketplace": true}
 
-// libraryFile says whether a path is code of another project or a cache of it.
 func libraryFile(path string) bool {
 	parts := strings.Split(path, "/")
 	folders := parts[:len(parts)-1]
@@ -228,7 +216,6 @@ var generatedFolders = map[string]bool{
 
 var generatedSuffixes = []string{".map", ".min.js", ".min.css", ".bundle.js"}
 
-// generatedFile says whether a path is build output, a cache or a report that a tool made.
 func generatedFile(path string) bool {
 	parts := strings.Split(path, "/")
 	for _, folder := range parts[:len(parts)-1] {
@@ -349,8 +336,6 @@ func (collector *Collector) CheckIgnore(ctx context.Context) {
 
 const adviceHistoryStart = "This env file is ignored by .gitignore today, but git has it in its history"
 
-// applyHistory asks git if an env file that .gitignore keeps out was ever committed. If it was, the key is in the
-// history, and anyone who can read the repository can read it: that is a finding.
 func (collector *Collector) applyHistory(ctx context.Context, finding *Finding) {
 	if collector.history == nil {
 		return
@@ -372,7 +357,6 @@ func (collector *Collector) applyHistory(ctx context.Context, finding *Finding) 
 	}
 }
 
-// directoriesAbove lists the folders of a path from the project folder down: "" then "a" then "a/b".
 func directoriesAbove(path string) []string {
 	dirs := []string{""}
 	parts := strings.Split(path, "/")
@@ -383,8 +367,6 @@ func directoriesAbove(path string) []string {
 	return dirs
 }
 
-// readLayer returns the rules of the .gitignore in one folder. A nil layer with true means that there is
-// none. False means that it could not be found out.
 func (collector *Collector) readLayer(ctx context.Context, dir string) (*gitignore.Layer, bool) {
 	folder := dir
 	if folder == "" {
@@ -407,7 +389,6 @@ func (collector *Collector) readLayer(ctx context.Context, dir string) (*gitigno
 	return &gitignore.Layer{Dir: dir, Rules: gitignore.Parse(read.Text)}, true
 }
 
-// fullScanner is what the gateway offers to finish a scan that stopped at a limit.
 type fullScanner interface {
 	FullScan(ctx context.Context, path string) (gateway.Result, error)
 }
