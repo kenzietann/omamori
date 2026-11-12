@@ -94,6 +94,9 @@ type Finding struct {
 	Last     string     `json:"last"`
 	Entity   *Entity    `json:"entity,omitempty"`
 	Actions  []Action   `json:"suggested_actions"`
+	// WeakTimes says that a cited item has only the time of the last change of its file. First, Last and the
+	// order of the evidence are then not times of actions. The summary says so in words.
+	WeakTimes bool `json:"weak_times,omitempty"`
 }
 
 type Action struct {

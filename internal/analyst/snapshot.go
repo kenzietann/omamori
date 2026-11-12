@@ -33,7 +33,18 @@ var evidenceFields = []string{
 	"wazuh_rule_id", "wazuh_level", "agent_id", "signature_id", "signature_category", "app_protocol",
 	"flow_state", "bytes_to_server", "bytes_to_client", "tls_version", "target_user", "auth_status", "auth_substatus",
 	"parent_process_id", "parent_process_guid",
+	// Fields of artifacts from the forensic triage. Log events do not have them, so the snapshot of a
+	// log-only run, and with it every earlier recording, stays the same byte for byte.
+	TimeSourceField, "unit", "exec_key", "schedule", "key_type", "fingerprint", "key_options", "target", "shell", "pid", "local_address", "local_port",
 }
+
+const (
+	// TimeSourceField says where the time of an artifact comes from. It is the name that internal/forensics uses.
+	TimeSourceField = "time_source"
+	// WeakTimeSource marks a time that is only the last change of the file that holds the entry.
+	WeakTimeSource = "file_modified"
+)
+
 var entityFields = []string{event.SourceIP, event.User, event.Host}
 var severity = map[string]int{"critical": 4, "high": 3, "medium": 2, "low": 1, "informational": 0}
 

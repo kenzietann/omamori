@@ -202,6 +202,35 @@ func uniqueKeys(decoder *json.Decoder, depth int) error {
 	return err
 }
 
+// AlertSummary, RelatedSummary and WeakTimeNote are the only texts of a finding. The checker and the store
+// both use them, so a stored finding reads the same as a checked one and holds no text from the model.
+func AlertSummary(id, title string, count int) string {
+	return fmt.Sprintf("%s: the rule %q matched %d events or hits. A rule match alone does not prove compromise.", id, title, count)
+}
+
+func RelatedSummary(alerts int, entity Entity) string {
+	return fmt.Sprintf("%d alerts share %s=%s within 24 hours. A shared entity is a review lead, not proof of one attacker or a causal chain.", alerts, entity.Field, entity.Value)
+}
+
+// HasWeakTimes says that an item has only the time of the last change of its file.
+func HasWeakTimes(evidence []Evidence) bool {
+	for _, item := range evidence {
+		if item.Fields[TimeSourceField] == WeakTimeSource {
+			return true
+		}
+	}
+
+	return false
+}
+
+func WeakTimeNote(weak bool) string {
+	if !weak {
+		return ""
+	}
+
+	return " Some cited items have only the time of the last change of their file, so these times do not say when or in which order things happened."
+}
+
 func (index snapshotIndex) check(claim Claim) (Finding, string) {
 	finding := Finding{Kind: claim.Kind, Alerts: []string{}, Evidence: []Evidence{}, Actions: []Action{}}
 	if claim.Kind != "alert" && claim.Kind != "related" {
@@ -260,7 +289,7 @@ func (index snapshotIndex) check(claim Claim) (Finding, string) {
 			return finding, "the claimed count differs from the detected alert"
 		}
 		finding.Count = alert.Count
-		finding.Summary = fmt.Sprintf("%s: the rule %q matched %d events or hits. A rule match alone does not prove compromise.", alert.ID, alert.Title, alert.Count)
+		finding.Summary = AlertSummary(alert.ID, alert.Title, alert.Count)
 	} else {
 		entity, found := index.entities[claim.Entity]
 		if !found {
@@ -275,8 +304,11 @@ func (index snapshotIndex) check(claim Claim) (Finding, string) {
 			return finding, "the related alerts span more than 24 hours"
 		}
 		finding.Entity = &entity
-		finding.Summary = fmt.Sprintf("%d alerts share %s=%s within 24 hours. A shared entity is a review lead, not proof of one attacker or a causal chain.", len(claim.Alerts), entity.Field, entity.Value)
+		finding.Summary = RelatedSummary(len(claim.Alerts), entity)
 	}
+	// The model cannot leave this out and cannot add it: it is read from the cited evidence.
+	finding.WeakTimes = HasWeakTimes(finding.Evidence)
+	finding.Summary += WeakTimeNote(finding.WeakTimes)
 	if len(claim.Actions) > len(actionCatalog) {
 		return finding, "a suggested action is unknown or repeated"
 	}

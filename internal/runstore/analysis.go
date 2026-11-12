@@ -2,7 +2,6 @@ package runstore
 
 import (
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -65,11 +64,13 @@ func WithAnalysis(input store.RunInput, attached *Analysis) (store.RunInput, err
 		// Reconstruct the same factual prose as the checker instead of retaining any caller-supplied narrative.
 		if finding.Kind == "alert" {
 			alert := alerts[finding.Alerts[0]]
-			finding.Summary = fmt.Sprintf("%s: the rule %q matched %d events or hits. A rule match alone does not prove compromise.", alert.ID, alert.Title, alert.Count)
+			finding.Summary = analyst.AlertSummary(alert.ID, alert.Title, alert.Count)
 		} else {
-			entity := finding.Entity
-			finding.Summary = fmt.Sprintf("%d alerts share %s=%s within 24 hours. A shared entity is a review lead, not proof of one attacker or a causal chain.", len(finding.Alerts), entity.Field, entity.Value)
+			finding.Summary = analyst.RelatedSummary(len(finding.Alerts), *finding.Entity)
 		}
+		// Whether the times are weak is read from the evidence again, not taken from the caller.
+		finding.WeakTimes = analyst.HasWeakTimes(finding.Evidence)
+		finding.Summary += analyst.WeakTimeNote(finding.WeakTimes)
 		for number, action := range finding.Actions {
 			finding.Actions[number] = catalog[action.ID]
 		}
