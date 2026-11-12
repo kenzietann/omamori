@@ -27,16 +27,7 @@ func (b backend) prepareHome(setup tui.Setup) (tui.Plan, error) {
 	if setup.Replay {
 		return tui.Plan{}, errors.New("open an analyst recording with the replay command")
 	}
-	now := time.Now()
-	if b.config.Now != nil {
-		now = b.config.Now()
-	}
-	location := time.Local
-	year := now.Year()
-	if b.config.Triage != nil {
-		location = b.config.Triage.Location
-		year = b.config.Triage.Year
-	}
+	now, location, year := b.readTime()
 	if setup.Task == tui.TaskDemo {
 		folder := filepath.Join(b.config.OutputBase, "demo-"+now.UTC().Format("20060102-150405"))
 		return localHomePlan("Make demo data", "Create synthetic logs and a synthetic Linux system in "+folder, func(ctx context.Context) (tui.Result, error) {

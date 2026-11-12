@@ -94,6 +94,8 @@ func (backend backend) Prepare(setup tui.Setup) (tui.Plan, error) {
 	switch setup.Task {
 	case tui.TaskDetect, tui.TaskAnalyze, tui.TaskForensics, tui.TaskForensicsAnalyze, tui.TaskStored, tui.TaskDemo, tui.TaskDashboard:
 		return backend.prepareHome(setup)
+	case tui.TaskRuleDraft:
+		return backend.prepareRuleDraft(setup)
 	}
 	prepared := taskrun.Setup{ProviderID: setup.ProviderID, Model: setup.Model, Key: setup.Key, Reasoning: setup.Reasoning, Log: backend.log}
 	if setup.Task == tui.TaskTriage {
