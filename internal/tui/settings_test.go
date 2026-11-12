@@ -121,7 +121,7 @@ func TestTheHomeMenuHasSettingsBeforeQuit(t *testing.T) {
 	if !strings.Contains(model.View(), "Settings") || strings.Index(model.View(), "Settings") > strings.Index(model.View(), "Quit") {
 		t.Errorf("the menu is wrong:\n%s", model.View())
 	}
-	opened, _ := pressAll(t, model, "down", "down", "enter")
+	opened, _ := pressAll(t, model, "up", "up", "enter")
 	if opened.step != stepSettings {
 		t.Errorf("step = %d", opened.step)
 	}
@@ -133,7 +133,7 @@ func TestTheHomeMenuHasSettingsBeforeQuit(t *testing.T) {
 
 func TestSettingsShowTheCurrentChoices(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{plainChoice, savedChoice}}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{ProviderID: "openai", Model: "gpt-x", Reasoning: "high"}), "down", "down", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{ProviderID: "openai", Model: "gpt-x", Reasoning: "high"}), "up", "up", "enter")
 
 	for _, want := range []string{"Settings", "Provider:   OpenAI", "Model:      gpt-x", "Reasoning:  high", "API key:    key saved in your Keychain", "❯ Change provider, model and reasoning level", "Forget the saved key of OpenAI", "Back to the home screen"} {
 		if !strings.Contains(model.View(), want) {
@@ -141,7 +141,7 @@ func TestSettingsShowTheCurrentChoices(t *testing.T) {
 		}
 	}
 
-	empty, _ := pressAll(t, newModelWith("/work/project", &fakeBackend{choices: []Choice{plainChoice}}, Defaults{}), "down", "down", "enter")
+	empty, _ := pressAll(t, newModelWith("/work/project", &fakeBackend{choices: []Choice{plainChoice}}, Defaults{}), "up", "up", "enter")
 	for _, want := range []string{"Provider:   (not chosen)", "Model:      (not chosen)", "Reasoning:  provider default"} {
 		if !strings.Contains(empty.View(), want) {
 			t.Errorf("the empty settings have no %q:\n%s", want, empty.View())
@@ -154,7 +154,7 @@ func TestSettingsShowTheCurrentChoices(t *testing.T) {
 
 func TestSettingsMoveAroundAndGoBack(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{savedChoice}}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "down", "down", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "up", "up", "enter")
 
 	up, _ := press(t, model, "up")
 	down, _ := pressAll(t, model, "down", "down", "down")
@@ -175,7 +175,7 @@ func TestSettingsMoveAroundAndGoBack(t *testing.T) {
 
 func TestChangingTheSettingsSavesThemAndNeverAsksForAPlan(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{plainChoice, savedChoice}, models: []string{"gpt-a", "gpt-b"}, reasoning: testLevels, preview: "p"}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "down", "down", "enter", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "up", "up", "enter", "enter")
 
 	if model.step != stepProvider || !model.settingsMode || model.providerCursor != 0 {
 		t.Fatalf("step = %d", model.step)
@@ -207,7 +207,7 @@ func TestChangingTheSettingsSavesThemAndNeverAsksForAPlan(t *testing.T) {
 func TestTheSettingsFlowStartsWhereTheSavedChoicesAre(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{plainChoice, savedChoice}, models: []string{"gpt-a", "gpt-b", "gpt-c"}, reasoning: testLevels}
 	saved := Defaults{ProviderID: "openai", Model: "gpt-b", Reasoning: "high"}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, saved), "down", "down", "enter", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, saved), "up", "up", "enter", "enter")
 
 	if model.providerCursor != 1 {
 		t.Errorf("the provider cursor is %d, want the saved provider", model.providerCursor)
@@ -224,7 +224,7 @@ func TestTheSettingsFlowStartsWhereTheSavedChoicesAre(t *testing.T) {
 
 func TestEscapeInTheSettingsFlowGoesBackToTheSettings(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{savedChoice}}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "down", "down", "enter", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "up", "up", "enter", "enter")
 
 	back, _ := press(t, model, "esc")
 
@@ -235,7 +235,7 @@ func TestEscapeInTheSettingsFlowGoesBackToTheSettings(t *testing.T) {
 
 func TestASettingsSaveErrorIsShownAndTheFlowStays(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{savedChoice}, models: []string{"gpt-a"}, saveSettingsErr: errors.New("the settings file cannot be written")}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "down", "down", "enter", "enter", "enter", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "up", "up", "enter", "enter", "enter", "enter")
 
 	if model.step != stepModel || !strings.Contains(model.View(), "the settings file cannot be written") || model.defaults != (Defaults{}) {
 		t.Errorf("step = %d, defaults = %+v:\n%s", model.step, model.defaults, model.View())
@@ -250,7 +250,7 @@ func TestASettingsSaveErrorIsShownAndTheFlowStays(t *testing.T) {
 func TestSettingsWithATypedKeyWipeItWhenDone(t *testing.T) {
 	const key = "sk-SECRET-key-123456"
 	backend := &fakeBackend{choices: []Choice{plainChoice}, models: []string{"claude-test"}, canSaveKeys: true}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "down", "down", "enter", "enter", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "up", "up", "enter", "enter", "enter")
 	model = typeText(t, model, key)
 
 	model, _ = pressAll(t, model, "enter", "enter")
@@ -265,7 +265,7 @@ func TestSettingsWithATypedKeyWipeItWhenDone(t *testing.T) {
 
 func TestForgettingASavedKey(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{savedChoice, {ID: "gemini", Name: "Gemini", KeySaved: true}}}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "down", "down", "enter", "down", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "up", "up", "enter", "down", "enter")
 
 	if len(backend.forgotKeys) != 1 || backend.forgotKeys[0] != "openai" || !strings.Contains(model.View(), "The saved key was removed.") {
 		t.Fatalf("forgot = %q:\n%s", backend.forgotKeys, model.View())
@@ -280,7 +280,7 @@ func TestForgettingASavedKey(t *testing.T) {
 
 func TestAKeyThatCannotBeForgottenSaysSo(t *testing.T) {
 	backend := &fakeBackend{choices: []Choice{savedChoice}, forgetKeyErr: errors.New("details that must not be shown")}
-	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "down", "down", "enter", "down", "enter")
+	model, _ := pressAll(t, newModelWith("/work/project", backend, Defaults{}), "up", "up", "enter", "down", "enter")
 
 	if !strings.Contains(model.View(), "The saved key could not be removed.") || strings.Contains(model.View(), "details") || !strings.Contains(model.View(), "Forget the saved key of OpenAI") {
 		t.Errorf("the screen is wrong:\n%s", model.View())
@@ -291,7 +291,7 @@ func TestSettingsTextFromTheBackendIsShownSafelyAndFits(t *testing.T) {
 	hostile := "evil\x1b[2J\u202e" + strings.Repeat("w", 100)
 	backend := &fakeBackend{choices: []Choice{{ID: "x", Name: hostile, KeySaved: true}}}
 	model := sized(newModelWith("/work/project", backend, Defaults{ProviderID: "x", Model: hostile, Reasoning: hostile}), 40, 24)
-	model, _ = pressAll(t, model, "down", "down", "enter")
+	model, _ = pressAll(t, model, "up", "up", "enter")
 
 	if character, ok := hasNoUnsafeCharacters(model.View()); !ok {
 		t.Errorf("the view has the character %U", character)
@@ -425,7 +425,7 @@ func FuzzSettings(f *testing.F) {
 
 		var views []string
 		for _, keys := range [][]string{
-			{"down", "down", "enter"},
+			{"up", "up", "enter"},
 			{"enter", "enter"},
 			{"enter", "enter", "enter"},
 			{"esc", "esc", "down", "enter"},

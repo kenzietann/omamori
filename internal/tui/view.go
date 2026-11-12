@@ -199,7 +199,19 @@ func (model Model) targetLine(label string) string {
 }
 
 func (model Model) menuView() string {
-	menu := []string{"Task A: Exposure check", "Task B: Log triage", "Settings", "Quit"}
+	// The names stand in one column, and what each one does stands after it.
+	width := 0
+	for _, item := range menuItems {
+		width = max(width, len([]rune(item.label)))
+	}
+	menu := make([]string, 0, len(menuItems))
+	for _, item := range menuItems {
+		label := item.label
+		if item.note != "" {
+			label += strings.Repeat(" ", width-len([]rune(item.label))) + "  " + item.note
+		}
+		menu = append(menu, label)
+	}
 
 	lead := append(model.headerLines(), "", model.targetLine("Target folder: "), "")
 	var trail []string
@@ -383,7 +395,12 @@ func (model Model) consentLead() []string {
 		consent = model.plan.ConsentText
 	}
 
-	return []string{model.oneLineHeader(), "", model.accentLine("Please confirm before anything is sent"), "",
+	heading := "Please confirm before anything is sent"
+	if model.plan != nil && model.plan.Local {
+		heading = "Please confirm. This runs on this computer, and nothing is sent"
+	}
+
+	return []string{model.oneLineHeader(), "", model.accentLine(heading), "",
 		model.warnLine(consent), "", model.dimLine(model.dryRunTitle()), ""}
 }
 
@@ -419,6 +436,9 @@ func (model Model) maxConsentScroll() int {
 }
 
 func (model Model) dryRunTitle() string {
+	if model.plan != nil && model.plan.Local {
+		return "Nothing has been done yet. This is what the run will do:"
+	}
 	if model.plan != nil && model.plan.Summary != "" && !model.consentFull {
 		return "Nothing has been sent yet. This is a summary of the first request:"
 	}
@@ -437,6 +457,9 @@ func (model Model) consentView() string {
 	}
 
 	hints := []hint{{"enter", "send and start"}, {"up/down", "scroll"}}
+	if model.plan != nil && model.plan.Local {
+		hints[0] = hint{"enter", "start"}
+	}
 	if model.plan != nil && model.plan.Summary != "" {
 		if model.consentFull {
 			hints = append(hints, hint{"d", "summary"})
@@ -468,7 +491,7 @@ func (model Model) runView() string {
 
 	// The line is cut once, as a whole, so that it never goes over the width.
 	const keys = "  (esc: cancel, q: quit)"
-	if !model.cancelling {
+	if !model.cancelling && !model.localRun {
 		title += "  " + model.progress.bar() + " " + strconv.Itoa(model.progress.percent()) + "%  " + model.progress.summary()
 	}
 	line := model.truncate(mark+" "+title+keys, 0)

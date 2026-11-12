@@ -332,3 +332,18 @@ messages follow Conventional Commits.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+### Home menu
+
+`omamori ui <folder>` opens the terminal home menu. It connects exposure checks,
+log triage, local detection, checked AI analysis, forensic collection (with an
+optional AI review), stored-run listing and synthetic demo generation to their
+real services. Local tasks skip provider setup; AI tasks preview the sanitized
+request before confirmation. Stored-run listing uses the configured database and
+does not create a missing local store during preparation.
+
+The menu uses built-in rules and the supplied folder. Use the direct commands
+for custom rules, optional forensic process/socket snapshots, storage filters,
+case management and other advanced flags. Demo generation writes separate logs
+and host artifacts under a new output folder; open its `logs` or `host/root`
+folder for the corresponding task.

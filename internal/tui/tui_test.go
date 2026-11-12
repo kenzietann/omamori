@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -276,6 +277,9 @@ func startedRun(t testing.TB, runner Runner) (Model, tea.Cmd) {
 }
 
 func TestHomeMenuMovesAndGoesAroundTheEnds(t *testing.T) {
+	// The menu grows with the program, so the ends are counted and not written down.
+	last := len(menuItems) - 1
+	downs := func(count int) []string { return slices.Repeat([]string{"down"}, count) }
 	testCases := []struct {
 		name       string
 		keys       []string
@@ -283,11 +287,11 @@ func TestHomeMenuMovesAndGoesAroundTheEnds(t *testing.T) {
 	}{
 		{"start", nil, 0},
 		{"down", []string{"down"}, 1},
-		{"down to the end", []string{"down", "down", "down"}, 3},
-		{"down past the end goes to the top", []string{"down", "down", "down", "down"}, 0},
-		{"down around once and a bit more", []string{"down", "down", "down", "down", "down"}, 1},
-		{"up at the top goes to the bottom", []string{"up"}, 3},
-		{"up twice from the top", []string{"up", "up"}, 2},
+		{"down to the end", downs(last), last},
+		{"down past the end goes to the top", downs(last + 1), 0},
+		{"down around once and a bit more", downs(last + 2), 1},
+		{"up at the top goes to the bottom", []string{"up"}, last},
+		{"up twice from the top", []string{"up", "up"}, last - 1},
 		{"down then up", []string{"down", "down", "up"}, 1},
 		{"other keys do nothing", []string{"b", "pgup", "esc"}, 0},
 	}
@@ -345,7 +349,7 @@ func TestHomeChoices(t *testing.T) {
 		t.Errorf("Task A checked a task: %q", notReady.taskChecks)
 	}
 
-	_, quitCommand := pressAll(t, model, "down", "down", "down", "enter")
+	_, quitCommand := pressAll(t, model, "up", "enter")
 	if !isQuit(quitCommand) {
 		t.Error("Quit in the menu does not quit")
 	}

@@ -16,6 +16,7 @@ const keyActionWait = 15 * time.Second
 // backend connects the screen to the core. It only converts types and holds no rules.
 type backend struct {
 	config taskrun.Config
+	env    environment
 	// settingsPath is where the choices are kept. Empty means that they are not kept.
 	settingsPath string
 	// log is the log of the triage, relative to the project folder. Empty means auth.log.
@@ -94,6 +95,10 @@ func (backend backend) ReasoningChoices(providerID, model string) []tui.Reasonin
 }
 
 func (backend backend) Prepare(setup tui.Setup) (tui.Plan, error) {
+	switch setup.Task {
+	case tui.TaskDetect, tui.TaskAnalyze, tui.TaskForensics, tui.TaskForensicsAnalyze, tui.TaskStored, tui.TaskDemo:
+		return backend.prepareHome(setup)
+	}
 	prepared := taskrun.Setup{ProviderID: setup.ProviderID, Model: setup.Model, Key: setup.Key, Reasoning: setup.Reasoning, Log: backend.log}
 	if setup.Task == tui.TaskTriage {
 		prepared.Task = taskrun.TaskTriage

@@ -279,7 +279,7 @@ func TestNoPageHasFrameLines(t *testing.T) {
 	list, _ := pressAll(t, base, "enter", "down", "enter")
 	reasoning, _ := pressAll(t, base, "enter", "down", "enter", "enter")
 	consent, _ := pressAll(t, base, "enter", "down", "enter", "enter", "enter")
-	settings, _ := pressAll(t, base, "down", "down", "enter")
+	settings, _ := pressAll(t, base, "up", "up", "enter")
 
 	for name, model := range map[string]Model{"menu": base, "provider": provider, "key": key, "models": list, "reasoning": reasoning, "consent": consent, "settings": settings} {
 		if strings.Contains(model.View(), "───") {

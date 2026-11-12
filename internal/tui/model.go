@@ -31,12 +31,48 @@ const (
 	stepSettings
 )
 
+// menuItem is one line of the home screen. A task with ai false runs on this computer only, so it needs
+// no provider, no model and no key, and it goes straight to the page that asks for a confirmation.
+type menuItem struct {
+	label string
+	note  string
+	task  string
+	ai    bool
+	kind  menuKind
+}
+
+type menuKind int
+
 const (
-	menuTaskA = iota
-	menuTaskB
-	menuSettings
-	menuQuit
+	menuTask menuKind = iota
+	menuOpenSettings
+	menuLeave
 )
+
+// menuItems is the home screen: every feature of the program, in the order of a typical piece of work.
+// A feature that is not here can only be reached from the command line.
+var menuItems = []menuItem{
+	{label: "Task A: Exposure check", note: "secrets and personal data in a project, with AI", task: "", ai: true},
+	{label: "Task B: Log triage", note: "sshd auth.log, with AI", task: TaskTriage, ai: true},
+	{label: "Detect", note: "run the rules over the logs in the folder, no AI", task: TaskDetect},
+	{label: "Analyze", note: "detect, then the AI reviews the alerts and every claim is checked", task: TaskAnalyze, ai: true},
+	{label: "Forensics", note: "read a Linux system in the folder: hashes, rules, timeline, no AI", task: TaskForensics},
+	{label: "Forensics + AI review", note: "the same, then the AI reviews the alerts", task: TaskForensicsAnalyze, ai: true},
+	{label: "Stored runs", note: "list what is in the local database", task: TaskStored},
+	{label: "Make demo data", note: "write synthetic logs and a synthetic system to try the above", task: TaskDemo},
+	{label: "Settings", kind: menuOpenSettings},
+	{label: "Quit", kind: menuLeave},
+}
+
+func menuIndex(kind menuKind) int {
+	for index, item := range menuItems {
+		if item.kind == kind {
+			return index
+		}
+	}
+
+	return 0
+}
 
 const (
 	stepBuffer     = 256
@@ -78,6 +114,7 @@ var ErrKeyRejected = errors.New("the provider rejected the key")
 
 type Setup struct {
 	// Task is empty for the exposure check, and TaskTriage for the log triage.
+	// It can also be one of the other Task names.
 	Task string
 	// Replay makes the run a replay of the recording that the backend holds. No provider, model or key is needed.
 	Replay     bool
@@ -94,8 +131,16 @@ type ReasoningChoice struct {
 	Label string
 }
 
-// TaskTriage is the name of the log triage in Setup.
-const TaskTriage = "triage"
+// Names of the tasks in Setup. The empty name is the exposure check.
+const (
+	TaskTriage           = "triage"
+	TaskDetect           = "detect"
+	TaskAnalyze          = "analyze"
+	TaskForensics        = "forensics"
+	TaskForensicsAnalyze = "forensics-analyze"
+	TaskStored           = "stored"
+	TaskDemo             = "demo"
+)
 
 // A Plan is what the user is asked to confirm. Nothing has been sent when a Plan exists.
 type Plan struct {
@@ -112,6 +157,9 @@ type Plan struct {
 	MaxTokens   int
 	Confirm     func()
 	Run         Runner
+	// Local says that the run stays on this computer: nothing is sent to anyone. The page that asks for the
+	// confirmation says so, and the running line shows no budget of requests and tokens.
+	Local bool
 }
 
 // Backend does the real work for the screen. It is defined here, where it is used,
@@ -189,6 +237,7 @@ type Model struct {
 	settingsCursor int
 	keyNotice      string
 	consentFull    bool
+	localRun       bool
 	consentScroll  int
 	task           string
 	title          string
@@ -494,27 +543,55 @@ func (model Model) handleHomeKey(key string) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "up":
-		model.cursor = moveUp(model.cursor, menuQuit+1)
+		model.cursor = moveUp(model.cursor, len(menuItems))
 		model.notice = ""
 	case "down":
-		model.cursor = moveDown(model.cursor, menuQuit+1)
+		model.cursor = moveDown(model.cursor, len(menuItems))
 		model.notice = ""
 	case "enter":
-		switch model.cursor {
-		case menuTaskA:
-			return model.startTask(""), nil
-		case menuTaskB:
-			return model.startTask(TaskTriage), nil
-		case menuSettings:
+		item := menuItems[model.cursor]
+		switch {
+		case item.kind == menuOpenSettings:
 			return model.openSettings(), nil
-		case menuQuit:
+		case item.kind == menuLeave:
 			model.quitting = true
 
 			return model, tea.Quit
+		case item.ai:
+			return model.startTask(item.task), nil
+		default:
+			return model.startLocal(item.task), nil
 		}
 	}
 
 	return model, nil
+}
+
+// startLocal prepares a task that needs no AI provider. The backend looks at the folder and says what the
+// run will do. Nothing is done until the user has read that and agreed, as for every other task.
+func (model Model) startLocal(task string) Model {
+	model.settingsMode = false
+	model.task = task
+	model.notice = ""
+	if model.target == "" || model.backend == nil {
+		model.notice = "There is no target folder. Start Omamori with a folder: omamori ui <folder>"
+		return model
+	}
+
+	plan, err := model.backend.Prepare(Setup{Task: task})
+	if err != nil {
+		model.notice = err.Error()
+		return model
+	}
+	// Whatever the backend says, a task from this path is shown as local. It was given no provider.
+	plan.Local = true
+	model.plan = &plan
+	model.consentFull = false
+	model.consentScroll = 0
+	model.hasPending = false
+	model.step = stepConsent
+
+	return model
 }
 
 func (model Model) beginSetup() Model {
@@ -1000,9 +1077,12 @@ func (model Model) handleConsentKey(key string) (tea.Model, tea.Cmd) {
 			model.consentScroll = 0
 		}
 	case "esc", "n":
+		model.notice = "Nothing was sent."
+		if model.plan != nil && model.plan.Local {
+			model.notice = "Nothing was started."
+		}
 		model.plan = nil
 		model.step = stepMenu
-		model.notice = "Nothing was sent."
 	case "enter", "y":
 		return model.confirm()
 	}
@@ -1019,6 +1099,7 @@ func (model Model) confirm() (tea.Model, tea.Cmd) {
 
 	model = model.sayRunStart(plan)
 	model.progress = progress{maxRequests: plan.MaxRequests, maxTokens: plan.MaxTokens}
+	model.localRun = plan.Local
 	model.plan = nil
 	model.step = stepMenu
 	plan.Confirm()

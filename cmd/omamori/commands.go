@@ -299,12 +299,14 @@ func runScreen(command string, args []string, env environment) int {
 	}
 
 	config := taskrun.Config{
-		Target:     chosen.target,
-		OutputBase: chosen.output,
-		Limits:     agent.Limits{MaxSteps: chosen.maxSteps, MaxTokens: chosen.maxTokens},
-		LookupEnv:  env.lookupEnv,
-		ListModels: env.listModels,
-		Keys:       env.keys,
+		Target:      chosen.target,
+		OutputBase:  chosen.output,
+		Limits:      agent.Limits{MaxSteps: chosen.maxSteps, MaxTokens: chosen.maxTokens},
+		LookupEnv:   env.lookupEnv,
+		ListModels:  env.listModels,
+		Keys:        env.keys,
+		Now:         env.now,
+		NewProvider: env.newProvider,
 	}
 	if command != "check" || chosen.triageFile != "" {
 		triageConfig, err := loadTriageConfig(chosen, env)
@@ -323,7 +325,7 @@ func runScreen(command string, args []string, env environment) int {
 			saved, _ = appconfig.Load(path)
 		}
 	}
-	model := tui.New(chosen.target, backend{config: config, settingsPath: path, log: chosen.log}, mergeDefaults(chosen, saved)).WithVersion(version)
+	model := tui.New(chosen.target, backend{config: config, env: env, settingsPath: path, log: chosen.log}, mergeDefaults(chosen, saved)).WithVersion(version)
 	switch command {
 	case "check":
 		model = model.WithTask("")
