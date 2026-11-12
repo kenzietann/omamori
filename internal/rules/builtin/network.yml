@@ -1,0 +1,246 @@
+# Movement inside a network, and what leaves it. The fields come from the syslog parser and from the
+# Zeek and Suricata parsers. "Internal" means an address of the private ranges (RFC 1918).
+# These rules know nothing about your network. A jump host, a scanner of your own or a backup to a
+# cloud will fire them, and then the rule needs a filter for that address.
+title: SSH login failed from an internal address
+name: ssh_internal_login_failure
+id: 6f3a2c10-0401-4a6e-9d7b-0a1b2c3d4e01
+description: One failed SSH login that came from inside the network. It is counted by other rules and gives no alert alone.
+level: low
+logsource: {product: linux, service: sshd}
+detection:
+  selection:
+    action: login
+    outcome: failure
+    src_ip|cidr: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']
+  condition: selection
+tests:
+  - name: an internal failure matches
+    events: [{product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}]
+    expect: {alerts: 1}
+  - name: a failure from outside and an internal success do not match
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: success, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 11.0.0.1, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 172.32.0.1, user: root}
+    expect: {alerts: 0}
+---
+title: SSH password guessing from an internal address
+name: ssh_internal_guessing
+id: 6f3a2c10-0402-4a6e-9d7b-0a1b2c3d4e02
+description: Five or more failed SSH logins from one internal address in ten minutes. A server does not guess passwords of other servers, so the sending host may be under someone else's control.
+level: high
+tags: [attack.lateral_movement, attack.t1021.004, attack.t1110]
+correlation:
+  type: event_count
+  rules: [ssh_internal_login_failure]
+  group-by: [src_ip]
+  timespan: 10m
+  condition: {gte: 5}
+tests:
+  - name: five internal failures are one alert
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+    expect: {alerts: 1}
+  - name: a person who types a wrong password twice is no alert
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: aiko}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: aiko}
+      - {product: linux, service: sshd, action: login, outcome: success, src_ip: 10.0.1.10, user: aiko}
+    expect: {alerts: 0}
+  - name: five failures from outside are for another rule
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
+    expect: {alerts: 0}
+---
+title: SSH login succeeded after guessing from an internal address
+name: ssh_internal_guessing_success
+id: 6f3a2c10-0403-4a6e-9d7b-0a1b2c3d4e03
+description: An internal address guessed passwords of another host and then logged in. Treat both hosts as taken over until they are checked.
+level: critical
+tags: [attack.lateral_movement, attack.t1021.004, attack.t1078]
+correlation:
+  type: temporal_ordered
+  rules: [ssh_internal_guessing, ssh_login_success]
+  group-by: [src_ip]
+  timespan: 10m
+tests:
+  - name: five failures and then a success are one alert
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: success, src_ip: 10.0.1.10, user: deploy}
+    expect: {alerts: 1}
+  - name: a success from another internal address is no alert
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: success, src_ip: 10.0.9.5, user: deploy}
+    expect: {alerts: 0}
+  - name: two wrong passwords and then a success are no alert
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: aiko}
+      - {product: linux, service: sshd, action: login, outcome: failure, src_ip: 10.0.1.10, user: aiko}
+      - {product: linux, service: sshd, action: login, outcome: success, src_ip: 10.0.1.10, user: aiko}
+    expect: {alerts: 0}
+---
+title: Internal connection that got no answer or was refused
+name: net_internal_unanswered
+id: 6f3a2c10-0404-4a6e-9d7b-0a1b2c3d4e04
+description: One connection between two internal addresses that was not set up (Zeek states S0 and REJ). It is counted by another rule and gives no alert alone.
+level: informational
+logsource: {product: zeek, service: conn}
+detection:
+  selection:
+    conn_state: [S0, REJ]
+    src_ip|cidr: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']
+  inside:
+    dst_ip|cidr: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']
+  condition: selection and inside
+tests:
+  - name: unanswered and refused match
+    events:
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.7, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.8, dst_port: 22, conn_state: REJ, bytes_sent: 0}
+    expect: {alerts: 2}
+  - name: a normal connection and a connection to the outside do not match
+    events:
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.20, dst_port: 22, conn_state: SF, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 203.0.113.80, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 203.0.113.9, dst_ip: 10.0.1.10, dst_port: 22, conn_state: REJ, bytes_sent: 0}
+    expect: {alerts: 0}
+---
+title: One internal address tries many internal addresses
+name: net_internal_sweep
+id: 6f3a2c10-0405-4a6e-9d7b-0a1b2c3d4e05
+description: One internal address had unanswered or refused connections to ten or more different internal addresses in five minutes. This is how a network is searched for hosts.
+level: high
+tags: [attack.discovery, attack.t1046, attack.t1018]
+correlation:
+  type: value_count
+  rules: [net_internal_unanswered]
+  group-by: [src_ip]
+  timespan: 5m
+  condition: {gte: 10, field: dst_ip}
+tests:
+  - name: ten different addresses are one alert
+    events:
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.1, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.2, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.3, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.4, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.5, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.6, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.7, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.8, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.9, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.1.10, dst_ip: 10.0.2.10, dst_port: 22, conn_state: S0, bytes_sent: 0}
+    expect: {alerts: 1}
+  - name: ten tries of one address that is gone are no alert
+    events:
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 10.0.2.99, dst_port: 22, conn_state: S0, bytes_sent: 0}
+    expect: {alerts: 0}
+---
+title: Large upload from an internal to an external address
+name: net_large_upload
+id: 6f3a2c10-0406-4a6e-9d7b-0a1b2c3d4e06
+description: One connection in which an internal address sent 100 MB or more to an external address. It is counted by another rule and gives no alert alone.
+level: low
+logsource: {product: zeek, service: conn}
+detection:
+  selection:
+    bytes_sent|gte: 100000000
+    src_ip|cidr: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']
+  inside:
+    dst_ip|cidr: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']
+  condition: selection and not inside
+tests:
+  - name: a large upload to the outside matches
+    events: [{product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.30, dst_ip: 203.0.113.80, dst_port: 22, conn_state: SF, bytes_sent: 2400000000}]
+    expect: {alerts: 1}
+  - name: a backup inside the network and a small upload do not match
+    events:
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.30, dst_ip: 10.0.9.6, dst_port: 22, conn_state: SF, bytes_sent: 2400000000}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.20, dst_ip: 198.51.100.200, dst_port: 22, conn_state: SF, bytes_sent: 5000000}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 203.0.113.9, dst_ip: 10.0.1.10, dst_port: 22, conn_state: SF, bytes_sent: 2400000000}
+    expect: {alerts: 0}
+---
+title: Large amount of data sent to an external address
+name: net_large_upload_external
+id: 6f3a2c10-0407-4a6e-9d7b-0a1b2c3d4e07
+description: An internal address sent 100 MB or more in one connection to an external address. One alert for each burst. It can be a backup or an update that you know.
+level: high
+tags: [attack.exfiltration, attack.t1048]
+correlation:
+  type: event_count
+  rules: [net_large_upload]
+  group-by: [src_ip]
+  timespan: 1h
+  condition: {gte: 1}
+tests:
+  - name: two large uploads of one host are one alert
+    events:
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.30, dst_ip: 203.0.113.80, dst_port: 22, conn_state: SF, bytes_sent: 2400000000}
+      - {product: zeek, service: conn, action: network_connect, src_ip: 10.0.2.30, dst_ip: 203.0.113.80, dst_port: 22, conn_state: SF, bytes_sent: 2400000000}
+    expect: {alerts: 1}
+---
+title: Network sensor alert of the highest severity
+name: ids_severity_one
+id: 6f3a2c10-0408-4a6e-9d7b-0a1b2c3d4e08
+description: One Suricata alert with severity 1. It is counted by another rule and gives no alert alone.
+level: low
+logsource: {product: suricata, service: alert}
+detection:
+  selection: {rule_severity: 1}
+  condition: selection
+tests:
+  - name: severity 1 matches and severity 3 does not
+    events:
+      - {product: suricata, service: alert, src_ip: 10.0.1.10, dst_ip: 10.0.2.20, rule_severity: 1, signature: "SYNTHETIC scan"}
+      - {product: suricata, service: alert, src_ip: 10.0.1.10, dst_ip: 10.0.2.20, rule_severity: 3, signature: "SYNTHETIC info"}
+      - {product: suricata, service: flow, src_ip: 10.0.1.10, dst_ip: 10.0.2.20, rule_severity: 1}
+    expect: {alerts: 1}
+---
+title: Network sensor raised its highest severity for an address
+name: ids_high_severity_alerts
+id: 6f3a2c10-0409-4a6e-9d7b-0a1b2c3d4e09
+description: Suricata gave one or more alerts of severity 1 for traffic from one address. One alert for each burst. What it means depends on the signature, which is in the evidence.
+level: high
+tags: [attack.discovery]
+correlation:
+  type: event_count
+  rules: [ids_severity_one]
+  group-by: [src_ip]
+  timespan: 10m
+  condition: {gte: 1}
+tests:
+  - name: three sensor alerts for one address are one alert
+    events:
+      - {product: suricata, service: alert, src_ip: 10.0.1.10, rule_severity: 1}
+      - {product: suricata, service: alert, src_ip: 10.0.1.10, rule_severity: 1}
+      - {product: suricata, service: alert, src_ip: 10.0.1.10, rule_severity: 1}
+    expect: {alerts: 1}
