@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/detect"
 	"github.com/kenzietann/omamori/internal/htmlreport"
 	"github.com/kenzietann/omamori/internal/intake"
@@ -24,7 +25,7 @@ import (
 )
 
 const (
-	usageDetect   = "usage: omamori detect [--rules folder] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
+	usageDetect   = "usage: omamori detect [--rules folder] [--assets file] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
 	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] [--host | --campaign] <new folder>"
 )
 
@@ -92,6 +93,8 @@ func runDetect(args []string, env environment) int {
 	flags.StringVar(&format, "format", "", "syslog, web, json, suricata, zeek, wazuh or windows")
 	flags.IntVar(&chosen.year, "year", 0, "year of syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of syslog lines")
+	var assetsPath string
+	flags.StringVar(&assetsPath, "assets", "", "asset list: names and addresses of your own machines")
 	flags.StringVar(&chosen.output, "output", "", "folder for the reports")
 	paths, err := splitFlags(flags, args)
 	if err != nil || len(paths) == 0 {
@@ -144,7 +147,13 @@ func runDetect(args []string, env environment) int {
 		sources = append(sources, absolute)
 	}
 
-	outcome, err := detect.Run(paths, loaded, rulesFrom, intake.Options{Year: chosen.year, Location: location, Format: format}, now)
+	var machines *assets.List
+	if assetsPath != "" {
+		if machines, err = assets.Load(assetsPath); err != nil {
+			return fail(err)
+		}
+	}
+	outcome, err := detect.Run(paths, loaded, rulesFrom, intake.Options{Year: chosen.year, Location: location, Format: format, Assets: machines}, now)
 	if err != nil {
 		return fail(err)
 	}
@@ -299,7 +308,8 @@ func writeCampaignScenario(env environment, directory string, seed int64, day ti
 	}
 	expected, err := json.MarshalIndent(map[string]any{
 		"note": "Synthetic logs made by omamori scenario --campaign. No line comes from a real system.", "seed": seed, "date": day.Format("2006-01-02"),
-		"story": story, "expected_alerts": append([]scenario.Expected{}, made.Expected...), "known_misses": append([]string{}, made.KnownMisses...),
+		"story": story, "expected_alerts": append([]scenario.Expected{}, made.Expected...),
+		"expected_alerts_with_assets": append([]scenario.Expected{}, made.ExpectedWithAssets...), "known_misses": append([]string{}, made.KnownMisses...),
 	}, "", "  ")
 	if err != nil {
 		return fail(errors.New("the list of expected alerts could not be written"))
@@ -308,15 +318,16 @@ func writeCampaignScenario(env environment, directory string, seed int64, day ti
 	for name, file := range made.Files {
 		files.Files["logs/"+name] = file
 	}
+	files.Files["assets.yml"] = scenario.HostFile{Text: made.Assets, Modified: env.clock()}
 	if err := os.MkdirAll(filepath.Dir(directory), 0o700); err != nil {
 		return fail(errors.New("the folder cannot be made"))
 	}
 	if err := scenario.WriteHost(directory, files); err != nil {
 		return fail(err)
 	}
-	fmt.Fprintf(env.stdout, "Wrote %d log files of three hosts and two network sensors for %s to %s\nThe story and the expected alerts are in %s\nTry: omamori detect --year %d --timezone %s -- %s\n",
+	fmt.Fprintf(env.stdout, "Wrote %d log files of three hosts and two network sensors for %s to %s\nThe story and the expected alerts are in %s\nTry: omamori detect --year %d --timezone %s --assets %s -- %s\n",
 		len(made.Files), day.Format("2006-01-02"), filepath.Join(directory, "logs"), filepath.Join(directory, "expected.json"),
-		day.Year(), shellArgument(location.String()), shellArgument(filepath.Join(directory, "logs")))
+		day.Year(), shellArgument(location.String()), shellArgument(filepath.Join(directory, "assets.yml")), shellArgument(filepath.Join(directory, "logs")))
 
 	return exitOK
 }

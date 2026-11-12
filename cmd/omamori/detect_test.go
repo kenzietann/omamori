@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"github.com/kenzietann/omamori/internal/analyst"
+	"github.com/kenzietann/omamori/internal/assets"
+	"github.com/kenzietann/omamori/internal/detect"
+	"github.com/kenzietann/omamori/internal/intake"
+	"github.com/kenzietann/omamori/internal/outbound"
+	"github.com/kenzietann/omamori/internal/rules"
 	"os"
 	"path/filepath"
 	"slices"
@@ -109,7 +115,7 @@ func TestScenarioThenDetect(t *testing.T) {
 	if found.code != exitOK {
 		t.Fatalf("detect: %d %s", found.code, found.stderr)
 	}
-	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 26 rules. 14 alerts, 1 critical, 5 high, 8 medium.") {
+	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 27 rules. 14 alerts, 1 critical, 5 high, 8 medium.") {
 		t.Errorf("the summary is %q", found.stdout)
 	}
 
@@ -321,7 +327,7 @@ func TestCampaignScenarioThenDetect(t *testing.T) {
 	before := snapshot(t, campaign)
 
 	found := runAt(t, detectNow, "detect", filepath.Join(campaign, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", output)
-	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "26 rules. 19 alerts, 2 critical, 9 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "27 rules. 19 alerts, 2 critical, 9 high, 8 medium.") {
 		t.Fatalf("detect: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(output, "detect-20261111-030405", "alerts.json"))
@@ -346,7 +352,103 @@ func TestCampaignScenarioThenDetect(t *testing.T) {
 		t.Fatal(made.stderr)
 	}
 	calm := runAt(t, detectNow, "detect", filepath.Join(quiet, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", filepath.Join(base, "out2"))
-	if calm.code != exitOK || !strings.Contains(calm.stdout, "26 rules. 0 alerts.") {
+	if calm.code != exitOK || !strings.Contains(calm.stdout, "27 rules. 0 alerts.") {
 		t.Fatalf("the quiet campaign: %d %s", calm.code, calm.stdout)
+	}
+}
+
+// The asset list through the real command line: the campaign writes it, detect joins the story with it, and
+// the AI review can relate alerts of the two halves through the machine, checked like every other claim.
+func TestCampaignWithTheAssetList(t *testing.T) {
+	base := t.TempDir()
+	campaign := filepath.Join(base, "campaign")
+	if made := runAt(t, detectNow, "scenario", "--campaign", "--seed", "3", "--date", "2026-11-10", "--timezone", "Asia/Tokyo", campaign); made.code != exitOK ||
+		!strings.Contains(made.stdout, "--assets") {
+		t.Fatalf("scenario: %d %s %s", made.code, made.stdout, made.stderr)
+	}
+	logs, list := filepath.Join(campaign, "logs"), filepath.Join(campaign, "assets.yml")
+	common := []string{logs, "--assets", list, "--year", "2026", "--timezone", "Asia/Tokyo"}
+
+	found := runAt(t, detectNow, append([]string{"detect", "--output", filepath.Join(base, "out")}, common...)...)
+	if found.code != exitOK || !strings.Contains(found.stdout, "27 rules. 20 alerts, 3 critical, 9 high, 8 medium.") {
+		t.Fatalf("detect with assets: %d %s %s", found.code, found.stdout, found.stderr)
+	}
+	alerts, _ := os.ReadFile(filepath.Join(base, "out", "detect-20261111-030405", "alerts.json"))
+	for _, want := range []string{`"rule": "host_takeover_then_internal_guessing"`, `"machine": "web01"`, `"src_asset": "web01"`, `"asset": "app01"`} {
+		if !strings.Contains(string(alerts), want) {
+			t.Errorf("alerts.json does not have %s", want)
+		}
+	}
+
+	bad := filepath.Join(base, "bad.yml")
+	os.WriteFile(bad, []byte("assets:\n  - name: a\n    addresses: [10.0.0.1]\n  - name: b\n    addresses: [10.0.0.1]\n"), 0o600)
+	for name, path := range map[string]string{"an address for two machines": bad, "a missing file": filepath.Join(base, "none.yml")} {
+		refused := runAt(t, detectNow, "detect", logs, "--assets", path, "--year", "2026", "--output", filepath.Join(base, "refused"))
+		if refused.code != exitFailed || !strings.Contains(refused.stderr, "asset list is not valid") {
+			t.Errorf("%s: %d %s", name, refused.code, refused.stderr)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(base, "refused")); err == nil {
+		t.Error("a refused run left a report folder")
+	}
+
+	// The fake answer reviews every alert, and relates the takeover of web01 with the guessing from web01.
+	machines, err := assets.Load(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, _ := rules.Builtin()
+	outcome, err := detect.Run([]string{logs}, set, "built-in", intake.Options{Year: 2026, Location: time.FixedZone("JST", 9*3600), Assets: machines}, detectNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := analyst.BuildSnapshot(outcome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	machine := ""
+	for _, entity := range snapshot.Entities {
+		if entity.Field == "asset" && entity.Value == "web01" {
+			machine = entity.ID
+		}
+	}
+	related := analyst.Claim{Kind: "related", Entity: machine}
+	for _, alert := range snapshot.Alerts {
+		if alert.Rule != "ssh_brute_force_success" && alert.Rule != "ssh_internal_guessing_success" {
+			continue
+		}
+		related.Alerts = append(related.Alerts, alert.ID)
+		for _, evidence := range alert.Evidence {
+			if slices.Contains(evidence.Entities, machine) {
+				related.Evidence = append(related.Evidence, evidence.ID)
+			}
+		}
+	}
+	if machine == "" || len(related.Alerts) != 2 || len(related.Evidence) < 2 {
+		t.Fatalf("the snapshot does not let the two alerts be related through the machine: %+v", related)
+	}
+	var answer analyst.Response
+	if err := json.Unmarshal([]byte(analystAnswers(t, snapshot)), &answer); err != nil {
+		t.Fatal(err)
+	}
+	answer.Claims = append(answer.Claims, related)
+	encoded, _ := json.Marshal(answer)
+	provider := &analystProvider{answer: string(encoded)}
+	database := filepath.Join(base, "db", "omamori.db")
+	reviewed := analyzeCommand(t, func(_, _, _, _ string) (outbound.Provider, error) { return provider, nil },
+		append([]string{"analyze", "--yes", "--provider", "openai", "--model", "test", "--db", database, "--output", filepath.Join(base, "review")}, common...)...)
+	if reviewed.code != exitOK || !strings.Contains(reviewed.stdout, "21 verified findings, 0 rejected claims, 0 unreviewed alerts") || !strings.Contains(reviewed.stdout, "Stored run:") {
+		t.Fatalf("analyze with assets: %d %s %s", reviewed.code, reviewed.stdout, reviewed.stderr)
+	}
+	report, _ := os.ReadFile(analysisFiles(t, filepath.Join(base, "review"))["report.md"])
+	if !strings.Contains(string(report), "2 alerts involve the machine web01 of the asset list within 24 hours") {
+		t.Error("the report does not have the checked claim about the machine")
+	}
+
+	// Without the list the machine is not an entity, so the same claim is refused, and the other 19 stay.
+	plain := analyzeCommand(t, func(_, _, _, _ string) (outbound.Provider, error) { return provider, nil },
+		"analyze", "--yes", "--provider", "openai", "--model", "test", "--output", filepath.Join(base, "plain"), logs, "--year", "2026", "--timezone", "Asia/Tokyo")
+	if plain.code != exitFailed || strings.Contains(plain.stdout, "21 verified") {
+		t.Fatalf("analyze without assets accepted the claim about the machine: %d %s", plain.code, plain.stdout)
 	}
 }

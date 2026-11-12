@@ -67,6 +67,8 @@ Flags for the triage (Task B). The log lines have no year and no time zone:
 
 Flags for detect:
   --rules folder      use the rules of a folder in place of the built-in rules (Sigma format, see docs/rules.md)
+  --assets file       names and addresses of your own machines (YAML). Events of a host and events of its
+                      address are then known to be one machine, and rules and the AI review can join them
   --format name       syslog, web, json, suricata, zeek, wazuh or windows (default: look at the first lines of each file)
   --year, --timezone  for syslog lines, which have no year and no time zone
   --output folder     where the report folder is made (default ~/omamori-output)
@@ -112,8 +114,8 @@ type environment struct {
 	keys taskrun.KeyStore
 	// settingsPath says where the choices are kept. Without it, they are not kept.
 	settingsPath func() (string, error)
-	now         func() time.Time
-	newProvider taskrun.ProviderFactory
+	now          func() time.Time
+	newProvider  taskrun.ProviderFactory
 }
 
 func mergeDefaults(chosen settings, saved appconfig.Settings) tui.Defaults {
