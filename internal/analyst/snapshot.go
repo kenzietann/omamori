@@ -35,7 +35,7 @@ var evidenceFields = []string{
 	"parent_process_id", "parent_process_guid",
 	// Fields of artifacts from the forensic triage. Log events do not have them, so the snapshot of a
 	// log-only run, and with it every earlier recording, stays the same byte for byte.
-	"asset", "src_asset", "dst_asset",
+	"asset", "src_asset", "dst_asset", "indicator", "indicator_type", "indicator_where",
 	TimeSourceField, "unit", "exec_key", "schedule", "key_type", "fingerprint", "key_options", "target", "shell", "pid", "local_address", "local_port",
 }
 
@@ -51,6 +51,10 @@ var entityFields = []string{event.SourceIP, event.User, event.Host}
 const assetEntity = "asset"
 
 var assetFields = []string{"asset", "src_asset", "dst_asset"}
+
+// An indicator is an entry of the list of known bad addresses, domains and hashes.
+const indicatorEntity = "indicator"
+
 var severity = map[string]int{"critical": 4, "high": 3, "medium": 2, "low": 1, "informational": 0}
 
 type snapshotBuilder struct {
@@ -179,6 +183,11 @@ func BuildSnapshot(outcome detect.Outcome) (Snapshot, error) {
 					item.Entities = addID(item.Entities, id)
 					current.Entities = addID(current.Entities, id)
 				}
+			}
+			if value, found := original.Fields[indicatorEntity]; found {
+				id := builder.entity(indicatorEntity, value)
+				item.Entities = addID(item.Entities, id)
+				current.Entities = addID(current.Entities, id)
 			}
 			for _, field := range assetFields {
 				if value, found := original.Fields[field]; found {

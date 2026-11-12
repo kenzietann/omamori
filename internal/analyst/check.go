@@ -209,10 +209,13 @@ func AlertSummary(id, title string, count int) string {
 // ValidEntityField says which kinds of entity alerts can share. The checker and the store both ask here,
 // so the store never refuses, or accepts, a kind that the checker sees differently.
 func ValidEntityField(field string) bool {
-	return slices.Contains(entityFields, field) || field == assetEntity
+	return slices.Contains(entityFields, field) || field == assetEntity || field == indicatorEntity
 }
 
 func RelatedSummary(alerts int, entity Entity) string {
+	if entity.Field == indicatorEntity {
+		return fmt.Sprintf("%d alerts have evidence that names %s, an entry of the indicator list, within 24 hours. The list says that it is known to be bad. This check only says that the evidence names it.", alerts, entity.Value)
+	}
 	if entity.Field == assetEntity {
 		return fmt.Sprintf("%d alerts involve the machine %s of the asset list within 24 hours, as the machine that wrote the events or as one end of a connection. This is a review lead, not proof of one attacker or a causal chain.", alerts, entity.Value)
 	}
