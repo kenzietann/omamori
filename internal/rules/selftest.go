@@ -12,6 +12,31 @@ import (
 //go:embed builtin/*.yml
 var builtinFiles embed.FS
 
+//go:embed forensic/*.yml
+var forensicFiles embed.FS
+
+// BuiltinForensics gives the built-in rules together with the rules for artifacts of a Linux system
+// (cron files, shell history, systemd units, accounts, snapshots). The forensic triage uses this set.
+func BuiltinForensics() (Set, error) {
+	var all []*Rule
+	for _, source := range []struct {
+		files  embed.FS
+		folder string
+	}{{builtinFiles, "builtin"}, {forensicFiles, "forensic"}} {
+		system, err := fs.Sub(source.files, source.folder)
+		if err != nil {
+			return Set{}, err
+		}
+		parsed, err := parseFS(system)
+		if err != nil {
+			return Set{}, err
+		}
+		all = append(all, parsed...)
+	}
+
+	return NewSet(all)
+}
+
 // Builtin gives the rules that are inside the program.
 func Builtin() (Set, error) {
 	system, err := fs.Sub(builtinFiles, "builtin")

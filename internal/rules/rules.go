@@ -201,6 +201,16 @@ func Load(directory string) (Set, error) {
 // LoadFS reads every .yml and .yaml file of a file system. It checks that a correlation rule refers to
 // rules that exist, that no two rules have the same name, and that the tests of every rule pass.
 func LoadFS(system fs.FS) (Set, error) {
+	all, err := parseFS(system)
+	if err != nil {
+		return Set{}, err
+	}
+
+	return NewSet(all)
+}
+
+// parseFS reads the rule files of a file system, in the order of their names.
+func parseFS(system fs.FS) ([]*Rule, error) {
 	var files []string
 	err := fs.WalkDir(system, ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -213,7 +223,7 @@ func LoadFS(system fs.FS) (Set, error) {
 		return nil
 	})
 	if err != nil {
-		return Set{}, errors.New("the rules folder cannot be read")
+		return nil, errors.New("the rules folder cannot be read")
 	}
 	slices.Sort(files)
 
@@ -221,18 +231,18 @@ func LoadFS(system fs.FS) (Set, error) {
 	for _, path := range files {
 		data, err := readLimited(system, path)
 		if err != nil {
-			return Set{}, err
+			return nil, err
 		}
 		parsed, err := Parse(data, path)
 		if err != nil {
-			return Set{}, err
+			return nil, err
 		}
 		if all = append(all, parsed...); len(all) > maxRules {
-			return Set{}, ErrTooBig
+			return nil, ErrTooBig
 		}
 	}
 
-	return NewSet(all)
+	return all, nil
 }
 
 // NewSet makes a set from parsed rules and checks it.
