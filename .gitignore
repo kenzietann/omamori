@@ -28,3 +28,6 @@ skills-lock.json
 
 # Optional frontend test dependencies
 tests/node_modules/
+
+# Local design skill workspace
+.impeccable/
