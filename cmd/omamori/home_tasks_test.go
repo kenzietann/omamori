@@ -11,14 +11,20 @@ import (
 	"time"
 
 	"github.com/kenzietann/omamori/internal/outbound"
+	"github.com/kenzietann/omamori/internal/scenario"
 	"github.com/kenzietann/omamori/internal/taskrun"
 	"github.com/kenzietann/omamori/internal/tui"
 )
 
 func TestHomeLocalTasksUseRealServices(t *testing.T) {
 	logs, _ := analystFixture(t, true)
-	b := backend{config: taskrun.Config{Target: logs, OutputBase: filepath.Join(t.TempDir(), "reports"), Now: func() time.Time { return detectNow }}}
+	system := hostFolder(t)
 	for _, task := range []string{tui.TaskDetect, tui.TaskForensics, tui.TaskDemo} {
+		target := logs
+		if task == tui.TaskForensics {
+			target = system
+		}
+		b := backend{config: taskrun.Config{Target: target, OutputBase: filepath.Join(t.TempDir(), "reports"), Now: func() time.Time { return detectNow }}}
 		plan, err := b.Prepare(tui.Setup{Task: task})
 		if err != nil {
 			t.Fatalf("%s: %v", task, err)
@@ -152,4 +158,14 @@ func TestHomeDashboardServesUntilCancelled(t *testing.T) {
 	if _, err := http.Get(link); err == nil {
 		t.Fatal("the link still answers after the stop")
 	}
+}
+
+// hostFolder writes the synthetic Linux system of the demo and gives the top of it.
+func hostFolder(t *testing.T) string {
+	t.Helper()
+	folder := filepath.Join(t.TempDir(), "host")
+	if err := scenario.WriteHost(folder, scenario.GenerateHost(3, time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC), true)); err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(folder, "root")
 }

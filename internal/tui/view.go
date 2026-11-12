@@ -159,8 +159,8 @@ func (model Model) View() string {
 		return model.consentView()
 	case stepSettings:
 		return model.settingsView()
-	case stepRuleInput:
-		return model.ruleInputView()
+	case stepForm:
+		return model.formView()
 	}
 
 	return model.menuView()
@@ -490,22 +490,46 @@ func (model Model) runView() string {
 	return style.Render(line)
 }
 
-func (model Model) ruleInputView() string {
-	lines := []string{model.oneLineHeader(), "", model.accentLine("Rule draft"), model.targetLine("Logs: "), "",
-		model.dimLine("The AI writes only the matching part of one rule. Omamori accepts it only if"),
-		model.dimLine("it loads, passes its tests, matches every example and is silent on days without"),
-		model.dimLine("an attack. You see the request before anything is sent."), ""}
-	for field := range ruleFieldCount {
-		marker, style := idleMarker, styleBody
-		text := safeText(string(model.ruleFields[field]))
-		if field == model.ruleCursor {
-			marker, style, text = selectMarker, styleSelected, text+"_"
-		}
-		lines = append(lines, model.bodyLine(ruleLabels[field]), style.Render(model.truncate(marker+text, 0)), "")
+func (model Model) formView() string {
+	lead := []string{model.oneLineHeader(), "", model.accentLine(model.menuLabel(model.task)), model.targetLine("Folder: "), ""}
+	for _, line := range formIntro[model.task] {
+		lead = append(lead, model.dimLine(line))
 	}
+	if len(formIntro[model.task]) > 0 {
+		lead = append(lead, "")
+	}
+	var trail []string
 	if model.setupError != "" {
-		lines = append(lines, model.warnLine(model.setupError))
+		trail = []string{model.warnLine(model.setupError)}
 	}
+	fields := forms[model.task]
+	first, last := visibleRange(model.formCursor, len(fields), max(model.room(len(lead)+len(trail)+2)/3, 1))
+	lines := append([]string{}, lead...)
+	for index := first; index < last; index++ {
+		field := fields[index]
+		marker, style := idleMarker, styleBody
+		text := safeText(model.fieldValue(field))
+		if len(field.choices) > 0 {
+			label := field.choices[0].label
+			for _, option := range field.choices {
+				if option.value == model.fieldValue(field) {
+					label = option.label
+				}
+			}
+			text = "‹ " + label + " ›"
+		}
+		if index == model.formCursor {
+			marker, style = selectMarker, styleSelected
+			if len(field.choices) == 0 {
+				text += "_"
+			}
+		}
+		lines = append(lines, model.bodyLine(field.label), style.Render(model.truncate(marker+text, 0)), "")
+	}
+	if first > 0 || last < len(fields) {
+		lines = append(lines, model.dimLine("More fields above or below: use up and down."))
+	}
+	lines = append(lines, trail...)
 
-	return model.plainPage(lines, model.footer(hint{"tab/up/down", "field"}, hint{"enter", "next field, then go on"}, hint{"esc", "back"}, hint{"ctrl+c", "quit"}))
+	return model.plainPage(lines, model.footer(hint{"tab/up/down", "field"}, hint{"left/right", "change a choice"}, hint{"enter", "go on"}, hint{"esc", "back"}, hint{"ctrl+c", "quit"}))
 }

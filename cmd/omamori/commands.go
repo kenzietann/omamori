@@ -104,7 +104,8 @@ Flags for rule draft (also --assets, --indicators, --format, --year, --timezone 
   --example ref       an event that the rule must match, as a report names it, like web01/auth.log:68
                       (required, up to 20 times)
   --title, --level    title and level of the saved rule (default: the goal, and medium)
-  --benign path       logs that you know to be clean; the rule must match nothing in them (repeatable)
+  --benign path       logs that you know to be clean; the rule must match nothing in them (repeatable,
+                      up to 20, apart from the searched logs, and they must give at least one event)
   --attempts n        answers the AI may give; after a refusal it is told the fixed reasons (default 3, max 5)
   --yes, --dry-run, --replay, --provider, --model, --reasoning, --timeout, --max-tokens  as for analyze
 The AI writes only the log source, the detection and tests. A rule is accepted only if it loads, passes its

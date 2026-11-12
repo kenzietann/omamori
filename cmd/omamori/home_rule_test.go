@@ -92,7 +92,7 @@ func TestHomeRuleDraftRefusesBadInputBeforeAnythingIsSent(t *testing.T) {
 			}
 		})
 	}
-	if _, err := b.Prepare(tui.Setup{Task: tui.TaskRuleDraft, Replay: true}); err == nil || !strings.Contains(err.Error(), "--replay") {
+	if _, err := b.Prepare(tui.Setup{Task: tui.TaskRuleDraft, Replay: true}); err == nil || !strings.Contains(err.Error(), "give the recording") {
 		t.Fatalf("a replay from the home screen: %v", err)
 	}
 	empty := ruleBackend(t, t.TempDir(), provider)
@@ -129,5 +129,130 @@ func TestSplitExamples(t *testing.T) {
 	got := splitExamples(" web01/auth.log:68, auth.log:3\tauth.log:4,,")
 	if !reflect.DeepEqual(got, []string{"web01/auth.log:68", "auth.log:3", "auth.log:4"}) {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// cleanFolder writes one log file that holds the given lines, in a folder apart from the campaign.
+func cleanFolder(t *testing.T, name string, lines ...string) string {
+	t.Helper()
+	folder := filepath.Join(t.TempDir(), "clean logs")
+	if err := os.MkdirAll(folder, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folder, name), []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return folder
+}
+
+func lineOf(t *testing.T, path string, number int) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Split(string(data), "\n")[number-1]
+}
+
+func TestHomeRuleDraftUsesTheCleanLogs(t *testing.T) {
+	logs := campaignFolder(t)
+	example := lineOf(t, filepath.Join(logs, "web01", "auth.log"), 68)
+	backup := lineOf(t, filepath.Join(logs, "web01", "auth.log"), 69)
+	if !strings.Contains(example, "u.sh | sh") || !strings.Contains(backup, "backup.sh") {
+		t.Fatalf("the campaign lines moved: %q %q", example, backup)
+	}
+
+	quiet := cleanFolder(t, "auth.log", backup, backup)
+	provider := &analystProvider{answer: cronRuleAnswer}
+	b := ruleBackend(t, logs, provider)
+	rule := cronRule
+	rule.Benign = quiet
+	plan, err := b.Prepare(tui.Setup{Task: tui.TaskRuleDraft, ProviderID: "openai", Model: "test", Key: "k", Rule: rule})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plan.Summary, "none of the 2 events of the clean logs") {
+		t.Fatalf("summary %q", plan.Summary)
+	}
+	plan.Confirm()
+	result, err := plan.Run(context.Background(), nil)
+	if err != nil || !result.Complete || !strings.Contains(result.Report, "| 1 | accepted | 1 of 1 |") || !strings.Contains(result.Report, "0 of 2 |") {
+		t.Fatalf("result %v:\n%s", err, result.Report)
+	}
+
+	noisy := cleanFolder(t, "auth.log", backup, example)
+	provider = &analystProvider{answer: cronRuleAnswer}
+	b = ruleBackend(t, logs, provider)
+	rule.Benign = quiet + " , " + noisy
+	plan, err = b.Prepare(tui.Setup{Task: tui.TaskRuleDraft, ProviderID: "openai", Model: "test", Key: "k", Rule: rule})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.Confirm()
+	result, err = plan.Run(context.Background(), nil)
+	if err != nil || result.Complete || len(provider.sent) != 3 || !strings.Contains(result.Report, "1 events of the logs that the user gave as clean") {
+		t.Fatalf("result %v, sent %d:\n%s", err, len(provider.sent), result.Report)
+	}
+	if _, err := os.Stat(filepath.Join(result.SavedTo, "rule.yml")); !os.IsNotExist(err) {
+		t.Fatal("a rule that matches the clean logs was written")
+	}
+	if !strings.Contains(provider.sent[1].Messages[2].Text, "logs that the user gave as clean") {
+		t.Fatal("the reason was not sent back")
+	}
+}
+
+func TestHomeRuleDraftRefusesBadCleanLogsBeforeAnythingIsSent(t *testing.T) {
+	logs := campaignFolder(t)
+	home := t.TempDir()
+	inHome := filepath.Join(home, "clean")
+	if err := os.Mkdir(inHome, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	empty := t.TempDir()
+	provider := &analystProvider{answer: cronRuleAnswer}
+	b := ruleBackend(t, logs, provider)
+	b.env.home = homeAt(home)
+	many := strings.Repeat(empty+",", maxBenign+1)
+	testCases := []struct {
+		name, benign, want string
+	}{
+		{"inside the logs", filepath.Join(logs, "web01"), "must be apart from the logs"},
+		{"the logs themselves", logs, "must be apart from the logs"},
+		{"around the logs", filepath.Dir(logs), "must be apart from the logs"},
+		{"not there", filepath.Join(empty, "missing.log"), "cannot be read"},
+		{"no events", empty, "no event could be read from the clean logs"},
+		{"in the home folder, empty", "~/clean", "no event could be read from the clean logs"},
+		{"too many", many, "at most 20"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule := cronRule
+			rule.Benign = testCase.benign
+			_, err := b.Prepare(tui.Setup{Task: tui.TaskRuleDraft, ProviderID: "openai", Model: "test", Key: "k", Rule: rule})
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("error %v, want %q", err, testCase.want)
+			}
+		})
+	}
+	if len(provider.sent) != 0 {
+		t.Fatal("something was sent")
+	}
+	if _, err := os.Stat(b.config.OutputBase); !os.IsNotExist(err) {
+		t.Fatal("a refused preparation wrote something")
+	}
+}
+
+func TestSplitPathsKeepsSpacesAndExpandsHome(t *testing.T) {
+	b := backend{env: environment{home: homeAt("/home/someone")}}
+	got, err := b.splitPaths(" ~/clean logs/day one , /var/log/ok.log,, ~ ")
+	if err != nil || !reflect.DeepEqual(got, []string{"/home/someone/clean logs/day one", "/var/log/ok.log", "/home/someone"}) {
+		t.Fatalf("got %q %v", got, err)
+	}
+	if got, err := b.splitPaths("  "); err != nil || len(got) != 0 {
+		t.Fatalf("empty: %q %v", got, err)
+	}
+	noHome := backend{env: environment{home: func() (string, error) { return "", nil }}}
+	if _, err := noHome.splitPaths("~/x"); err == nil {
+		t.Fatal("~ without a home folder was accepted")
 	}
 }

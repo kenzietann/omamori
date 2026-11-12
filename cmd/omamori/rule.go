@@ -17,6 +17,7 @@ import (
 	"github.com/kenzietann/omamori/internal/event"
 	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/intake"
+	"github.com/kenzietann/omamori/internal/pathguard"
 	"github.com/kenzietann/omamori/internal/ruledraft"
 	"github.com/kenzietann/omamori/internal/taskrun"
 )
@@ -117,13 +118,9 @@ func runRule(args []string, env environment) int {
 	if len(read.Events) == 0 {
 		return fail(errors.New("no event could be read from the logs. Give the format with --format"))
 	}
-	var clean []event.Event
-	if len(benign) > 0 {
-		readClean, err := intake.Read(benign, options)
-		if err != nil {
-			return fail(err)
-		}
-		clean = readClean.Events
+	clean, err := readBenign(benign, paths, options)
+	if err != nil {
+		return fail(err)
 	}
 
 	setup, err := aiSetup(env, flags, chosen, reasoning, recordingPath)
@@ -180,4 +177,34 @@ func runRule(args []string, env environment) int {
 	}
 	fmt.Fprintf(env.stdout, "Rule: %s\nRead the report before you use it. Accepted means it passed Omamori's checks, not that it is quiet on your network.\n", result.RuleFile)
 	return exitOK
+}
+
+const maxBenign = 20
+
+// readBenign reads the logs that the user gives as clean. They must be apart from the logs that are searched,
+// because a clean copy of an example would refuse every rule. Clean logs that give no event are refused too:
+// a check that ran on nothing must not look like a check that passed.
+func readBenign(benign, logs []string, options intake.Options) ([]event.Event, error) {
+	if len(benign) == 0 {
+		return nil, nil
+	}
+	if len(benign) > maxBenign {
+		return nil, fmt.Errorf("give at most %d clean logs", maxBenign)
+	}
+	for _, clean := range benign {
+		for _, log := range logs {
+			if pathguard.CheckOutputFolder(log, clean) != nil {
+				return nil, fmt.Errorf("the clean logs %s must be apart from the logs that are searched, not inside them or around them", filepath.Base(clean))
+			}
+		}
+	}
+	read, err := intake.Read(benign, options)
+	if err != nil {
+		return nil, fmt.Errorf("the clean logs cannot be read: %w", err)
+	}
+	if len(read.Events) == 0 {
+		return nil, errors.New("no event could be read from the clean logs. Check the paths, or give the format")
+	}
+
+	return read.Events, nil
 }

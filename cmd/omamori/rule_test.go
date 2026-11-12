@@ -154,6 +154,8 @@ func TestRuleDraftRefusesBadUse(t *testing.T) {
 		{"an unknown level", ruleArgs(output, logs, "--provider", "openai", "--model", "test", "--level", "urgent"), exitFailed},
 		{"too many attempts", ruleArgs(output, logs, "--provider", "openai", "--model", "test", "--attempts", "9"), exitFailed},
 		{"output inside the logs", ruleArgs(filepath.Join(logs, "out"), logs, "--provider", "openai", "--model", "test"), exitFailed},
+		{"clean logs inside the logs", ruleArgs(output, logs, "--provider", "openai", "--model", "test", "--benign", filepath.Join(logs, "web01")), exitFailed},
+		{"clean logs with no event", ruleArgs(output, logs, "--provider", "openai", "--model", "test", "--benign", t.TempDir()), exitFailed},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -165,5 +167,21 @@ func TestRuleDraftRefusesBadUse(t *testing.T) {
 	}
 	if _, err := os.Stat(output); !os.IsNotExist(err) {
 		t.Fatal("a refused command wrote something")
+	}
+}
+
+func TestRuleDraftCleanLogsRefuseARuleThatMatchesThem(t *testing.T) {
+	logs := campaignFolder(t)
+	clean := cleanFolder(t, "auth.log", lineOf(t, filepath.Join(logs, "web01", "auth.log"), 68))
+	provider := &analystProvider{answer: cronRuleAnswer}
+	factory := func(_, _, _, _ string) (outbound.Provider, error) { return provider, nil }
+	output := filepath.Join(t.TempDir(), "out")
+	got := analyzeCommand(t, factory, ruleArgs(output, logs, "--yes", "--provider", "openai", "--model", "test", "--attempts", "1", "--benign", clean)...)
+	if got.code != exitFailed || !strings.Contains(got.stderr, "no rule was accepted") || len(provider.sent) != 1 {
+		t.Fatalf("%d %s %s, sent %d", got.code, got.stdout, got.stderr, len(provider.sent))
+	}
+	report, err := os.ReadFile(analysisFiles(t, output)["report.md"])
+	if err != nil || !strings.Contains(string(report), "logs that the user gave as clean") {
+		t.Fatalf("report %v:\n%s", err, report)
 	}
 }

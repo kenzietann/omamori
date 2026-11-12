@@ -28,7 +28,7 @@ const (
 	stepReasoning
 	stepConsent
 	stepSettings
-	stepRuleInput
+	stepForm
 )
 
 type menuItem struct {
@@ -57,7 +57,8 @@ var menuItems = []menuItem{
 	{label: "Rule draft", note: "point at log lines; the AI writes a rule and code decides if it is accepted", task: TaskRuleDraft, ai: true},
 	{label: "Dashboard", note: "start the local web dashboard on 127.0.0.1 for alerts, evidence and cases", task: TaskDashboard},
 	{label: "Stored runs", note: "list what is in the local database", task: TaskStored},
-	{label: "Make demo data", note: "write synthetic logs and a synthetic system to try the above", task: TaskDemo},
+	{label: "Verify hashes", note: "check a forensic manifest against the folder, no AI", task: TaskVerify},
+	{label: "Make demo data", note: "write synthetic logs, a synthetic system or a campaign to try the above", task: TaskDemo},
 	{label: "Settings", kind: menuOpenSettings},
 	{label: "Quit", kind: menuLeave},
 }
@@ -108,32 +109,11 @@ func (choice Choice) HasKey() bool {
 
 var ErrKeyRejected = errors.New("the provider rejected the key")
 
-// RuleInput is what the user types for a rule draft. Examples are event references, as reports name
-// them, separated by spaces or commas.
-type RuleInput struct {
-	Goal     string
-	Examples string
-	Title    string
-	Level    string
-}
-
-const (
-	ruleGoal = iota
-	ruleExamples
-	ruleTitle
-	ruleLevel
-	ruleFieldCount
-)
-
-var (
-	ruleLabels = [ruleFieldCount]string{"Goal, what the rule is for:", "Example events (like web01/auth.log:68, separated by spaces):", "Title (empty: the goal):", "Level (informational, low, medium, high or critical; empty: medium):"}
-	ruleLimits = [ruleFieldCount]int{300, 2000, 100, 20}
-)
-
 type Setup struct {
 	Task string
-	// Rule is only set for a rule draft.
-	Rule RuleInput
+	// Rule is only set for a rule draft, and Options only for a task with a form.
+	Rule    RuleInput
+	Options Options
 	// Replay makes the run a replay of the recording that the backend holds. No provider, model or key is needed.
 	Replay     bool
 	ProviderID string
@@ -157,6 +137,7 @@ const (
 	TaskDemo             = "demo"
 	TaskDashboard        = "dashboard"
 	TaskRuleDraft        = "rule-draft"
+	TaskVerify           = "verify"
 )
 
 type Plan struct {
@@ -262,19 +243,21 @@ type Model struct {
 	pending         Defaults
 	hasPending      bool
 	keyInput        []rune
-	ruleFields      [ruleFieldCount][]rune
-	ruleCursor      int
-	setupError      string
-	plan            *Plan
-	steps           []string
-	progress        progress
-	running         bool
-	cancelling      bool
-	cancel          context.CancelFunc
-	runID           int
-	stepChannel     chan tea.Msg
-	width           int
-	height          int
+	// formValues holds what was typed or chosen on the forms, by the key of the field. It is shared by the
+	// forms of all tasks, so a path typed once is there for the next task. It is copied before each change.
+	formValues  map[string]string
+	formCursor  int
+	setupError  string
+	plan        *Plan
+	steps       []string
+	progress    progress
+	running     bool
+	cancelling  bool
+	cancel      context.CancelFunc
+	runID       int
+	stepChannel chan tea.Msg
+	width       int
+	height      int
 }
 
 func New(target string, backend Backend, defaults Defaults) Model {
@@ -496,8 +479,8 @@ func (model Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if model.screen == homeScreen && (model.step == stepKey || model.step == stepModel && model.modelTyping) {
 		return model.handleEntryKey(message)
 	}
-	if model.screen == homeScreen && model.step == stepRuleInput {
-		return model.handleRuleKey(message)
+	if model.screen == homeScreen && model.step == stepForm {
+		return model.handleFormKey(message)
 	}
 
 	if key == "q" {
@@ -556,8 +539,8 @@ func (model Model) handleHomeKey(key string) (tea.Model, tea.Cmd) {
 			model.quitting = true
 
 			return model, tea.Quit
-		case item.task == TaskRuleDraft:
-			return model.openRuleInput(), nil
+		case hasForm(item.task):
+			return model.openForm(item.task), nil
 		case item.ai:
 			return model.startTask(item.task), nil
 		default:
@@ -577,12 +560,12 @@ func (model Model) startLocal(task string) Model {
 		return model
 	}
 
-	plan, err := model.backend.Prepare(Setup{Task: task})
+	plan, err := model.backend.Prepare(Setup{Task: task, Rule: model.ruleSetup(), Options: model.formOptions()})
 	if err != nil {
 		model.notice = err.Error()
 		return model
 	}
-	plan.Local = true
+	plan.Local = plan.Local || !hasForm(task)
 	model.plan = &plan
 	model.consentFull = false
 	model.consentScroll = 0
@@ -637,10 +620,10 @@ func (model Model) startTask(task string) Model {
 	}
 
 	chosen := started.choices[index]
-	setup := Setup{Task: task, ProviderID: chosen.ID, Model: started.defaults.Model, Reasoning: started.defaults.Reasoning, Rule: started.ruleSetup()}
+	setup := Setup{Task: task, ProviderID: chosen.ID, Model: started.defaults.Model, Reasoning: started.defaults.Reasoning, Rule: started.ruleSetup(), Options: started.formOptions()}
 	plan, err := started.backend.Prepare(setup)
-	if err != nil && task == TaskRuleDraft {
-		model.step = stepRuleInput
+	if err != nil && hasForm(task) {
+		model.step = stepForm
 		model.setupError = err.Error()
 
 		return model
@@ -696,8 +679,8 @@ func (model Model) handleProviderKey(key string) (Model, tea.Cmd) {
 		model.step = stepMenu
 		if model.settingsMode {
 			model.step = stepSettings
-		} else if model.task == TaskRuleDraft {
-			model.step = stepRuleInput
+		} else if hasForm(model.task) {
+			model.step = stepForm
 		}
 	case "enter":
 		chosen := model.choices[model.providerCursor]
@@ -1034,12 +1017,12 @@ func (model Model) handleReasoningKey(key string) (Model, tea.Cmd) {
 func (model Model) prepare() Model {
 	chosen := model.choices[model.providerCursor]
 
-	plan, err := model.backend.Prepare(Setup{Task: model.task, ProviderID: chosen.ID, Model: string(model.modelInput), Key: string(model.keyInput), Reasoning: model.reasoning, Rule: model.ruleSetup()})
-	if err != nil && model.task == TaskRuleDraft {
-		// The input of the rule is the most likely cause, so the user goes back to it. The key is not kept.
+	plan, err := model.backend.Prepare(Setup{Task: model.task, ProviderID: chosen.ID, Model: string(model.modelInput), Key: string(model.keyInput), Reasoning: model.reasoning, Rule: model.ruleSetup(), Options: model.formOptions()})
+	if err != nil && hasForm(model.task) {
+		// What was typed on the form is the most likely cause, so the user goes back to it. The key is not kept.
 		model.forgetKey()
 		model.modelTyping = false
-		model.step = stepRuleInput
+		model.step = stepForm
 		model.setupError = err.Error()
 		return model
 	}
@@ -1252,87 +1235,4 @@ func (model *Model) leaveSettings() {
 	model.settingsMode = false
 	model.notice = ""
 	model.step = stepMenu
-}
-
-func (model Model) openRuleInput() Model {
-	model.settingsMode = false
-	model.task = TaskRuleDraft
-	model.notice = ""
-	if model.target == "" || model.backend == nil {
-		model.notice = "There is no target folder. Start Omamori with a folder of logs: omamori ui <folder>"
-		return model
-	}
-	if err := model.backend.TaskReady(TaskRuleDraft); err != nil {
-		model.notice = err.Error()
-		return model
-	}
-	model.setupError = ""
-	model.ruleCursor = ruleGoal
-	model.step = stepRuleInput
-
-	return model
-}
-
-func (model Model) ruleSetup() RuleInput {
-	if model.task != TaskRuleDraft {
-		return RuleInput{}
-	}
-	text := func(field int) string { return strings.TrimSpace(string(model.ruleFields[field])) }
-
-	return RuleInput{Goal: text(ruleGoal), Examples: text(ruleExamples), Title: text(ruleTitle), Level: strings.ToLower(text(ruleLevel))}
-}
-
-// handleRuleKey edits the fields of a rule draft. Every key is text here, so q does not quit.
-func (model Model) handleRuleKey(message tea.KeyMsg) (Model, tea.Cmd) {
-	field := &model.ruleFields[model.ruleCursor]
-	limit := ruleLimits[model.ruleCursor]
-	switch message.Type {
-	case tea.KeyEsc:
-		model.setupError = ""
-		model.step = stepMenu
-	case tea.KeyUp, tea.KeyShiftTab:
-		model.ruleCursor = moveUp(model.ruleCursor, ruleFieldCount)
-	case tea.KeyDown, tea.KeyTab:
-		model.ruleCursor = moveDown(model.ruleCursor, ruleFieldCount)
-	case tea.KeyEnter:
-		if model.ruleCursor < ruleFieldCount-1 {
-			model.ruleCursor++
-			return model, nil
-		}
-		return model.submitRule(), nil
-	case tea.KeyBackspace:
-		*field = slices.Clone((*field)[:max(len(*field)-1, 0)])
-		model.setupError = ""
-	case tea.KeySpace:
-		if len(*field) < limit {
-			*field = append(slices.Clone(*field), ' ')
-		}
-		model.setupError = ""
-	case tea.KeyRunes:
-		typed := []rune(cleanInput(string(message.Runes)))
-		*field = append(slices.Clone(*field), typed[:min(len(typed), max(limit-len(*field), 0))]...)
-		model.setupError = ""
-	}
-
-	return model, nil
-}
-
-func (model Model) submitRule() Model {
-	input := model.ruleSetup()
-	switch {
-	case input.Goal == "":
-		model.ruleCursor, model.setupError = ruleGoal, "Type what the rule is for."
-		return model
-	case input.Examples == "":
-		model.ruleCursor, model.setupError = ruleExamples, "Type at least one example event, as a report names it."
-		return model
-	}
-	model.setupError = ""
-	started := model.startTask(TaskRuleDraft)
-	if started.notice != "" {
-		started.step = stepRuleInput
-		started.setupError, started.notice = started.notice, ""
-	}
-
-	return started
 }

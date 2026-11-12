@@ -92,7 +92,7 @@ func (backend backend) ReasoningChoices(providerID, model string) []tui.Reasonin
 
 func (backend backend) Prepare(setup tui.Setup) (tui.Plan, error) {
 	switch setup.Task {
-	case tui.TaskDetect, tui.TaskAnalyze, tui.TaskForensics, tui.TaskForensicsAnalyze, tui.TaskStored, tui.TaskDemo, tui.TaskDashboard:
+	case tui.TaskDetect, tui.TaskAnalyze, tui.TaskForensics, tui.TaskForensicsAnalyze, tui.TaskStored, tui.TaskDemo, tui.TaskDashboard, tui.TaskVerify:
 		return backend.prepareHome(setup)
 	case tui.TaskRuleDraft:
 		return backend.prepareRuleDraft(setup)
