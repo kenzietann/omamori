@@ -41,3 +41,28 @@ test('mobile charts disclose progressively and menu opens real routes',async t=>
  d.querySelector('input[name=title]').value='Synthetic case';d.querySelector('textarea[name=notes]').value='<script>window.executed=true</script>';d.querySelector('main form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>d.querySelector('h1').textContent==='Case detail');assert.equal(w.executed,undefined);assert.equal(d.querySelectorAll('main script').length,0);
 });
 test('empty workspace does not invent chart data',async t=>{const {document:d}=await app(t,{empty:true});assert.equal(d.querySelectorAll('.histogram').length,0);assert.match(d.querySelector('main').textContent,/Start with your evidence/)});
+
+test('selected-alert actions precede evidence and survive tab changes', async t => {
+ const {document:d}=await app(t);
+ const actions=d.querySelector('.inspector-actions');
+ assert.match(actions.textContent,/Open alert details/);
+ assert.ok(actions.compareDocumentPosition(d.querySelector('#review-panel')) & 4);
+ d.querySelector('[data-tab="rule"]').click();
+ await until(()=>d.querySelector('#review-panel').textContent.includes('fixture_rule'));
+ assert.equal(d.querySelector('.inspector-actions'),actions);
+ actions.querySelector('button').click();
+ await until(()=>d.querySelector('#detail-body').textContent.includes('Synthetic alert 1'));
+ assert.match(d.querySelector('#detail-body').textContent,/Synthetic alert 1/);
+ const bars=d.querySelector('.histogram');
+ assert.ok(parseInt(bars.style.minWidth)>=bars.children.length*48);
+});
+test('stacked alert selection moves focus to evidence and returns to the same row', async t => {
+ const {document:d}=await app(t,{width:390});
+ const row=d.querySelector('[data-alert="a14"]');
+ row.focus();row.click();
+ await until(()=>d.activeElement.id==='selected-alert-title');
+ assert.equal(d.activeElement.textContent,'Synthetic alert 14');
+ d.querySelector('.back-to-queue').click();
+ assert.equal(d.activeElement,row);
+ assert.equal(row.getAttribute('aria-pressed'),'true');
+});

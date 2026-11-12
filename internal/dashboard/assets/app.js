@@ -399,6 +399,7 @@ function activityChart(alerts) {
       );
     }),
   );
+  bars.style.minWidth = Math.max(320, buckets.length * 48) + "px";
   return node(
     "section",
     { class: "chart-panel" },
@@ -613,12 +614,6 @@ async function overview() {
                   a.event_ids.length +
                   " retained evidence records.",
               ),
-              button("Open alert details", () => showAlert(run.id, a.id)),
-              node(
-                "div",
-                { class: "actions" },
-                link("Open run timeline", "timeline/" + run.id),
-              ),
             );
           } else if (which === "rule") {
             body.replaceChildren(
@@ -713,13 +708,32 @@ async function overview() {
             badge(a.level),
             node("span", { class: "mono subtle" }, a.id),
           ),
-          node("h2", {}, a.title),
+          node("h2", { id: "selected-alert-title", tabindex: -1 }, a.title),
           node(
             "p",
             { class: "identity" },
             Object.entries(a.group || {})
               .map(([k, v]) => k + "=" + v)
               .join(" · ") || a.rule,
+          ),
+          node(
+            "div",
+            { class: "actions inspector-actions" },
+            button("Open alert details", () => showAlert(run.id, a.id)),
+            link("Open run timeline", "timeline/" + run.id),
+            button(
+              "Back to alert queue",
+              () => {
+                const row = [...list.children].find(
+                  (row) => row.dataset.alert === a.id,
+                );
+                if (row) {
+                  row.focus({ preventScroll: true });
+                  row.scrollIntoView({ block: "nearest" });
+                }
+              },
+              "link back-to-queue",
+            ),
           ),
           tabs,
           body,
@@ -743,13 +757,15 @@ async function overview() {
           focus &&
           chosen === selection &&
           matchMedia("(max-width:900px)").matches
-        )
+        ) {
+          inspector.querySelector("h2").focus({ preventScroll: true });
           inspector.scrollIntoView({
             block: "start",
             behavior: matchMedia("(prefers-reduced-motion:reduce)").matches
               ? "auto"
               : "smooth",
           });
+        }
       } catch (e) {
         if (chosen === selection)
           inspector.replaceChildren(node("p", { class: "warning" }, e.message));
@@ -809,6 +825,7 @@ async function overview() {
         inspect(filtered.find((a) => a.id === reviewSelected) || filtered[0]);
       else {
         ++request;
+        ++selection;
         list.append(
           empty(
             "No alerts in this filter",

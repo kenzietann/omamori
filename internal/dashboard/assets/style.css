@@ -287,6 +287,7 @@ p {
   margin: 8px 0 0;
 }
 .header-actions {
+  flex-shrink: 0;
   display: flex;
   gap: 10px;
   align-items: center;
@@ -476,7 +477,7 @@ time,
   border-bottom: 1px solid var(--line);
 }
 .queue-head select {
-  min-height: 36px;
+  min-height: 44px;
   width: auto;
   max-width: 160px;
   font-size: 12px;
@@ -1285,4 +1286,55 @@ p {
   max-height: 90px;
   display: block;
   overflow: hidden;
+}
+
+/* Keep operational controls reachable and focus visible inside clipped panes. */
+.navigation {
+  overflow-y: auto;
+}
+.sidebar-foot {
+  flex-shrink: 0;
+}
+.alert-row:focus-visible {
+  outline-offset: -3px;
+}
+#selected-alert-title:focus-visible,
+.inspector-body:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.inspector-actions {
+  margin-top: 16px;
+}
+.back-to-queue {
+  display: none;
+}
+.chart-panel summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.chart-panel summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(-45deg);
+  margin-right: 9px;
+}
+.chart-panel details[open] summary::before {
+  transform: rotate(45deg);
+}
+@media (max-width: 900px) {
+  .back-to-queue {
+    display: inline-flex;
+  }
+  .queue-head select {
+    font-size: 16px;
+  }
+}
+
+.header-actions .button {
+  white-space: nowrap;
 }

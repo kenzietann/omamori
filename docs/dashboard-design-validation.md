@@ -31,7 +31,34 @@ certification. The Impeccable detector returned no findings.
   production activity. No real AI provider was called during this redesign.
 - Existing security controls, SQL services and AI confirmation were not changed.
 
-## Open template-gate findings
+## Dashboard-specific follow-up — 2026-11-12
+
+The original 42 findings below are retained as historical checker output, not a current defect count.
+This follow-up applies the user's request to fix issues that actually affect this dashboard.
+
+- **Action reachability:** full-alert details and the run timeline now sit before the evidence tabs,
+  instead of below up to eight evidence records. They remain available in every tab.
+- **Keyboard continuity:** stacked layouts move focus to the selected alert title. A Back to alert
+  queue action restores focus to the same row; queue focus rings draw inside the clipping boundary.
+- **Touch targets:** the severity picker and chart-data disclosure have 44px minimum heights; the
+  stacked severity picker uses 16px text to avoid mobile input zoom.
+- **Chart readability:** each activity bucket receives at least 48px of plot width. Dense series
+  scroll inside the chart region while the full date endpoints remain visible outside it.
+- **Short windows:** the sidebar scrolls so navigation and theme controls remain reachable.
+  Header actions resist shrinking, keeping Start a run on one line at 320px.
+
+The remaining template categories are intentionally unchanged: fullscreen hero/section/footer
+geometry, sales headlines, decorative moments, equal page margins that ignore the navigation rail,
+and document-anchor checks on SPA routes. Section headings, compact chart headings and selected-alert
+titles have different roles and retain their documented sizes. Queue/inspector contents intentionally
+have separate insets. Offscreen text rectangles in scroll panes are not visible text collisions.
+
+Validation for this follow-up: nine frontend tests pass, including new regressions for action
+placement across tabs and focus return; the embedded dashboard builds and its Go tests pass.
+Fresh headless captures were inspected at 1440px, 768px, 390px and 320px (dark).
+The original generic gate was not rerun; its exhausted-round result above is historical.
+
+## Original template-gate findings
 
 | Check | Target | Tool finding |
 |---|---|---|
