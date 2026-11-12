@@ -159,6 +159,8 @@ func (model Model) View() string {
 		return model.consentView()
 	case stepSettings:
 		return model.settingsView()
+	case stepRuleInput:
+		return model.ruleInputView()
 	}
 
 	return model.menuView()
@@ -486,4 +488,24 @@ func (model Model) runView() string {
 	}
 
 	return style.Render(line)
+}
+
+func (model Model) ruleInputView() string {
+	lines := []string{model.oneLineHeader(), "", model.accentLine("Rule draft"), model.targetLine("Logs: "), "",
+		model.dimLine("The AI writes only the matching part of one rule. Omamori accepts it only if"),
+		model.dimLine("it loads, passes its tests, matches every example and is silent on days without"),
+		model.dimLine("an attack. You see the request before anything is sent."), ""}
+	for field := range ruleFieldCount {
+		marker, style := idleMarker, styleBody
+		text := safeText(string(model.ruleFields[field]))
+		if field == model.ruleCursor {
+			marker, style, text = selectMarker, styleSelected, text+"_"
+		}
+		lines = append(lines, model.bodyLine(ruleLabels[field]), style.Render(model.truncate(marker+text, 0)), "")
+	}
+	if model.setupError != "" {
+		lines = append(lines, model.warnLine(model.setupError))
+	}
+
+	return model.plainPage(lines, model.footer(hint{"tab/up/down", "field"}, hint{"enter", "next field, then go on"}, hint{"esc", "back"}, hint{"ctrl+c", "quit"}))
 }
