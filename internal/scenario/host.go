@@ -28,6 +28,10 @@ type Host struct {
 	// when that list is given. Both are empty for a single system.
 	Assets             string
 	ExpectedWithAssets []Expected
+	// Indicators is an indicator list for the scenario, as YAML, and ExpectedWithIndicators are the alerts
+	// that fire only when it is given.
+	Indicators             string
+	ExpectedWithIndicators []Expected
 }
 
 func fakeKey(random *rand.Rand, comment string) string {

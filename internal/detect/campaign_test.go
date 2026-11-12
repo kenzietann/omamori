@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kenzietann/omamori/internal/assets"
+	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/intake"
 	"github.com/kenzietann/omamori/internal/rules"
 	"github.com/kenzietann/omamori/internal/scenario"
@@ -20,6 +21,12 @@ func runCampaign(t *testing.T, made scenario.Host) Outcome {
 
 func runCampaignWith(t *testing.T, made scenario.Host, machines *assets.List) Outcome {
 	t.Helper()
+
+	return runCampaignFull(t, made, machines, nil)
+}
+
+func runCampaignFull(t *testing.T, made scenario.Host, machines *assets.List, known *indicators.List) Outcome {
+	t.Helper()
 	folder := filepath.Join(t.TempDir(), "campaign")
 	if err := scenario.WriteHost(folder, made); err != nil {
 		t.Fatal(err)
@@ -28,7 +35,7 @@ func runCampaignWith(t *testing.T, made scenario.Host, machines *assets.List) Ou
 	if err != nil {
 		t.Fatal(err)
 	}
-	outcome, err := Run([]string{folder}, set, "built-in", intake.Options{Year: 2026, Location: tokyo, Assets: machines}, scenarioDay())
+	outcome, err := Run([]string{folder}, set, "built-in", intake.Options{Year: 2026, Location: tokyo, Assets: machines, Indicators: known}, scenarioDay())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,4 +175,44 @@ func mustAssets(t *testing.T) *assets.List {
 	}
 
 	return machines
+}
+
+// With the indicator list, the address that hands out the script and takes the data is one alert that has
+// evidence from two hosts and two kinds of logs: the cron job of web01 and the upload of db01.
+func TestCampaignWithTheIndicatorList(t *testing.T) {
+	for seed := int64(1); seed <= 25; seed++ {
+		made := scenario.GenerateCampaign(seed, scenarioDay(), true)
+		known, err := indicators.Parse([]byte(made.Indicators))
+		if err != nil {
+			t.Fatal(err)
+		}
+		outcome := runCampaignFull(t, made, nil, known)
+		got := found(outcome)
+		for _, wanted := range append(append([]scenario.Expected{}, made.Expected...), made.ExpectedWithIndicators...) {
+			if got[wanted] == 0 {
+				t.Errorf("seed %d: missed %s for %q", seed, wanted.Rule, wanted.Who)
+			}
+			delete(got, wanted)
+		}
+		for other := range got {
+			t.Errorf("seed %d: alert that the scenario does not expect: %s %s", seed, other.Rule, other.Who)
+		}
+		for _, alert := range outcome.Result.Alerts {
+			if alert.Rule.Name != "intel_indicator_seen" {
+				continue
+			}
+			sources := map[string]bool{}
+			for _, kept := range alert.Events {
+				sources[kept.Ref[:strings.Index(kept.Ref, ":")]] = true
+			}
+			if alert.Count != 4 || !sources["web01/auth.log"] || !sources["sensor/conn.log"] {
+				t.Errorf("seed %d: the indicator alert has %d events from %v", seed, alert.Count, sources)
+			}
+		}
+
+		quiet := scenario.GenerateCampaign(seed, scenarioDay(), false)
+		for _, alert := range runCampaignFull(t, quiet, nil, known).Result.Alerts {
+			t.Errorf("seed %d: alert on a day without the attack, with the indicator list: %s", seed, alert.Rule.Name)
+		}
+	}
 }

@@ -25,7 +25,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/event"
+	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/intake"
 )
 
@@ -71,6 +73,9 @@ type Options struct {
 	Location  *time.Location
 	Processes string
 	Sockets   string
+	// Assets and Indicators are optional, as for the detection in logs.
+	Assets     *assets.List
+	Indicators *indicators.List
 }
 
 type Entry struct {
@@ -181,6 +186,8 @@ func Collect(folder string, options Options) (Collection, error) {
 		}
 	}
 
+	options.Assets.Enrich(c.result.Events)
+	options.Indicators.Enrich(c.result.Events)
 	event.Sort(c.result.Events)
 	sort.Strings(c.result.Manifest.Skipped)
 

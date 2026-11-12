@@ -21,6 +21,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/event"
+	"github.com/kenzietann/omamori/internal/indicators"
 )
 
 const (
@@ -56,6 +57,8 @@ type Options struct {
 	Format   string
 	// Assets is optional: the list of your own machines.
 	Assets *assets.List
+	// Indicators is optional: the list of addresses, domains and hashes that are known to be bad.
+	Indicators *indicators.List
 }
 
 type Stats struct {
@@ -223,6 +226,7 @@ func ReadContext(ctx context.Context, paths []string, options Options) (Result, 
 		}
 	}
 	options.Assets.Enrich(result.Events)
+	options.Indicators.Enrich(result.Events)
 	event.Sort(result.Events)
 
 	return result, nil
