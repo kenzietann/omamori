@@ -11,7 +11,7 @@ One Go binary, `omamori`. Everything is a library package under `internal/`, and
                                             │                                     │
                                             └──> SQL store <─────────────────────┤
                                                                                   ├──> report (Markdown, HTML)
-    Linux artifacts ──> forensics (later) ──> event.Event (same timeline)         └──> AI analyst,
+    Linux artifacts ──> forensics (hashed) ─> event.Event (same timeline)         └──> AI analyst,
                                                                                        every claim checked by code
 
 Omamori is an AI blue-team tool with a CLI now and a local dashboard planned. The dashboard will run on
@@ -29,7 +29,7 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
 | 2 | AI analyst on alerts: sanitized alert summaries out, claims in, each claim checked against alerts and events, only verified claims shown; replay recording; shared run service for CLI and local dashboard | built and verified (2026-11-12); live model evaluation pending |
 | 3 | More intake: Suricata eve.json, Zeek, Wazuh alerts, Sysmon/Windows event JSON, with field maps and fuzz tests | built and verified (2026-11-12), documented JSON subsets |
 | 4 | SQLite/PostgreSQL/MariaDB storage, search, cases, timelines across runs | built and verified (2026-11-12) |
-| 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | January |
+| 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | built and verified (2026-11-12); analyst over forensic runs is next |
 | 6 | Local web UI on 127.0.0.1 over the store | February |
 | 7 | Full synthetic scenario across sources (SSH takeover, persistence, lateral movement), rehearsed demo | February |
 
@@ -98,6 +98,24 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
     have the same contract on all three databases. Cases use optimistic versions and explicit
     evidence membership. Timelines merge selected events and alerts with deterministic ordering.
     Full-text indexing, retention and data migration between backends are separate work.
+
+19. **Artifacts are events.** (`internal/forensics`) A cron job, a key or a history command becomes
+    an `event.Event` with `category: forensics` and a `service` that names its kind. So the rule engine,
+    the report, the store and later the analyst and the dashboard take forensic runs with no second
+    code path. `forensics.Run` gives a `detect.Outcome` plus the manifest, and it writes nothing.
+20. **Hash what is read, while it is read.** A file is opened once, without following a link, and the
+    same bytes go to the hasher and to the parser. The manifest therefore describes exactly what the
+    findings were made from. The hash is always of the whole file, also when only a part is parsed.
+21. **A fixed list of places, opened through `os.Root`.** No walk of the whole system: the collector
+    opens named places only, so `/etc/shadow` and private keys are out by construction, not by a
+    filter. `os.Root` refuses any path that leaves the evidence folder. Links are skipped and named.
+22. **A time says where it comes from.** Most artifacts have no time of their own. Their events carry
+    `time_source`, and the timeline shows it in words, because "last change of the file" must not be
+    read as "when it happened".
+23. **Artifact rules are a second embedded set.** `rules.BuiltinForensics()` is the built-in rules plus
+    `internal/rules/forensic/`. `detect` keeps its 17 rules and its measured behavior unchanged.
+24. **Table cells write `|` as `¦`, not as `/`.** (Changes decision 10's detail from slice 1.) In a
+    shell command `curl x / sh` reads as something else than `curl x | sh`. The report says what `¦` is.
 
 ## Slice 1 verification (2026-11-12)
 
@@ -219,6 +237,42 @@ case create/update/link/detach operations, and cross-run timelines. Previews nev
 
 See [storage.md](storage.md) for configuration, command examples, query semantics and limits.
 The local web dashboard remains planned; this slice provides its persistent application APIs.
+
+## Slice 5 verification (2026-11-12)
+
+`omamori forensics` reads a fixed list of Linux artifacts from an evidence folder, hashes each file,
+evaluates 27 rules (17 built-in, 10 for artifacts) and writes `report.md`, `report.html`, `alerts.json`,
+`manifest.json` and `manifest.sha256`. `forensics verify` checks the hashes again. `scenario --host`
+writes a synthetic system. See [forensics.md](forensics.md).
+
+- Across 25 seeds, 550 of 550 expected rule/entity cases were found on attacked systems (12 from logs
+  and 10 from artifacts each), with no unexpected case and no alert on the 25 systems without an attack
+  (1,375 benign artifact events). These are synthetic fixtures written together with the rules, not an
+  estimate for real intrusions.
+- The seed-3 system through the built command: 22 files hashed, 1,254 log events, 77 artifacts, 26 alerts
+  (3 critical, 14 high, 9 medium). `shasum -c manifest.sha256` and `forensics verify` agree; after one
+  changed byte `verify` names the file and ends with an error code. The run was stored in SQLite and
+  its artifacts and alerts were found by search.
+- Tests compare content, mode and time of change of every file and folder of the evidence before and
+  after a run. Links (inside and outside the folder, to files and to folders), a named pipe, a hostile
+  manifest with paths out of the folder, `/etc/shadow`, private keys and a secret inside a history are
+  each covered by a test with a canary value.
+- Looking at the real report found two defects that the tests had missed: tab-separated lines of
+  `/etc/crontab` put a part of the command into the user column, and `|` in table cells was shown as `/`.
+  Fuzzing found a crash in the process snapshot parser (a heading with COMMAND before PID). All three
+  are fixed and have regression tests; the fuzz input is kept in `testdata`.
+- Seven parser fuzz targets ran 10 to 20 seconds each after the fix with no failure.
+- 23 mutations were made in a copy of the repository. 19 were caught at once. Two survivors showed
+  missing assertions, which were added (appending to a log is not emptying it; a manifest path out of
+  the folder is reported as an invalid manifest, not as a missing file). Two were each one half of a
+  deliberate double check (file type before and after opening): removing either half alone changes
+  nothing, removing both is caught.
+- Two test expectations of mine were wrong and were corrected, not the code: a tab inside a cron
+  schedule is turned into a space, and the report itself names `/etc/shadow` in its limits.
+
+Not verified: real disk images, real distributions other than the Debian-like layout of the scenario,
+SELinux or immutable-file cases, very large evidence folders, and Windows as the machine that runs the
+tool (`O_NOFOLLOW` and named pipes are Unix). The analyst does not read forensic runs yet.
 
 ## Not decided yet
 

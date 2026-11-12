@@ -19,6 +19,8 @@ and will use the same detection and analyst services.
 mode work. `detect` checks local logs with rules and `scenario` makes synthetic
 demo logs. `analyze` reviews detected alerts with the AI and verifies its claims.
 SQLite, PostgreSQL and MariaDB can store runs for search, cases and timelines.
+`forensics` reads the artifacts of a Linux system read-only, hashes them and
+builds a timeline.
 The local dashboard, AI rule generation (Task C) and the Should items are not
 done. I am learning Go while I build it.
 
@@ -148,6 +150,26 @@ events. These APIs are shared with the future local dashboard. See the
 [storage guide](docs/storage.md) for backend setup, case commands, query semantics
 and limits. PostgreSQL and MariaDB have been tested with disposable real servers,
 including the CLI detection and analyst replay paths.
+
+### Forensic triage of a Linux system
+
+`forensics` reads logs, crontabs, systemd units, `authorized_keys`, shell
+histories and `/etc/passwd` from a folder (a mounted image, a copy, or `/`), and
+saved output of `ps` and `ss` when you give it. It only reads. Every file it
+opens is hashed into a manifest that can be checked again later. The same rules
+and the same store are used, and alerts from logs and artifacts stand in one
+timeline that says where each time comes from.
+
+```sh
+omamori scenario --host --date 2026-11-10 --timezone Asia/Tokyo ./demo-host
+omamori forensics --year 2026 --timezone Asia/Tokyo \
+  --processes ./demo-host/snapshots/ps.txt --sockets ./demo-host/snapshots/ss.txt ./demo-host/root
+omamori forensics verify ~/omamori-output/forensics-<time>/manifest.json ./demo-host/root
+```
+
+Password hashes and private keys are never read, and links are not followed.
+See the [forensics guide](docs/forensics.md) for what is read, what the times
+mean and what is not covered.
 
 ## Live test results
 
@@ -284,6 +306,8 @@ AI is limited by the guard and can only use read-only tools.
   mixed-source demo.
 - [Storage and investigations](docs/storage.md): SQLite/PostgreSQL/MariaDB,
   persistent runs, search, cases, timelines and dashboard APIs.
+- [Forensic triage](docs/forensics.md): read-only collection of Linux artifacts,
+  the hash manifest, the timeline and its limits.
 - [My Number test table](docs/mynumber-test-table.md): my test cases for the
   first detector. All numbers are dummy numbers.
 
