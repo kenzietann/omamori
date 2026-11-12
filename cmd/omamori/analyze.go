@@ -97,6 +97,39 @@ func runAnalyze(args []string, env environment) int {
 		return fail(errors.New("no log file could be read. Give the format with --format syslog, web, json, suricata, zeek, wazuh or windows"))
 	}
 
+	target := sources[0]
+	if info, err := os.Stat(target); err == nil && !info.IsDir() {
+		target = filepath.Dir(target)
+	}
+	review := analystFlags{reasoning: reasoning, recordingPath: recordingPath, confirmed: confirmed, dryRun: dryRun, timeout: timeout}
+	summary := fmt.Sprintf("Detected %d alerts from %d events in %d files.", len(outcome.Result.Alerts), len(outcome.Intake.Events), len(outcome.Intake.Files))
+
+	return reviewOutcome(env, flags, chosen, review, database, outcome, sources, target, analysisrun.Base{}, summary)
+}
+
+// analystFlags are the choices of one AI review, from the command line.
+type analystFlags struct {
+	reasoning, recordingPath string
+	confirmed, dryRun        bool
+	timeout                  time.Duration
+}
+
+// reviewOutcome is the terminal side of one checked AI review: provider choice, preview, confirmation, run.
+// analyze and forensics both end here, so a forensic run is previewed, guarded, recorded and replayed
+// in the same way as a detection run.
+func reviewOutcome(env environment, flags *flag.FlagSet, chosen settings, review analystFlags, database storageFlags,
+	outcome detect.Outcome, sources []string, target string, base analysisrun.Base, summary string) int {
+	lookup := env.lookupEnv
+	if lookup == nil {
+		lookup = func(string) string { return "" }
+	}
+	fail := func(err error) int {
+		fmt.Fprintln(env.stderr, "omamori:", err)
+		return exitFailed
+	}
+	recordingPath, reasoning, confirmed, dryRun, timeout := review.recordingPath, review.reasoning, review.confirmed, review.dryRun, review.timeout
+	var err error
+
 	setup := taskrun.Setup{}
 	if recordingPath != "" {
 		recorded, err := replay.Load(recordingPath)
@@ -128,10 +161,6 @@ func runAnalyze(args []string, env environment) int {
 		}
 	}
 
-	target := sources[0]
-	if info, err := os.Stat(target); err == nil && !info.IsDir() {
-		target = filepath.Dir(target)
-	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -139,6 +168,7 @@ func runAnalyze(args []string, env environment) int {
 	config := analysisrun.Config{
 		Provider: taskrun.Config{Target: target, OutputBase: chosen.output, LookupEnv: lookup, Keys: env.keys, Now: env.now, NewProvider: env.newProvider},
 		Sources:  sources,
+		Base:     base,
 	}
 	// Preview never opens or initializes a database. Persistence is enabled only for an actual run.
 	if database.wanted() && !dryRun && (confirmed || recordingPath != "") {
@@ -154,7 +184,7 @@ func runAnalyze(args []string, env environment) int {
 	if err != nil {
 		return fail(err)
 	}
-	fmt.Fprintf(env.stdout, "Detected %d alerts from %d events in %d files.\n%s\n", len(outcome.Result.Alerts), len(outcome.Intake.Events), len(outcome.Intake.Files), session.ConsentText())
+	fmt.Fprintf(env.stdout, "%s\n%s\n", summary, session.ConsentText())
 	if dryRun || recordingPath == "" && !confirmed {
 		preview, err := session.Preview()
 		if err != nil {

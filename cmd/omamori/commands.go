@@ -75,6 +75,8 @@ Flags for detect:
 Flags for forensics (also --rules, --year, --timezone, --output, --store and --db, as for detect):
   --processes file    saved output of "ps aux" or "ps -ef" from the system
   --sockets file      saved output of "ss -tulpn" or "netstat -tulpn" from the system
+  --analyze           let the AI analyst review the alerts; takes --yes, --dry-run, --replay, --provider and
+                      --model as analyze does. Without --yes it only shows the guarded request
 The evidence folder is the top of the system: a mounted image, an unpacked copy, or / itself.
 Nothing in it is changed or run. Password hashes and private keys are never read.
 

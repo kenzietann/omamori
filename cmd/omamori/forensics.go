@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/kenzietann/omamori/internal/analysisrun"
 	"github.com/kenzietann/omamori/internal/detect"
 	"github.com/kenzietann/omamori/internal/forensics"
 	"github.com/kenzietann/omamori/internal/htmlreport"
@@ -22,6 +23,7 @@ import (
 
 const (
 	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--rules folder] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
+		"       omamori forensics --analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] ... <evidence folder>\n" +
 		"       omamori forensics verify <manifest.json> <evidence folder>"
 	maxManifestBytes = 64 << 20
 )
@@ -44,8 +46,25 @@ func runForensics(args []string, env environment) int {
 	flags.IntVar(&chosen.year, "year", 0, "year of syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of syslog lines")
 	flags.StringVar(&chosen.output, "output", "", "folder for the reports")
+	lookup := env.lookupEnv
+	if lookup == nil {
+		lookup = func(string) string { return "" }
+	}
+	var review analystFlags
+	var analyze bool
+	flags.BoolVar(&analyze, "analyze", false, "let the AI analyst review the alerts, with every claim checked")
+	flags.StringVar(&chosen.provider, "provider", lookup("OMAMORI_PROVIDER"), "AI provider")
+	flags.StringVar(&chosen.model, "model", lookup("OMAMORI_MODEL"), "model name")
+	flags.StringVar(&review.reasoning, "reasoning", "", "reasoning level")
+	flags.StringVar(&review.recordingPath, "replay", "", "replay recorded analyst answers offline")
+	flags.BoolVar(&review.confirmed, "yes", false, "send the sanitized alert snapshot to the selected provider")
+	flags.BoolVar(&review.dryRun, "dry-run", false, "show the guarded request without sending or writing reports")
+	flags.DurationVar(&review.timeout, "timeout", 2*time.Minute, "maximum time for the analysis")
 	paths, err := splitFlags(flags, args)
-	if err != nil || len(paths) != 1 {
+	// The choices of the analyst mean nothing without --analyze. They are refused, so that nobody thinks
+	// that --yes alone sent something, or that --dry-run alone kept the reports from being written.
+	alone := !analyze && (review.confirmed || review.dryRun || review.recordingPath != "")
+	if err != nil || len(paths) != 1 || alone || review.confirmed && review.dryRun || review.timeout <= 0 {
 		fmt.Fprintln(env.stderr, usageForensics)
 		return exitUsage
 	}
@@ -115,6 +134,24 @@ func runForensics(args []string, env environment) int {
 	if err != nil {
 		return fail(errors.New("the alerts could not be written"))
 	}
+	artifacts := 0
+	for _, current := range result.Outcome.Intake.Events {
+		if current.Source == forensics.Source {
+			artifacts++
+		}
+	}
+	read := fmt.Sprintf("Read and hashed %d files: %d log events and %d artifacts. %d rules. %d alerts",
+		len(result.Manifest.Entries), len(result.Outcome.Intake.Events)-artifacts, artifacts, result.Outcome.Rules, len(result.Outcome.Result.Alerts))
+	if analyze {
+		// The analyst service writes the folder: the same reports and manifest, with the checked review added.
+		// A preview writes nothing at all.
+		base := analysisrun.Base{Report: report, Prefix: "forensics", Files: map[string]string{
+			"manifest.json": result.ManifestText, "manifest.sha256": result.ManifestSHA256 + "  manifest.json\n",
+		}}
+
+		return reviewOutcome(env, flags, chosen, review, database, result.Outcome, sources, evidence, base, read+".\nManifest SHA-256: "+result.ManifestSHA256)
+	}
+
 	// Nothing was written until here. The report folder must be new and away from the evidence: the triage
 	// must never put a file into the system that it looks at.
 	writer, err := reportwriter.NewRun(sources, directory)
@@ -134,18 +171,11 @@ func runForensics(args []string, env environment) int {
 		}
 	}
 
-	artifacts := 0
-	for _, current := range result.Outcome.Intake.Events {
-		if current.Source == forensics.Source {
-			artifacts++
-		}
-	}
 	counts := map[string]int{}
 	for _, alert := range result.Outcome.Result.Alerts {
 		counts[alert.Rule.Level]++
 	}
-	fmt.Fprintf(env.stdout, "Read and hashed %d files: %d log events and %d artifacts. %d rules. %d alerts",
-		len(result.Manifest.Entries), len(result.Outcome.Intake.Events)-artifacts, artifacts, result.Outcome.Rules, len(result.Outcome.Result.Alerts))
+	fmt.Fprint(env.stdout, read)
 	for _, level := range []string{"critical", "high", "medium", "low", "informational"} {
 		if counts[level] > 0 {
 			fmt.Fprintf(env.stdout, ", %d %s", counts[level], level)
