@@ -30,7 +30,7 @@ claims is checked by code, and collectors only read.
 | Sigma | A documented subset as the rule format, with correlations, aliases and tests inside the rule | Conversion to other SIEM query languages. Many modifiers |
 | MISP | `--indicators`: a list of addresses, domains and SHA-256 hashes marks events in every source ([demo.md](demo.md)) | Feeds, sharing, sightings, expiry, scores, MISP's own formats |
 | YARA | nothing (the exposure check finds secrets, not malware) | Pattern rules over files |
-| AI rule writing | nothing | The AI drafts a rule; code accepts it only if its tests pass and it stays quiet on benign scenarios. **Next candidate, and the most "AI" of them** |
+| AI rule writing | `rule draft`: the AI writes the matching part of one rule for events you point at; code accepts it only if it loads, passes its tests, matches every example, matches nothing on built-in benign days or `--benign` logs, and is not too broad ([rule-writing.md](rule-writing.md)) | Correlation rules, a live model measurement, the home screen and the dashboard |
 
 ## 4. SIEM, log management and orchestration
 
@@ -42,7 +42,10 @@ claims is checked by code, and collectors only read.
 
 ## What is AI-powered today
 
+`rule draft`: the AI drafts the matching part of a detection rule and code decides whether it is
+accepted ([rule-writing.md](rule-writing.md)).
+
 `analyze` and `forensics --analyze`: the AI reviews alerts, relates them through an address, a user, a
 host, a machine of the asset list or an indicator, and suggests review steps from a fixed list. No live
-model has been measured on the campaign or on a forensic run yet. Everything else on this page is
+model has been measured on the campaign, on a forensic run or on rule writing yet. Everything else on this page is
 plain code, on purpose: rules, parsers and lists must work the same with and without a provider.

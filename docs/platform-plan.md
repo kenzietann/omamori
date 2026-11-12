@@ -405,6 +405,31 @@ rules, 39 with the artifact rules); the AI review can relate alerts through an i
 Not done: feeds and MISP formats, expiry and scores, address ranges, more than one mark for an event,
 free text of syslog messages, `--indicators` in the home screen and the dashboard.
 
+### AI rule writing, Task C (2026-11-12)
+
+Chosen next from the toolkit direction: the "AI rule writing" row of [toolkit.md](toolkit.md), standing in
+for writing a Sigma rule by hand. `internal/ruledraft` and `omamori rule draft`; details in
+[rule-writing.md](rule-writing.md).
+
+- The AI writes only `logsource`, `detection` and `tests`. Title, level, name, tags, description and the
+  names of tests come from the user and from code.
+- Accepted only if it loads in the real loader, passes its own tests, matches every example, matches
+  nothing on 4 built-in benign days (4756 events in the test run) and nothing in `--benign` logs, and is
+  not too broad (more than 5% of the events and more than 10 times the examples; a guess).
+- Up to 3 answers by default (5 at most). After a refusal only the fixed reasons go back.
+- Campaign seed 1: the cron download rule matched the example and 3 of 1826 events (all three planted
+  runs), 0 benign events, not the backup job that also calls curl.
+- Decided while testing: loader messages are kept but every quoted name is replaced, because a
+  test-event key from the answer could be quoted into the report. Test-event keys must be plain names.
+  The answer is filtered for secrets before it is checked and sent back, so a live run and its replay
+  see the same text and the recorded requests match (tested over two answers). Copies of an example on
+  other hosts are no longer shown as "other events".
+- `Check` fuzzed for 60 s; 20 mutations in a copy all caught (one equivalent mutation replaced).
+
+Not done: a live provider run (none has been made for any AI feature), correlation rules, the home
+screen and the dashboard (no text input for a goal and example references), real clean logs as a
+built-in benign set.
+
 ## Not decided yet
 
 - Streaming (tail -f) evaluation. The engine is written so that state is per group, which is what a

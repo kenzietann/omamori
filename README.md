@@ -20,8 +20,9 @@ mode work. `detect` checks local logs with rules and `scenario` makes synthetic
 demo logs. `analyze` reviews detected alerts with the AI and verifies its claims.
 SQLite, PostgreSQL and MariaDB can store runs for search, cases and timelines.
 `forensics` reads the artifacts of a Linux system read-only, hashes them and
-builds a timeline.
-AI rule generation (Task C) and the remaining Should items are not done. I am learning Go while I build it.
+builds a timeline. `rule draft` (Task C) lets the AI write the matching part of a detection rule,
+and code accepts it only if it passes fixed checks. No live model has been measured on it yet.
+The remaining Should items are not done. I am learning Go while I build it.
 
 ## Why I am building this
 
@@ -202,8 +203,10 @@ numbers changed between runs.
 - **Task B: log triage.** Read an sshd `auth.log`. Find two cases: many failed
   logins followed by a success, and one IP trying many usernames. A normal
   program checks the AI's answer, so the AI cannot just make things up.
-- **Task C: detection rules (if I have time).** The AI proposes a rule. Omamori
-  tests it on sample logs.
+- **Task C: detection rules.** You point at log lines and say what you want. The AI writes
+  the matching part of a rule. Omamori accepts it only if it loads, passes its tests,
+  matches every example, and matches nothing on days without an attack
+  ([rule-writing.md](docs/rule-writing.md)).
 - A terminal screen: setup pages, then the run prints a live progress bar and the
   report into the normal terminal, so you can select and scroll it.
 - **Replay mode.** Recorded AI answers play back through the real pipeline, so
@@ -304,6 +307,8 @@ AI is limited by the guard and can only use read-only tools.
 - [AI analyst](docs/analyst.md): checked alert reviews, replay and the shared
   service for the local dashboard.
 - [Local rules](docs/rules.md): supported detection and correlation YAML.
+- [AI rule writing](docs/rule-writing.md): `rule draft`, what is sent, the checks
+  that decide whether a rule is accepted, and their limits.
 - [Log intake](docs/intake.md): supported source formats, field maps and a
   mixed-source demo.
 - [Storage and investigations](docs/storage.md): SQLite/PostgreSQL/MariaDB,

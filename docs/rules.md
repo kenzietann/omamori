@@ -18,6 +18,9 @@ omamori detect --rules ./rules --year 2026 --timezone Asia/Tokyo \
 chosen folder. An invalid rule or a failing embedded test stops the run before
 reports are written. Without `--rules`, the built-in rules are used.
 
+To let the AI draft a rule from log lines that you point at, see [rule-writing.md](rule-writing.md).
+A drafted rule is an ordinary rule file in this format.
+
 ## A small example
 
 Save this as `rules/ssh.yml`. The first rule matches failed SSH logins. The second
