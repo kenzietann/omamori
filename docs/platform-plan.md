@@ -31,7 +31,7 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
 | 4 | SQLite/PostgreSQL/MariaDB storage, search, cases, timelines across runs | built and verified (2026-11-12) |
 | 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | built and verified (2026-11-12), with the checked AI review (`--analyze`); live model evaluation pending |
 | 6 | Local web UI on 127.0.0.1 over the store | built and verified (2026-11-12), initial investigation dashboard |
-| 7 | Full synthetic scenario across sources (SSH takeover, persistence, lateral movement), rehearsed demo | February |
+| 7 | Full synthetic scenario across sources (SSH takeover, persistence, lateral movement), rehearsed demo | started (2026-11-12): campaign, nine network rules and the walk-through are built and measured; asset list, bundled analyst replay and a rehearsal are open |
 
 ## Decisions
 
@@ -330,6 +330,31 @@ search, case editing with optimistic versions, scoped timelines and a confirmed 
 
 See [dashboard.md](dashboard.md). Full cross-source rehearsal remains slice 7. Live model evaluation,
 streaming, multi-user access and production sensor/disk validation are not claimed by this dashboard.
+
+## Slice 7, first part (2026-11-12)
+
+`omamori scenario --campaign` writes one attack through three hosts (web01, app01, db01) as six log
+files of five kinds: sshd logs of each host, the web log of web01, a Zeek connection log and Suricata
+alerts. Nine rules were added to the built-in set (26 in all) in `internal/rules/builtin/network.yml`:
+guessing from an internal address and a login after it, a sweep of internal addresses, a large upload
+to an external address, and sensor alerts of severity 1. [demo.md](demo.md) is the walk-through.
+The home screen also got a Dashboard line, which starts the same server as the `dashboard` command.
+
+- Across 25 seeds, 425 of 425 expected rule/entity cases were found, with no unexpected case and no
+  alert on 39,397 events of days without the attack. Synthetic fixtures written with the rules.
+- Seed 3 through the built command: 6 files, 1,820 events, 19 alerts (2 critical, 9 high, 8 medium);
+  the benign campaign gives none. The report names evidence from every source in one timeline.
+- 13 mutations in a copy of the repository were caught by test assertions. One of them (removing the
+  check for the confirmation of the Dashboard task) first made a test wait forever; that test now has
+  a deadline and fails in five seconds.
+- One expectation of a new test was wrong (the split of alert levels) and was corrected.
+
+Open, and said in the demo: the login to db01 with a stolen key gives no alert; nothing joins the host
+name `web01` with its address `10.0.1.10`, so the alerts of the first host and of the movement share no
+entity; the rules have no knowledge of the network and need filters for jump hosts, scanners and cloud
+backups. Next: an asset list that gives events of a host its address (and the other way), a scripted
+analyst replay of the campaign, a forensic image of web01 that fits the same story, and a timed rehearsal.
+The Dashboard line of the home screen was tested through its backend, not by a person in a terminal.
 
 ## Not decided yet
 

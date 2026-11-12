@@ -62,7 +62,7 @@ an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all
 
 `detect` reads sshd/Linux syslog, Apache/Nginx access logs, or JSON lines with a
 timestamp. It normalizes supported Suricata EVE, Zeek, Wazuh and Windows/Sysmon
-JSON exports into the shared event fields. It applies 17 built-in rules, including counts, distinct counts and
+JSON exports into the shared event fields. It applies 26 built-in rules, including counts, distinct counts and
 ordered sequences such as password guessing followed by a successful login.
 Rule evaluation uses no API key. The command stays local unless you enable
 storage on a configured database server.
@@ -85,7 +85,8 @@ to load your own YAML rules, or `--format syslog|web|json|suricata|zeek|wazuh|wi
 to choose a parser. Auto mode can read mixed JSON sources; an explicit source
 format counts other shapes as unread. See the [intake guide](docs/intake.md)
 for field mappings, supported exporters and limits. The built-in rules cover
-their existing scenarios; additional sources can use custom rules.
+SSH, Linux host events, web servers, and movement inside a network as Zeek and
+Suricata see it; additional sources can use custom rules.
 Custom rules replace the built-in set. The rule format is a documented subset of
 Sigma: unsupported conditions and modifiers are refused. Rules can include test
 events, and a rule set with failing tests is refused too.
@@ -307,6 +308,8 @@ AI is limited by the guard and can only use read-only tools.
   mixed-source demo.
 - [Storage and investigations](docs/storage.md): SQLite/PostgreSQL/MariaDB,
   persistent runs, search, cases, timelines and dashboard APIs.
+- [Demo: one attack through three hosts](docs/demo.md): the synthetic campaign
+  across host logs and network sensors, what is found and what is not.
 - [Forensic triage](docs/forensics.md): read-only collection of Linux artifacts,
   the hash manifest, the timeline and its limits.
 - [My Number test table](docs/mynumber-test-table.md): my test cases for the

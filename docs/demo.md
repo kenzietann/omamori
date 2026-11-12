@@ -1,0 +1,55 @@
+# Demo: one attack through three hosts
+
+This is the walk-through of slice 7. Everything in it is synthetic: `omamori scenario --campaign`
+writes the logs, and no line comes from a real system. No AI provider and no network are needed
+for the steps below.
+
+## The story
+
+| Time | Step | Seen in | Found by |
+|---|---|---|---|
+| 02:10 | An outside address guesses the password of root on web01 and logs in | `web01/auth.log` | SSH login succeeded after password guessing (critical) |
+| 02:14 | A new account and a cron job that downloads a script are made on web01 | `web01/auth.log` | A new user account was made; Cron runs a download that is piped into a shell |
+| 02:25 | web01 looks for hosts with SSH in the server network | `sensor/conn.log` (Zeek), `sensor/eve.json` (Suricata) | One internal address tries many internal addresses; Network sensor raised its highest severity |
+| 02:31 | web01 guesses the password of deploy on app01 and logs in | `app01/auth.log` | SSH login succeeded after guessing from an internal address (critical) |
+| 02:41 | app01 logs in to db01 with a key that was found on app01 | `db01/auth.log` | **nothing** (see below) |
+| 02:52 | db01 sends 2.4 GB to an outside address | `sensor/conn.log` | Large amount of data sent to an external address |
+
+The rest of the day has other outside addresses that scan and attack web01 (password spraying, a web
+scan, injection attempts). They belong to the day of web01 and have no link to the six steps.
+
+## Run it
+
+```sh
+omamori scenario --campaign --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-campaign
+omamori detect ./demo-campaign/logs --year 2026 --timezone Asia/Tokyo --store
+omamori dashboard ./demo-campaign/logs
+```
+
+`detect` reads six files of three hosts and two sensors: 1,820 events, 26 rules, 19 alerts
+(2 critical, 9 high, 8 medium). The report has one timeline for all sources. With `--store` the run
+is in the local database, and the dashboard shows the alert queue with the evidence beside it.
+`./demo-campaign/expected.json` holds the story, the alerts that must fire and the known misses.
+
+`omamori scenario --campaign --benign` writes the same network on a day without the attack. It has
+the things that look like the attack and are not: a monitoring host that connects to every server, a
+person who goes from web01 to app01 and types a wrong password twice, a 3 GB backup to an internal
+address, and a host that keeps trying one address that is gone. `detect` gives no alert for it.
+
+For the checked AI review, add `analyze` in place of `detect` (preview first, `--yes` to send).
+No recording of a review of this campaign is bundled yet.
+
+## What the demo must say out loud
+
+- **Step 5 is not found.** One accepted key from an internal address looks like every ordinary login.
+  Finding it needs knowledge that the rules do not have: which host normally logs in to which.
+- **The two halves are not joined by the tool.** In its own logs the first host is `web01`. In the
+  logs of the other hosts and of the sensor it is `10.0.1.10`. Nothing in the program knows that these
+  are the same machine, so the alerts of steps 1–2 and of steps 3–4 share no entity. A person joins
+  them, or the AI review does not join them at all. An asset list (host name to address) is the next
+  piece of work.
+- **The rules know nothing about your network.** A jump host, a vulnerability scanner of your own,
+  or a backup to a cloud fires the new rules. Each needs a filter for that address.
+- **Measured on synthetic days only.** Over 25 seeds: 425 of 425 expected alerts, no unexpected
+  alert, and no alert on 39,397 events of days without the attack. The logs and the rules were
+  written together, so this shows that the path works, not how many real intrusions would be found.

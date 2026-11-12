@@ -116,8 +116,9 @@ documented alternate fields. Generic zone-less timestamps use `--timezone`.
   Per-field and per-event text budgets are disclosed as `truncated_fields`,
   alongside omitted alerts and evidence. Original logs remain unchanged.
 
-The 17 built-in rules are unchanged; adding a parser does not imply complete
-attack coverage for that source. Use [custom rules](rules.md) for the additional
+Nine built-in rules use Zeek connection records and Suricata alerts (a sweep of internal
+addresses, a large upload to an external address, sensor alerts of severity 1); see
+[demo.md](demo.md). A parser does not imply complete attack coverage for its source. Use [custom rules](rules.md) for the additional
 fields. The [mixed-source fixture](../testdata/fixtures/intake/README.md) provides
 eight demonstration rules and reproducible expected results. Its data is
 synthetic, and live sensor/model accuracy has not been measured by these tests.
