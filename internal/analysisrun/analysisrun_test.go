@@ -422,3 +422,43 @@ func TestConcurrentRunCallsSendAtMostOnce(t *testing.T) {
 		t.Fatalf("concurrent runs: %v, %v, %d requests", first, second, len(f.provider.requests))
 	}
 }
+
+// A caller can add files to the output folder, such as an evidence manifest. They are written as given,
+// and a name that the analysis itself writes is refused, so that no added file can stand in for a report.
+func TestBaseReportAndAddedFiles(t *testing.T) {
+	for _, name := range reservedFiles {
+		f := newFixture(t)
+		f.config.Base = Base{Files: map[string]string{name: "x"}}
+		if _, err := Prepare(context.Background(), f.config, f.outcome, f.setup); !errors.Is(err, ErrSetup) {
+			t.Errorf("%s as an added file gave %v", name, err)
+		}
+	}
+
+	f := newFixture(t)
+	const manifest = "{\"sha\":\"" + plantedSecret + "\"}\n"
+	f.config.Base = Base{Report: "# Own report\n\n- No AI was used for this report. Every alert comes from a rule, and the lines that made it fire are listed.\n", Prefix: "forensics",
+		Files: map[string]string{"manifest.json": manifest}}
+	f.provider.answer = outbound.Response{Text: `{"claims":[]}`, TokensUsed: 10}
+	session, err := Prepare(context.Background(), f.config, f.outcome, f.setup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// What the caller does with its map after preparation changes nothing.
+	f.config.Base.Files["manifest.json"] = "changed later"
+	session.Confirm()
+	result, err := session.Run(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(result.SavedTo) != "forensics-20261112-010203" {
+		t.Errorf("the folder is %s", filepath.Base(result.SavedTo))
+	}
+	written, err := os.ReadFile(filepath.Join(result.SavedTo, "manifest.json"))
+	if err != nil || string(written) != manifest {
+		t.Fatalf("the added file is %q, %v", written, err)
+	}
+	report, _ := os.ReadFile(filepath.Join(result.SavedTo, "report.md"))
+	if !strings.HasPrefix(string(report), "# Own report") || !strings.Contains(string(report), "## AI analyst") || strings.Contains(string(report), "No AI was used") {
+		t.Errorf("the report is not the given report with the analysis:\n%s", report)
+	}
+}

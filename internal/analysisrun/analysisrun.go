@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -47,7 +49,23 @@ type Config struct {
 	Sources  []string
 	// Store is optional. Both the CLI and local dashboard can persist the same frozen run.
 	Store runstore.Writer
+	// Base is optional. It is for a run that is more than detection in logs, such as the forensic triage.
+	Base Base
 }
+
+// Base replaces the plain detection report of a run and adds files to its output folder.
+// It is frozen at preparation like everything else.
+type Base struct {
+	// Report is the Markdown report of the run. Empty means the detection report.
+	Report string
+	// Files are written next to the reports, for example the evidence manifest. Names of the files that
+	// every analysis writes are refused.
+	Files map[string]string
+	// Prefix is the first part of the name of the output folder. Empty means "analyze".
+	Prefix string
+}
+
+var reservedFiles = []string{"report.md", "report.html", "alerts.json", "analysis.json", "events.jsonl", "recording.json"}
 
 // Progress is safe to show in a terminal, local dashboard, or event stream. Message is fixed text.
 type Progress struct {
@@ -89,7 +107,10 @@ type Session struct {
 	baseAlerts  string
 	noAlerts    bool
 	storedInput *store.RunInput
+	extraFiles  []extraFile
 }
+
+type extraFile struct{ name, content string }
 
 // Prepare reads no additional logs, writes no files, and makes no provider requests.
 // The detection result is rendered now so later caller mutation cannot change the reviewed evidence.
@@ -113,10 +134,25 @@ func Prepare(ctx context.Context, config Config, outcome detect.Outcome, setup t
 	if err != nil {
 		return nil, ErrSetup
 	}
+	report, prefix := config.Base.Report, config.Base.Prefix
+	if report == "" {
+		report = detect.Markdown(outcome)
+	}
+	if prefix == "" {
+		prefix = "analyze"
+	}
 	session := &Session{
-		config: config, snapshot: snapshot, request: request, baseReport: detect.Markdown(outcome), baseAlerts: alerts,
+		config: config, snapshot: snapshot, request: request, baseReport: report, baseAlerts: alerts,
 		mode: "live", noAlerts: snapshot.Coverage.TotalAlerts == 0 && setup.Recording == nil,
 	}
+	for name, content := range config.Base.Files {
+		if slices.Contains(reservedFiles, name) {
+			return nil, ErrSetup
+		}
+		session.extraFiles = append(session.extraFiles, extraFile{name, content})
+	}
+	sort.Slice(session.extraFiles, func(first, second int) bool { return session.extraFiles[first].name < session.extraFiles[second].name })
+	session.config.Base = Base{}
 	if config.Store != nil {
 		input, err := runstore.Build(outcome, nil)
 		if err != nil {
@@ -124,7 +160,7 @@ func Prepare(ctx context.Context, config Config, outcome detect.Outcome, setup t
 		}
 		session.storedInput = &input
 	}
-	session.directory = filepath.Join(config.Provider.OutputBase, "analyze-"+config.Provider.Now().UTC().Format("20060102-150405"))
+	session.directory = filepath.Join(config.Provider.OutputBase, prefix+"-"+config.Provider.Now().UTC().Format("20060102-150405"))
 	for _, source := range config.Sources {
 		if source == "" {
 			return nil, ErrSetup
@@ -374,9 +410,11 @@ func (session *Session) save(writer *reportwriter.Writer, result Result) error {
 	if err != nil {
 		return ErrOutput
 	}
-	for _, file := range []struct{ name, content string }{
+	// The added files are written as they were given: a manifest must stay byte for byte what its hash was made of.
+	files := append([]extraFile{
 		{"report.md", report}, {"report.html", htmlreport.Render(report)}, {"alerts.json", alerts}, {"analysis.json", string(analysis) + "\n"},
-	} {
+	}, session.extraFiles...)
+	for _, file := range files {
 		if err := writer.Write(file.name, file.content); err != nil {
 			return ErrOutput
 		}
