@@ -145,37 +145,14 @@ func reviewOutcome(env environment, flags *flag.FlagSet, chosen settings, review
 		return exitFailed
 	}
 	recordingPath, reasoning, confirmed, dryRun, timeout := review.recordingPath, review.reasoning, review.confirmed, review.dryRun, review.timeout
-	var err error
 
-	setup := taskrun.Setup{}
-	if recordingPath != "" {
-		recorded, err := replay.Load(recordingPath)
-		if err != nil {
-			return fail(err)
-		}
-		setup.Recording = &recorded
-	} else {
-		var saved appconfig.Settings
-		if env.settingsPath != nil {
-			if path, err := env.settingsPath(); err == nil {
-				saved, _ = appconfig.Load(path)
-			}
-		}
-		defaults := mergeDefaults(chosen, saved)
-		setup.ProviderID, setup.Model, setup.Reasoning = defaults.ProviderID, defaults.Model, defaults.Reasoning
-		reasoningSet := false
-		flags.Visit(func(option *flag.Flag) {
-			if option.Name == "reasoning" {
-				reasoningSet = true
-			}
-		})
-		if reasoningSet {
-			setup.Reasoning = reasoning
-		}
-		if len(outcome.Result.Alerts) > 0 && !knownProvider(setup.ProviderID) {
-			fmt.Fprintln(env.stderr, "omamori: choose a known provider with --provider. Run omamori providers to see them.")
-			return exitUsage
-		}
+	setup, err := aiSetup(env, flags, chosen, reasoning, recordingPath)
+	if err != nil {
+		return fail(err)
+	}
+	if recordingPath == "" && len(outcome.Result.Alerts) > 0 && !knownProvider(setup.ProviderID) {
+		fmt.Fprintln(env.stderr, "omamori: choose a known provider with --provider. Run omamori providers to see them.")
+		return exitUsage
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -233,4 +210,30 @@ func reviewOutcome(env environment, flags *flag.FlagSet, chosen settings, review
 		return exitFailed
 	}
 	return exitOK
+}
+
+// aiSetup chooses what answers a run: a recording, or a provider from the flags and the saved settings.
+// A --reasoning flag wins over the saved level, even when it is empty.
+func aiSetup(env environment, flags *flag.FlagSet, chosen settings, reasoning, recordingPath string) (taskrun.Setup, error) {
+	if recordingPath != "" {
+		recorded, err := replay.Load(recordingPath)
+		if err != nil {
+			return taskrun.Setup{}, err
+		}
+		return taskrun.Setup{Recording: &recorded}, nil
+	}
+	var saved appconfig.Settings
+	if env.settingsPath != nil {
+		if path, err := env.settingsPath(); err == nil {
+			saved, _ = appconfig.Load(path)
+		}
+	}
+	defaults := mergeDefaults(chosen, saved)
+	setup := taskrun.Setup{ProviderID: defaults.ProviderID, Model: defaults.Model, Reasoning: defaults.Reasoning}
+	flags.Visit(func(option *flag.Flag) {
+		if option.Name == "reasoning" {
+			setup.Reasoning = reasoning
+		}
+	})
+	return setup, nil
 }
