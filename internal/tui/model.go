@@ -47,8 +47,8 @@ const (
 )
 
 var menuItems = []menuItem{
-	{label: "Task A: Exposure check", note: "secrets and personal data in a project, with AI", task: "", ai: true},
-	{label: "Task B: Log triage", note: "sshd auth.log, with AI", task: TaskTriage, ai: true},
+	{label: "Exposure check", note: "secrets and personal data in a project, with AI", task: "", ai: true},
+	{label: "Log triage", note: "sshd auth.log, with AI", task: TaskTriage, ai: true},
 	{label: "Detect", note: "run the rules over the logs in the folder, no AI", task: TaskDetect},
 	{label: "Analyze", note: "detect, then the AI reviews the alerts and every claim is checked", task: TaskAnalyze, ai: true},
 	{label: "Forensics", note: "read a Linux system in the folder: hashes, rules, timeline, no AI", task: TaskForensics},
@@ -90,10 +90,10 @@ type Result struct {
 type Runner func(ctx context.Context, step func(text string)) (Result, error)
 
 type Choice struct {
-	ID       string
-	Name     string
-	Local    bool
-	KeyFound bool
+	ID           string
+	Name         string
+	Local        bool
+	KeyFound     bool
 	KeySaved     bool
 	KeyEnv       string
 	DefaultModel string
@@ -113,7 +113,7 @@ type Setup struct {
 	ProviderID string
 	Model      string
 	Key        string
-	Reasoning string
+	Reasoning  string
 }
 
 type ReasoningChoice struct {
@@ -134,9 +134,9 @@ const (
 
 type Plan struct {
 	ConsentText string
-	Title string
+	Title       string
 	// Label is shown next to the title when the run is a replay, for example "REPLAY".
-	Label string
+	Label   string
 	Summary string
 	Preview string
 	// MaxRequests and MaxTokens are the limits of the run. The progress bar shows how much of them is used.
@@ -167,7 +167,7 @@ type Backend interface {
 type Defaults struct {
 	ProviderID string
 	Model      string
-	Reasoning string
+	Reasoning  string
 }
 
 type keySaveResult int
@@ -197,39 +197,39 @@ type doneMsg struct {
 }
 
 type Model struct {
-	screen         screen
-	step           homeStep
-	target         string
-	backend        Backend
-	defaults       Defaults
-	cursor         int
-	notice         string
-	choices        []Choice
-	providerCursor int
-	modelInput     []rune
-	models         []string
-	modelCursor    int
-	modelsLoading  bool
-	modelTyping    bool
-	modelsNotice   string
-	fetchID        int
-	reasonChoices  []ReasoningChoice
-	reasonCursor   int
-	reasoning      string
-	settingsMode   bool
-	settingsCursor int
-	keyNotice      string
-	consentFull    bool
-	localRun       bool
-	consentScroll  int
-	task           string
-	title          string
-	label          string
-	outbox         []string
-	transcript     []string
-	version        string
-	quitting       bool
-	frame          int
+	screen          screen
+	step            homeStep
+	target          string
+	backend         Backend
+	defaults        Defaults
+	cursor          int
+	notice          string
+	choices         []Choice
+	providerCursor  int
+	modelInput      []rune
+	models          []string
+	modelCursor     int
+	modelsLoading   bool
+	modelTyping     bool
+	modelsNotice    string
+	fetchID         int
+	reasonChoices   []ReasoningChoice
+	reasonCursor    int
+	reasoning       string
+	settingsMode    bool
+	settingsCursor  int
+	keyNotice       string
+	consentFull     bool
+	localRun        bool
+	consentScroll   int
+	task            string
+	title           string
+	label           string
+	outbox          []string
+	transcript      []string
+	version         string
+	quitting        bool
+	frame           int
 	leaveFullScreen bool
 	enterFullScreen bool
 	pending         Defaults

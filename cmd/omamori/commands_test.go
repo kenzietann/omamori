@@ -162,7 +162,7 @@ func TestCheckOpensTheScreenAtTheProviderChoice(t *testing.T) {
 func TestUiOpensTheHomeMenu(t *testing.T) {
 	result := runCommand(t, []string{"ui", t.TempDir()}, nil, nil)
 
-	if view := result.screens[0].View(); result.code != exitOK || !strings.Contains(view, "Task A: Exposure check") || strings.Contains(view, "Choose the AI provider") {
+	if view := result.screens[0].View(); result.code != exitOK || !strings.Contains(view, "Exposure check") || strings.Contains(view, "Choose the AI provider") {
 		t.Errorf("code %d:\n%s", result.code, view)
 	}
 }

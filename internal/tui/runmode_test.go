@@ -152,7 +152,7 @@ func TestEnterGoesBackToTheFullScreenMenuAfterTheRun(t *testing.T) {
 	for _, key := range []string{"enter", "esc", "b"} {
 		back, command := press(t, model, key)
 
-		if back.screen != homeScreen || back.step != stepMenu || !strings.Contains(back.View(), "Task A: Exposure check") {
+		if back.screen != homeScreen || back.step != stepMenu || !strings.Contains(back.View(), "Exposure check") {
 			t.Errorf("%s did not go back to the menu", key)
 		}
 		if effects := effectsOf(command); len(effects) != 1 || effects[0] != "enter-alt" {

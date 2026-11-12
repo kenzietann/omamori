@@ -132,17 +132,17 @@ type modelCall struct {
 }
 
 type fakeBackend struct {
-	consent    string
-	choices    []Choice
-	runner     Runner
-	prepareErr error
-	preview    string
-	summary    string
-	setups     []Setup
-	confirmed  int
-	models     []string
-	modelsErr  error
-	modelCalls []modelCall
+	consent         string
+	choices         []Choice
+	runner          Runner
+	prepareErr      error
+	preview         string
+	summary         string
+	setups          []Setup
+	confirmed       int
+	models          []string
+	modelsErr       error
+	modelCalls      []modelCall
 	reasoning       []ReasoningChoice
 	reasoningModels []string
 	canSaveKeys     bool
