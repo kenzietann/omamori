@@ -500,3 +500,72 @@ func FuzzCondition(f *testing.F) {
 		}
 	})
 }
+
+const aliasRules = base + "title: Burst\nname: burst\ncorrelation: {type: event_count, rules: [fail], group-by: [src_ip], timespan: 60s, condition: {gte: 3}}\n---\n" +
+	"title: Joined\nname: joined\ncorrelation:\n  type: temporal_ordered\n  rules: [ok, burst]\n  aliases:\n    machine: {ok: asset, burst: src_asset}\n  group-by: [machine]\n  timespan: 10m"
+
+// A machine is "asset" where it wrote the log and "src_asset" where another host saw it. An alias lets
+// one correlation follow it through both.
+func TestAliasesJoinDifferentFieldsOfTheRules(t *testing.T) {
+	set := mustSet(t, aliasRules)
+	login := func(second int, asset string) event.Event {
+		return at(second, "outcome", "success", "src_ip", "203.0.113.9", "asset", asset)
+	}
+	guesses := func(from int, source, asset string) []event.Event {
+		var events []event.Event
+		for index := 0; index < 3; index++ {
+			events = append(events, at(from+index, "outcome", "failure", "src_ip", "10.0.1.10", "src_asset", source, "asset", asset))
+		}
+
+		return events
+	}
+	cases := []struct {
+		name   string
+		events []event.Event
+		want   int
+	}{
+		{"a login on web01, then web01 guesses on app01", append([]event.Event{login(0, "web01")}, guesses(10, "web01", "app01")...), 1},
+		{"the guessing host is another machine", append([]event.Event{login(0, "web01")}, guesses(10, "build01", "app01")...), 0},
+		{"the login was on the host that is guessed at", append([]event.Event{login(0, "app01")}, guesses(10, "web01", "app01")...), 0},
+		{"the guessing comes first", append(guesses(0, "web01", "app01"), login(10, "web01")), 0},
+		{"no asset fields at all", []event.Event{at(0, "outcome", "success", "src_ip", "203.0.113.9"), at(10, "outcome", "failure", "src_ip", "10.0.1.10"), at(11, "outcome", "failure", "src_ip", "10.0.1.10"), at(12, "outcome", "failure", "src_ip", "10.0.1.10")}, 0},
+		{"the first guess names another machine", append([]event.Event{login(0, "web01"), at(9, "outcome", "failure", "src_ip", "10.0.1.10", "src_asset", "other", "asset", "app01")}, guesses(10, "web01", "app01")[:2]...), 0},
+		{"the guesses name two different machines", append([]event.Event{login(0, "web01")}, append(guesses(10, "web01", "app01")[:2], at(12, "outcome", "failure", "src_ip", "10.0.1.10", "src_asset", "other", "asset", "app01"))...), 0},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := 0
+			for _, alert := range set.Evaluate(testCase.events).Alerts {
+				if alert.Rule.Name != "joined" {
+					continue
+				}
+				got++
+				if len(alert.Group) != 1 || alert.Group[0] != (Pair{"machine", "web01"}) {
+					t.Errorf("the group is %v", alert.Group)
+				}
+			}
+			if got != testCase.want {
+				t.Fatalf("%d joined alerts, want %d", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestAliasesThatMustBeRefused(t *testing.T) {
+	head := "title: T\ncorrelation:\n  type: temporal_ordered\n  rules: [a, b]\n  timespan: 5m\n  group-by: [machine]\n  aliases:\n"
+	for name, text := range map[string]string{
+		"not a map":              head + "    - machine\n",
+		"a name not in group-by": head + "    other: {a: x, b: y}\n",
+		"a rule without a field": head + "    machine: {a: x}\n",
+		"a rule not in the list": head + "    machine: {a: x, c: y}\n",
+		"one rule too many":      head + "    machine: {a: x, b: y, c: z}\n",
+		"a field that is a list": head + "    machine: {a: x, b: [y]}\n",
+		"an empty field":         head + "    machine: {a: x, b: ''}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Parse([]byte(text), "bad.yml"); !errors.Is(err, ErrInvalid) {
+				t.Fatalf("error is %v, want ErrInvalid", err)
+			}
+		})
+	}
+}

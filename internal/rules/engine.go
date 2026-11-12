@@ -11,7 +11,7 @@ import (
 const (
 	MaxEvidence = 50
 	maxValuesIn = 200
-	maxHits = 500_000
+	maxHits     = 500_000
 )
 
 type Pair struct {
@@ -20,22 +20,22 @@ type Pair struct {
 }
 
 type Alert struct {
-	Rule  *Rule
-	Time  time.Time
-	First time.Time
-	Last  time.Time
-	Group []Pair
+	Rule   *Rule
+	Time   time.Time
+	First  time.Time
+	Last   time.Time
+	Group  []Pair
 	Count  int
 	Events []event.Event
 	Values []string
-	Parts []*Alert
+	Parts  []*Alert
 
 	order int
 }
 
 type Result struct {
 	Alerts []*Alert
-	Cut []string
+	Cut    []string
 }
 
 func (alert *Alert) field(name string) (string, bool) {
@@ -49,7 +49,18 @@ func (alert *Alert) field(name string) (string, bool) {
 		}
 	}
 
-	return "", false
+	// A hit of a correlation also has a field when every event that it kept has it with one value:
+	// ten failed logins on one host are a hit "on that host", whatever the hit was grouped by.
+	shared := ""
+	for _, kept := range alert.Events {
+		value, found := kept.Get(name)
+		if !found || value == "" || shared != "" && value != shared {
+			return "", false
+		}
+		shared = value
+	}
+
+	return shared, shared != ""
 }
 
 func (alert *Alert) addEvents(events []event.Event) {
@@ -156,10 +167,14 @@ func (set Set) merge(rule *Rule, hits map[*Rule][]*Alert) []step {
 	return steps
 }
 
-func (rule *Rule) groupOf(hit *Alert) (key string, group []Pair, complete bool) {
+func (rule *Rule) groupOf(current step) (key string, group []Pair, complete bool) {
 	var builder strings.Builder
 	for _, field := range rule.correlation.groupBy {
-		value, found := hit.field(field)
+		source := field
+		if fields, aliased := rule.correlation.aliases[field]; aliased {
+			source = fields[current.index]
+		}
+		value, found := current.hit.field(source)
 		if !found || value == "" {
 			return "", nil, false
 		}
@@ -175,7 +190,7 @@ func (rule *Rule) correlate(steps []step) []*Alert {
 	groups := map[string]*groupState{}
 	var found []*Alert
 	for _, current := range steps {
-		key, group, complete := rule.groupOf(current.hit)
+		key, group, complete := rule.groupOf(current)
 		if !complete {
 			continue
 		}
@@ -203,7 +218,7 @@ func (rule *Rule) correlate(steps []step) []*Alert {
 }
 
 type groupState struct {
-	group []Pair
+	group  []Pair
 	window []*Alert
 	burst  *Alert
 	values map[string]bool

@@ -26,13 +26,16 @@ type correlation struct {
 	timespan   time.Duration
 	threshold  int
 	field      string
-	generate bool
+	generate   bool
+	// aliases gives a group-by name a different field for each rule of the list, as in Sigma:
+	// aliases[name][index of the rule] is the field.
+	aliases map[string][]string
 }
 
 func parseCorrelation(raw map[string]any) (*correlation, error) {
 	parsed := &correlation{}
 	for key := range raw {
-		if !slices.Contains([]string{"type", "rules", "group-by", "timespan", "condition", "generate"}, key) {
+		if !slices.Contains([]string{"type", "rules", "group-by", "timespan", "condition", "generate", "aliases"}, key) {
 			return nil, fmt.Errorf("the correlation key %q is not supported", truncate(key, 30))
 		}
 	}
@@ -53,6 +56,12 @@ func parseCorrelation(raw map[string]any) (*correlation, error) {
 	if raw["group-by"] != nil {
 		if parsed.groupBy, err = textList(raw["group-by"], maxGroupBy); err != nil {
 			return nil, errors.New("\"group-by\" must be a list of field names")
+		}
+	}
+
+	if raw["aliases"] != nil {
+		if parsed.aliases, err = parseAliases(raw["aliases"], parsed.references, parsed.groupBy); err != nil {
+			return nil, err
 		}
 	}
 
@@ -155,4 +164,34 @@ func hasDuplicate(list []string) bool {
 	}
 
 	return false
+}
+
+// parseAliases reads "aliases": for a name of group-by, the field that each rule of the list uses for it.
+// Every rule of the list must have a field, so that no hit falls out of the grouping without a word.
+func parseAliases(raw any, references, groupBy []string) (map[string][]string, error) {
+	names, isMap := raw.(map[string]any)
+	if !isMap || len(names) == 0 || len(names) > maxGroupBy {
+		return nil, errors.New("\"aliases\" must be a map from a group-by name to the field of each rule")
+	}
+	aliases := map[string][]string{}
+	for name, value := range names {
+		if !slices.Contains(groupBy, name) {
+			return nil, fmt.Errorf("the alias %q is not in group-by", truncate(name, 30))
+		}
+		fields, isMap := value.(map[string]any)
+		if !isMap || len(fields) != len(references) {
+			return nil, fmt.Errorf("the alias %q needs one field for every rule of the list", truncate(name, 30))
+		}
+		list := make([]string, len(references))
+		for index, reference := range references {
+			field, isText := fields[reference].(string)
+			if !isText || strings.TrimSpace(field) == "" {
+				return nil, fmt.Errorf("the alias %q has no field for the rule %q", truncate(name, 30), truncate(reference, 40))
+			}
+			list[index] = field
+		}
+		aliases[name] = list
+	}
+
+	return aliases, nil
 }

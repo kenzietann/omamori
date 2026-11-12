@@ -6,12 +6,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/intake"
 	"github.com/kenzietann/omamori/internal/rules"
 	"github.com/kenzietann/omamori/internal/scenario"
 )
 
 func runCampaign(t *testing.T, made scenario.Host) Outcome {
+	t.Helper()
+
+	return runCampaignWith(t, made, nil)
+}
+
+func runCampaignWith(t *testing.T, made scenario.Host, machines *assets.List) Outcome {
 	t.Helper()
 	folder := filepath.Join(t.TempDir(), "campaign")
 	if err := scenario.WriteHost(folder, made); err != nil {
@@ -21,7 +28,7 @@ func runCampaign(t *testing.T, made scenario.Host) Outcome {
 	if err != nil {
 		t.Fatal(err)
 	}
-	outcome, err := Run([]string{folder}, set, "built-in", intake.Options{Year: 2026, Location: tokyo}, scenarioDay())
+	outcome, err := Run([]string{folder}, set, "built-in", intake.Options{Year: 2026, Location: tokyo, Assets: machines}, scenarioDay())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,4 +111,61 @@ func TestCampaignReportCoversEverySource(t *testing.T) {
 		}
 		last = at
 	}
+}
+
+// With the asset list of the network, the first host of the story and the address that moves inside are one
+// machine, and one more alert joins the two halves. Without the list that alert is absent, which the
+// measurement above shows. The list must add nothing on a day without the attack.
+func TestCampaignWithTheAssetListJoinsTheStory(t *testing.T) {
+	for seed := int64(1); seed <= 25; seed++ {
+		made := scenario.GenerateCampaign(seed, scenarioDay(), true)
+		machines, err := assets.Parse([]byte(made.Assets))
+		if err != nil {
+			t.Fatal(err)
+		}
+		outcome := runCampaignWith(t, made, machines)
+		got := found(outcome)
+		for _, wanted := range append(append([]scenario.Expected{}, made.Expected...), made.ExpectedWithAssets...) {
+			if got[wanted] == 0 {
+				t.Errorf("seed %d: missed %s for %q", seed, wanted.Rule, wanted.Who)
+			}
+			delete(got, wanted)
+		}
+		for other := range got {
+			t.Errorf("seed %d: alert that the scenario does not expect: %s %s", seed, other.Rule, other.Who)
+		}
+		if len(made.ExpectedWithAssets) != 1 {
+			t.Fatalf("the campaign must name the one alert that needs the asset list")
+		}
+
+		for _, alert := range outcome.Result.Alerts {
+			if alert.Rule.Name != "host_takeover_then_internal_guessing" {
+				continue
+			}
+			// The two steps come from the logs of two different hosts.
+			if len(alert.Parts) != 2 || !strings.HasPrefix(alert.Parts[0].Events[0].Ref, "web01/auth.log:") || !strings.HasPrefix(alert.Parts[1].Events[0].Ref, "app01/auth.log:") {
+				t.Errorf("seed %d: the steps of the joined alert are not from web01 and then app01", seed)
+			}
+		}
+
+		quiet := scenario.GenerateCampaign(seed, scenarioDay(), false)
+		for _, alert := range runCampaignWith(t, quiet, machines).Result.Alerts {
+			t.Errorf("seed %d: alert on a day without the attack, with the asset list: %s", seed, alert.Rule.Name)
+		}
+	}
+
+	report := Markdown(runCampaignWith(t, scenario.GenerateCampaign(3, scenarioDay(), true), mustAssets(t)))
+	if !strings.Contains(report, "A host was logged in to after password guessing and then guesses passwords inside | machine=web01") {
+		t.Error("the report does not show the joined alert with its machine")
+	}
+}
+
+func mustAssets(t *testing.T) *assets.List {
+	t.Helper()
+	machines, err := assets.Parse([]byte(scenario.GenerateCampaign(3, scenarioDay(), true).Assets))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return machines
 }

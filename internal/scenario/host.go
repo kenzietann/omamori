@@ -17,13 +17,17 @@ import (
 type HostFile struct {
 	Text     string
 	Modified time.Time
-	Link string
+	Link     string
 }
 
 type Host struct {
-	Files    map[string]HostFile
-	Expected []Expected
+	Files       map[string]HostFile
+	Expected    []Expected
 	KnownMisses []string
+	// Assets is the asset list of the network, as YAML, and ExpectedWithAssets are the alerts that fire only
+	// when that list is given. Both are empty for a single system.
+	Assets             string
+	ExpectedWithAssets []Expected
 }
 
 func fakeKey(random *rand.Rand, comment string) string {

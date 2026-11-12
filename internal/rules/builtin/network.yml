@@ -244,3 +244,96 @@ tests:
       - {product: suricata, service: alert, src_ip: 10.0.1.10, rule_severity: 1}
       - {product: suricata, service: alert, src_ip: 10.0.1.10, rule_severity: 1}
     expect: {alerts: 1}
+---
+title: A host was logged in to after password guessing and then guesses passwords inside
+name: host_takeover_then_internal_guessing
+id: 6f3a2c10-0410-4a6e-9d7b-0a1b2c3d4e10
+description: Someone guessed a password of this host and logged in. Within six hours the same host guessed passwords of another host inside the network. This rule needs the asset list (--assets), which says that the host name and the address are one machine.
+level: critical
+tags: [attack.lateral_movement, attack.t1021.004, attack.initial_access]
+correlation:
+  type: temporal_ordered
+  rules: [ssh_brute_force_success, ssh_internal_guessing]
+  aliases:
+    machine:
+      ssh_brute_force_success: asset
+      ssh_internal_guessing: src_asset
+  group-by: [machine]
+  timespan: 6h
+tests:
+  - name: the host is taken over and then guesses inside
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: success, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+    expect: {alerts: 1}
+  - name: without the asset list nothing joins the two
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: success, host: web01, src_ip: 203.0.113.9, user: root}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy}
+    expect: {alerts: 0}
+  - name: another host guesses inside
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: success, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.3.3, user: deploy, asset: app01, src_asset: build01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.3.3, user: deploy, asset: app01, src_asset: build01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.3.3, user: deploy, asset: app01, src_asset: build01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.3.3, user: deploy, asset: app01, src_asset: build01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.3.3, user: deploy, asset: app01, src_asset: build01}
+    expect: {alerts: 0}
+  - name: the guessing inside comes first
+    events:
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: app01, src_ip: 10.0.1.10, user: deploy, asset: app01, src_asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: failure, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+      - {product: linux, service: sshd, action: login, outcome: success, host: web01, src_ip: 203.0.113.9, user: root, asset: web01}
+    expect: {alerts: 0}

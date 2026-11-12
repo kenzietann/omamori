@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/event"
 )
 
@@ -52,22 +53,24 @@ var (
 type Options struct {
 	Year     int
 	Location *time.Location
-	Format string
+	Format   string
+	// Assets is optional: the list of your own machines.
+	Assets *assets.List
 }
 
 type Stats struct {
-	File   string
-	Format string
-	Sources []string
-	Lines   int
-	Events  int
+	File      string
+	Format    string
+	Sources   []string
+	Lines     int
+	Events    int
 	Blank     int
 	Malformed int
 }
 
 type Result struct {
-	Events []event.Event
-	Files  []Stats
+	Events  []event.Event
+	Files   []Stats
 	Skipped []string
 }
 
@@ -219,6 +222,7 @@ func ReadContext(ctx context.Context, paths []string, options Options) (Result, 
 			return Result{}, ErrTooBig
 		}
 	}
+	options.Assets.Enrich(result.Events)
 	event.Sort(result.Events)
 
 	return result, nil
