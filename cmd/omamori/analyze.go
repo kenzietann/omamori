@@ -15,6 +15,7 @@ import (
 	"github.com/kenzietann/omamori/internal/appconfig"
 	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/detect"
+	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/intake"
 	"github.com/kenzietann/omamori/internal/replay"
 	"github.com/kenzietann/omamori/internal/rules"
@@ -22,7 +23,7 @@ import (
 	"github.com/kenzietann/omamori/internal/taskrun"
 )
 
-const usageAnalyze = "usage: omamori analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] [--rules folder] [--assets file] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
+const usageAnalyze = "usage: omamori analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] [--rules folder] [--assets file] [--indicators file] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
 
 // runAnalyze is the terminal adapter for the shared analysis service. The future local dashboard
 // can use the same Prepare/Preview/Confirm/Run lifecycle without invoking this command or a TUI.
@@ -47,6 +48,8 @@ func runAnalyze(args []string, env environment) int {
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of classic syslog lines")
 	var assetsPath string
 	flags.StringVar(&assetsPath, "assets", "", "asset list: names and addresses of your own machines")
+	var indicatorsPath string
+	flags.StringVar(&indicatorsPath, "indicators", "", "indicator list: addresses, domains and hashes that are known to be bad")
 	flags.StringVar(&chosen.output, "output", "", "folder for reports")
 	flags.StringVar(&recordingPath, "replay", "", "replay recorded analyst answers offline")
 	flags.BoolVar(&confirmed, "yes", false, "send the sanitized alert snapshot to the selected provider")
@@ -98,7 +101,13 @@ func runAnalyze(args []string, env environment) int {
 			return fail(err)
 		}
 	}
-	outcome, err := detect.Run(sources, loaded, rulesFrom, intake.Options{Year: chosen.year, Location: location, Format: format, Assets: machines}, now)
+	var known *indicators.List
+	if indicatorsPath != "" {
+		if known, err = indicators.Load(indicatorsPath); err != nil {
+			return fail(err)
+		}
+	}
+	outcome, err := detect.Run(sources, loaded, rulesFrom, intake.Options{Year: chosen.year, Location: location, Format: format, Assets: machines, Indicators: known}, now)
 	if err != nil {
 		return fail(err)
 	}

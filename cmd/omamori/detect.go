@@ -16,6 +16,7 @@ import (
 	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/detect"
 	"github.com/kenzietann/omamori/internal/htmlreport"
+	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/intake"
 	"github.com/kenzietann/omamori/internal/pathguard"
 	"github.com/kenzietann/omamori/internal/reportwriter"
@@ -25,7 +26,7 @@ import (
 )
 
 const (
-	usageDetect   = "usage: omamori detect [--rules folder] [--assets file] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
+	usageDetect   = "usage: omamori detect [--rules folder] [--assets file] [--indicators file] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
 	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] [--host | --campaign] <new folder>"
 )
 
@@ -95,6 +96,8 @@ func runDetect(args []string, env environment) int {
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of syslog lines")
 	var assetsPath string
 	flags.StringVar(&assetsPath, "assets", "", "asset list: names and addresses of your own machines")
+	var indicatorsPath string
+	flags.StringVar(&indicatorsPath, "indicators", "", "indicator list: addresses, domains and hashes that are known to be bad")
 	flags.StringVar(&chosen.output, "output", "", "folder for the reports")
 	paths, err := splitFlags(flags, args)
 	if err != nil || len(paths) == 0 {
@@ -153,7 +156,13 @@ func runDetect(args []string, env environment) int {
 			return fail(err)
 		}
 	}
-	outcome, err := detect.Run(paths, loaded, rulesFrom, intake.Options{Year: chosen.year, Location: location, Format: format, Assets: machines}, now)
+	var known *indicators.List
+	if indicatorsPath != "" {
+		if known, err = indicators.Load(indicatorsPath); err != nil {
+			return fail(err)
+		}
+	}
+	outcome, err := detect.Run(paths, loaded, rulesFrom, intake.Options{Year: chosen.year, Location: location, Format: format, Assets: machines, Indicators: known}, now)
 	if err != nil {
 		return fail(err)
 	}
@@ -309,7 +318,8 @@ func writeCampaignScenario(env environment, directory string, seed int64, day ti
 	expected, err := json.MarshalIndent(map[string]any{
 		"note": "Synthetic logs made by omamori scenario --campaign. No line comes from a real system.", "seed": seed, "date": day.Format("2006-01-02"),
 		"story": story, "expected_alerts": append([]scenario.Expected{}, made.Expected...),
-		"expected_alerts_with_assets": append([]scenario.Expected{}, made.ExpectedWithAssets...), "known_misses": append([]string{}, made.KnownMisses...),
+		"expected_alerts_with_assets":     append([]scenario.Expected{}, made.ExpectedWithAssets...),
+		"expected_alerts_with_indicators": append([]scenario.Expected{}, made.ExpectedWithIndicators...), "known_misses": append([]string{}, made.KnownMisses...),
 	}, "", "  ")
 	if err != nil {
 		return fail(errors.New("the list of expected alerts could not be written"))
@@ -319,15 +329,16 @@ func writeCampaignScenario(env environment, directory string, seed int64, day ti
 		files.Files["logs/"+name] = file
 	}
 	files.Files["assets.yml"] = scenario.HostFile{Text: made.Assets, Modified: env.clock()}
+	files.Files["indicators.yml"] = scenario.HostFile{Text: made.Indicators, Modified: env.clock()}
 	if err := os.MkdirAll(filepath.Dir(directory), 0o700); err != nil {
 		return fail(errors.New("the folder cannot be made"))
 	}
 	if err := scenario.WriteHost(directory, files); err != nil {
 		return fail(err)
 	}
-	fmt.Fprintf(env.stdout, "Wrote %d log files of three hosts and two network sensors for %s to %s\nThe story and the expected alerts are in %s\nTry: omamori detect --year %d --timezone %s --assets %s -- %s\n",
+	fmt.Fprintf(env.stdout, "Wrote %d log files of three hosts and two network sensors for %s to %s\nThe story and the expected alerts are in %s\nTry: omamori detect --year %d --timezone %s --assets %s --indicators %s -- %s\n",
 		len(made.Files), day.Format("2006-01-02"), filepath.Join(directory, "logs"), filepath.Join(directory, "expected.json"),
-		day.Year(), shellArgument(location.String()), shellArgument(filepath.Join(directory, "assets.yml")), shellArgument(filepath.Join(directory, "logs")))
+		day.Year(), shellArgument(location.String()), shellArgument(filepath.Join(directory, "assets.yml")), shellArgument(filepath.Join(directory, "indicators.yml")), shellArgument(filepath.Join(directory, "logs")))
 
 	return exitOK
 }

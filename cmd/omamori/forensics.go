@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/kenzietann/omamori/internal/analysisrun"
+	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/detect"
 	"github.com/kenzietann/omamori/internal/forensics"
 	"github.com/kenzietann/omamori/internal/htmlreport"
+	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/pathguard"
 	"github.com/kenzietann/omamori/internal/reportwriter"
 	"github.com/kenzietann/omamori/internal/rules"
@@ -22,7 +24,7 @@ import (
 )
 
 const (
-	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--rules folder] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
+	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--rules folder] [--assets file] [--indicators file] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
 		"       omamori forensics --analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] ... <evidence folder>\n" +
 		"       omamori forensics verify <manifest.json> <evidence folder>"
 	maxManifestBytes = 64 << 20
@@ -44,6 +46,9 @@ func runForensics(args []string, env environment) int {
 	flags.IntVar(&chosen.year, "year", 0, "year of syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of syslog lines")
 	flags.StringVar(&chosen.output, "output", "", "folder for the reports")
+	var assetsPath, indicatorsPath string
+	flags.StringVar(&assetsPath, "assets", "", "asset list: names and addresses of your own machines")
+	flags.StringVar(&indicatorsPath, "indicators", "", "indicator list: addresses, domains and hashes that are known to be bad")
 	lookup := env.lookupEnv
 	if lookup == nil {
 		lookup = func(string) string { return "" }
@@ -96,6 +101,18 @@ func runForensics(args []string, env environment) int {
 		return fail(errors.New("the rules folder has no rule"))
 	}
 
+	var machines *assets.List
+	if assetsPath != "" {
+		if machines, err = assets.Load(assetsPath); err != nil {
+			return fail(err)
+		}
+	}
+	var known *indicators.List
+	if indicatorsPath != "" {
+		if known, err = indicators.Load(indicatorsPath); err != nil {
+			return fail(err)
+		}
+	}
 	evidence, err := filepath.Abs(paths[0])
 	if err != nil {
 		return fail(errors.New("the evidence folder is not usable"))
@@ -118,7 +135,7 @@ func runForensics(args []string, env environment) int {
 		}
 	}
 
-	result, err := forensics.Run(evidence, loaded, rulesFrom, forensics.Options{Year: chosen.year, Location: location, Processes: processes, Sockets: sockets}, now)
+	result, err := forensics.Run(evidence, loaded, rulesFrom, forensics.Options{Year: chosen.year, Location: location, Processes: processes, Sockets: sockets, Assets: machines, Indicators: known}, now)
 	if err != nil {
 		return fail(err)
 	}

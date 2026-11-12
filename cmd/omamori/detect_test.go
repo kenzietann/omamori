@@ -7,6 +7,7 @@ import (
 	"github.com/kenzietann/omamori/internal/analyst"
 	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/detect"
+	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/intake"
 	"github.com/kenzietann/omamori/internal/outbound"
 	"github.com/kenzietann/omamori/internal/rules"
@@ -115,7 +116,7 @@ func TestScenarioThenDetect(t *testing.T) {
 	if found.code != exitOK {
 		t.Fatalf("detect: %d %s", found.code, found.stderr)
 	}
-	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 27 rules. 14 alerts, 1 critical, 5 high, 8 medium.") {
+	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 29 rules. 14 alerts, 1 critical, 5 high, 8 medium.") {
 		t.Errorf("the summary is %q", found.stdout)
 	}
 
@@ -327,7 +328,7 @@ func TestCampaignScenarioThenDetect(t *testing.T) {
 	before := snapshot(t, campaign)
 
 	found := runAt(t, detectNow, "detect", filepath.Join(campaign, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", output)
-	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "27 rules. 19 alerts, 2 critical, 9 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "29 rules. 19 alerts, 2 critical, 9 high, 8 medium.") {
 		t.Fatalf("detect: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(output, "detect-20261111-030405", "alerts.json"))
@@ -352,7 +353,7 @@ func TestCampaignScenarioThenDetect(t *testing.T) {
 		t.Fatal(made.stderr)
 	}
 	calm := runAt(t, detectNow, "detect", filepath.Join(quiet, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", filepath.Join(base, "out2"))
-	if calm.code != exitOK || !strings.Contains(calm.stdout, "27 rules. 0 alerts.") {
+	if calm.code != exitOK || !strings.Contains(calm.stdout, "29 rules. 0 alerts.") {
 		t.Fatalf("the quiet campaign: %d %s", calm.code, calm.stdout)
 	}
 }
@@ -370,7 +371,7 @@ func TestCampaignWithTheAssetList(t *testing.T) {
 	common := []string{logs, "--assets", list, "--year", "2026", "--timezone", "Asia/Tokyo"}
 
 	found := runAt(t, detectNow, append([]string{"detect", "--output", filepath.Join(base, "out")}, common...)...)
-	if found.code != exitOK || !strings.Contains(found.stdout, "27 rules. 20 alerts, 3 critical, 9 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "29 rules. 20 alerts, 3 critical, 9 high, 8 medium.") {
 		t.Fatalf("detect with assets: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(base, "out", "detect-20261111-030405", "alerts.json"))
@@ -450,5 +451,109 @@ func TestCampaignWithTheAssetList(t *testing.T) {
 		"analyze", "--yes", "--provider", "openai", "--model", "test", "--output", filepath.Join(base, "plain"), logs, "--year", "2026", "--timezone", "Asia/Tokyo")
 	if plain.code != exitFailed || strings.Contains(plain.stdout, "21 verified") {
 		t.Fatalf("analyze without assets accepted the claim about the machine: %d %s", plain.code, plain.stdout)
+	}
+}
+
+// The indicator list through the real command line, for logs and for the forensic triage, and as an entity
+// that the AI review can use to relate alerts.
+func TestIndicatorListThroughTheCommandLine(t *testing.T) {
+	base := t.TempDir()
+	campaign := filepath.Join(base, "campaign")
+	if made := runAt(t, detectNow, "scenario", "--campaign", "--seed", "3", "--date", "2026-11-10", "--timezone", "Asia/Tokyo", campaign); made.code != exitOK ||
+		!strings.Contains(made.stdout, "--indicators") {
+		t.Fatalf("scenario: %d %s %s", made.code, made.stdout, made.stderr)
+	}
+	logs, known, machines := filepath.Join(campaign, "logs"), filepath.Join(campaign, "indicators.yml"), filepath.Join(campaign, "assets.yml")
+	common := []string{logs, "--indicators", known, "--assets", machines, "--year", "2026", "--timezone", "Asia/Tokyo"}
+
+	found := runAt(t, detectNow, append([]string{"detect", "--output", filepath.Join(base, "out")}, common...)...)
+	if found.code != exitOK || !strings.Contains(found.stdout, "29 rules. 21 alerts, 3 critical, 10 high, 8 medium.") {
+		t.Fatalf("detect with both lists: %d %s %s", found.code, found.stdout, found.stderr)
+	}
+	report, _ := os.ReadFile(filepath.Join(base, "out", "detect-20261111-030405", "report.md"))
+	if !strings.Contains(string(report), "Known bad indicator seen | indicator=203.0.113.80 | 4 |") {
+		t.Error("the report does not show the indicator alert with its four events")
+	}
+
+	bad := filepath.Join(base, "bad.yml")
+	os.WriteFile(bad, []byte("indicators:\n  - type: ip\n    value: 203.0.113.80\n  - type: ip\n    value: nonsense\n"), 0o600)
+	for _, command := range []string{"detect", "forensics"} {
+		refused := runAt(t, detectNow, command, logs, "--indicators", bad, "--year", "2026", "--output", filepath.Join(base, "refused"))
+		if refused.code != exitFailed || !strings.Contains(refused.stderr, "indicator list is not valid") || !strings.Contains(refused.stderr, "entry 2") {
+			t.Errorf("%s with a bad list: %d %s", command, refused.code, refused.stderr)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(base, "refused")); err == nil {
+		t.Error("a refused run left a report folder")
+	}
+
+	// The forensic triage marks the artifacts too: the cron job and the shell history name the same address.
+	host := hostFixture(t, false)
+	triage := runAt(t, detectNow, forensicsArgs(host, filepath.Join(base, "forensics"), "--indicators", known)...)
+	if triage.code != exitOK || !strings.Contains(triage.stdout, "39 rules. 27 alerts") {
+		t.Fatalf("forensics with indicators: %d %s %s", triage.code, triage.stdout, triage.stderr)
+	}
+	alerts, _ := os.ReadFile(filepath.Join(base, "forensics", "forensics-20261111-030405", "alerts.json"))
+	for _, want := range []string{`"rule": "intel_indicator_seen"`, `"ref": "root/.bash_history:`, `"ref": "var/spool/cron/crontabs/root:2"`, `"ref": "var/log/auth.log:`, `"indicator_where": "command"`} {
+		if !strings.Contains(string(alerts), want) {
+			t.Errorf("the forensic alerts do not have %s", want)
+		}
+	}
+
+	// A scripted AI answer relates the cron alert of web01 and the upload alert of db01 through the indicator.
+	listA, _ := assets.Load(machines)
+	listI, err := indicators.Load(known)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, _ := rules.Builtin()
+	outcome, err := detect.Run([]string{logs}, set, "built-in", intake.Options{Year: 2026, Location: time.FixedZone("JST", 9*3600), Assets: listA, Indicators: listI}, detectNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := analyst.BuildSnapshot(outcome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared := ""
+	for _, entity := range snapshot.Entities {
+		if entity.Field == "indicator" && entity.Value == "203.0.113.80" {
+			shared = entity.ID
+		}
+	}
+	related := analyst.Claim{Kind: "related", Entity: shared}
+	for _, alert := range snapshot.Alerts {
+		if alert.Rule != "linux_cron_download_exec" && alert.Rule != "net_large_upload_external" {
+			continue
+		}
+		if len(related.Alerts) == 2 && alert.Rule == "linux_cron_download_exec" {
+			continue
+		}
+		cited := false
+		for _, evidence := range alert.Evidence {
+			if slices.Contains(evidence.Entities, shared) {
+				related.Evidence, cited = append(related.Evidence, evidence.ID), true
+			}
+		}
+		if cited {
+			related.Alerts = append(related.Alerts, alert.ID)
+		}
+	}
+	if shared == "" || len(related.Alerts) != 2 {
+		t.Fatalf("the snapshot does not let the cron job and the upload be related through the indicator: %+v", related)
+	}
+	var answer analyst.Response
+	json.Unmarshal([]byte(analystAnswers(t, snapshot)), &answer)
+	answer.Claims = append(answer.Claims, related)
+	encoded, _ := json.Marshal(answer)
+	provider := &analystProvider{answer: string(encoded)}
+	reviewed := analyzeCommand(t, func(_, _, _, _ string) (outbound.Provider, error) { return provider, nil },
+		append([]string{"analyze", "--yes", "--provider", "openai", "--model", "test", "--db", filepath.Join(base, "db", "o.db"), "--output", filepath.Join(base, "review")}, common...)...)
+	if reviewed.code != exitOK || !strings.Contains(reviewed.stdout, "22 verified findings, 0 rejected claims") || !strings.Contains(reviewed.stdout, "Stored run:") {
+		t.Fatalf("analyze with indicators: %d %s %s", reviewed.code, reviewed.stdout, reviewed.stderr)
+	}
+	text, _ := os.ReadFile(analysisFiles(t, filepath.Join(base, "review"))["report.md"])
+	if !strings.Contains(string(text), "2 alerts have evidence that names 203.0.113.80, an entry of the indicator list") {
+		t.Error("the report does not have the checked claim about the indicator")
 	}
 }

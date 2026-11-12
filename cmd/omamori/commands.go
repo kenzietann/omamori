@@ -69,6 +69,8 @@ Flags for detect:
   --rules folder      use the rules of a folder in place of the built-in rules (Sigma format, see docs/rules.md)
   --assets file       names and addresses of your own machines (YAML). Events of a host and events of its
                       address are then known to be one machine, and rules and the AI review can join them
+  --indicators file   addresses, domains and SHA-256 hashes that are known to be bad (YAML). Events that name
+                      one are marked in every kind of log, and one alert is given for each indicator
   --format name       syslog, web, json, suricata, zeek, wazuh or windows (default: look at the first lines of each file)
   --year, --timezone  for syslog lines, which have no year and no time zone
   --output folder     where the report folder is made (default ~/omamori-output)
