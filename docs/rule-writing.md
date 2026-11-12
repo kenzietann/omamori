@@ -36,11 +36,15 @@ colon and the line, like `auth.log:290` or `web01/auth.log:68`. Give up to 20 wi
 ## From the home screen
 
 `omamori ui <folder of logs>`, then **Rule draft**. A page asks for the goal, the example events
-(separated by spaces or commas), a title and a level; tab or up/down moves between the fields, and
-enter on the last field goes on. Then come the same provider, model and consent pages as for the other
+(separated by spaces or commas), clean logs (optional: files or folders separated by commas, so a path
+may hold a space; `~/` is your home folder, other relative paths start from where you ran Omamori),
+a title, a level (a choice), the number of answers (1 to 5), the log format, an asset list, an
+indicator list and a recording to replay. Tab or up/down moves between the fields, left and right
+change a choice, and enter goes on. With a recording, the provider pages are skipped and nothing
+is sent. Then come the same provider, model and consent pages as for the other
 AI tasks: the guarded request is shown, and nothing is sent before you confirm. If the input is wrong
 (an example that is not in the logs, a level that does not exist), you are back on the page with the
-reason and your text kept. The run uses the built-in benign days, 3 answers at most, and writes the
+reason and your text kept. The run uses the built-in benign days and your clean logs, and writes the
 same folder as the command. The page was tested through the screen model and the backend, not by a
 person in a terminal.
 
@@ -67,7 +71,7 @@ Every check is plain code. The AI's answer is refused if:
 | the real loader refuses it, or its own tests fail | same loader and test runner as `detect --rules` |
 | it misses an example in the real logs | the examples are what the rule is for |
 | it matches any event of the built-in days without an attack | 4 synthetic days: three of one server, one of the three-host network (4756 events in the test run) |
-| it matches any event of logs given with `--benign` | your own clean logs, the better test |
+| it matches any event of logs given with `--benign` (or in the home screen's clean logs field) | your own clean logs, the better test. They must be apart from the searched logs, and they must give at least one event, or the run does not start |
 | it matches more than 5% of the events of your logs and more than 10 times the number of examples | too broad. These two numbers are a guess, not measured |
 
 An accepted rule also gets one more test: the examples as they were sent, which it must match. The
@@ -106,5 +110,4 @@ the real condition, which are among the 20.
   on real logs. The built-in days are synthetic and small; give real clean logs with `--benign`.
 - A rule that matches the examples can miss the next variant of the same attack. Read the detection.
 - Only single-event detection rules. Counting and sequences (correlations) are written by hand.
-- Not in the dashboard yet. The home screen has no `--benign`, `--attempts`, `--assets` or
-  `--indicators`, and no replay: use the command for those.
+- Not in the dashboard yet.

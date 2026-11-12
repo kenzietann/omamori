@@ -434,8 +434,44 @@ draft is incomplete and writes no rule), not by a person in a terminal. 11 mutat
 caught at once; two survived (an error after saved settings was shown as a settings problem, and a
 refused draft was not tested from the home screen) until tests for both were added.
 
+Clean logs in the home screen (same day): a fifth field takes files or folders separated by commas
+(so a path may hold a space; `~/` is the home folder). The command and the home screen now read them
+through one function that refuses clean logs inside, around or equal to the searched logs (a clean
+copy of an example would refuse every rule) and clean logs that give no event (a check on nothing must
+not look like a pass). Both are new for `--benign` on the command too. A test found that a bare `~`
+became `<home>/~`; fixed. 11 mutations in a copy, all caught.
+
 Not done: a live provider run (none has been made for any AI feature), correlation rules, the
-dashboard, `--benign` and replay in the home screen, real clean logs as a built-in benign set.
+dashboard, real clean logs as a built-in benign set.
+
+### Home screen forms (2026-11-12)
+
+The rule draft page became one form page for every task with options, so the home screen takes what
+the commands take for its tasks (table in the README, "Home menu"). New: the rules folder, asset
+and indicator lists, log format and storage for Detect and Analyze; ps and ss snapshots for Forensics;
+replay of a recording for Analyze, Forensics + AI review and Rule draft (no provider pages, nothing
+sent); the number of answers for Rule draft; a **Verify hashes** line (`forensics verify`); and three
+kinds of demo data with a seed (adding the campaign). Choices change with left and right; values are
+kept between forms, but a task only gets the fields its form shows.
+
+- Storage opens the database only when the run starts. A checked AI review with storage is made
+  again from the same alerts with the store when it starts, so the request sent is the one shown;
+  this costs one more preparation and no request.
+- Two stricter checks than before: Detect from the home screen refuses logs that give no event (a
+  wrong format gave an empty report), and Forensics refuses a folder without Linux artifacts, as the
+  command does. The old home test ran Forensics on a log folder and expected a report; it now uses
+  the synthetic system.
+- Tests: 13 for the forms (screen model), 7 for the backend on the campaign, the synthetic system and
+  the analyst fixture (lists, rules folder, format, storage, replay, snapshots, verify, demo kinds,
+  rule draft options and replay). A test of the replay first failed because the test read the Tokyo
+  fixture as UTC; the test was wrong.
+- 24 mutations in a copy: 22 caught at once. One survived until a test checked the request budget of a
+  rule draft replay. One is equivalent and stays: a guard against typing into a choice field, which
+  the length limit of 0 already stops.
+
+Not done in the home screen: `--db`, `--dry-run`, `--timeout`, the year and zone per task (they are
+flags of `omamori ui`), store search and cases (the dashboard has them), `eval`, `peek`, `models`.
+Not tried by a person in a terminal.
 
 ## Not decided yet
 

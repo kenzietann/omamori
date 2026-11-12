@@ -55,7 +55,7 @@ A name is matched with the host name in a log (also with a domain after it, and 
 case). An address is matched with the source and the destination of an event. Events then carry
 `asset` (the machine that wrote the log), `src_asset` and `dst_asset`. A name or an address that
 stands twice is refused, because one address must mean one machine. `detect`, `analyze` and `forensics`
-take `--assets`; the home screen and the dashboard do not take it yet.
+take `--assets`, and so do their forms in the home screen; the dashboard does not take it yet.
 
 ## The indicator list
 

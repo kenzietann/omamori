@@ -351,11 +351,28 @@ real services. Local tasks skip provider setup; AI tasks preview the sanitized
 request before confirmation. Stored-run listing uses the configured database and
 does not create a missing local store during preparation.
 
-The menu uses built-in rules and the supplied folder. Use the direct commands
-for custom rules, optional forensic process/socket snapshots, storage filters,
-case management and other advanced flags. Demo generation writes separate logs
-and host artifacts under a new output folder; open its `logs` or `host/root`
-folder for the corresponding task.
+Each task with options opens a form first. Text fields take paths (`~/` is your
+home folder); choices change with left and right; enter goes on, and every field
+can stay empty for the default of the command. What the forms take:
+
+| Task | Form |
+|---|---|
+| Detect | rules folder, asset list, indicator list, log format, store the run |
+| Analyze | the same, and a recording to replay instead of asking a provider |
+| Forensics | saved `ps` and `ss` output, rules folder, asset list, indicator list, store the run |
+| Forensics + AI review | the same, and a recording to replay |
+| Rule draft | goal, examples, clean logs, title, level, number of answers, log format, asset list, indicator list, a recording to replay |
+| Verify hashes | the manifest of an earlier forensic run; the folder is the evidence |
+| Make demo data | one server and a system, the three-host campaign, or a day without attacks; a seed |
+
+A wrong value (a file that is not there, a log format that reads no event, an example
+that is not in the logs) brings you back to the form with the reason and your text
+kept. With storage, the database is opened only when the run starts. A recording on
+the form skips the provider pages: nothing is sent.
+
+Use the direct commands for the year and time zone of syslog lines (give them to
+`omamori ui`), `--db`, the dashboard port, store search and cases (or use the
+dashboard), `--dry-run`, `--timeout`, and `eval`, `peek` and `models`.
 
 ### Local web dashboard
 
