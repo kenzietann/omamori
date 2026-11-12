@@ -168,6 +168,8 @@ omamori forensics verify ~/omamori-output/forensics-<time>/manifest.json ./demo-
 ```
 
 Password hashes and private keys are never read, and links are not followed.
+Add `--analyze` for the checked AI review of the alerts; findings that rest only
+on a file's last change are marked as having weak times.
 See the [forensics guide](docs/forensics.md) for what is read, what the times
 mean and what is not covered.
 

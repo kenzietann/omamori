@@ -29,7 +29,7 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
 | 2 | AI analyst on alerts: sanitized alert summaries out, claims in, each claim checked against alerts and events, only verified claims shown; replay recording; shared run service for CLI and local dashboard | built and verified (2026-11-12); live model evaluation pending |
 | 3 | More intake: Suricata eve.json, Zeek, Wazuh alerts, Sysmon/Windows event JSON, with field maps and fuzz tests | built and verified (2026-11-12), documented JSON subsets |
 | 4 | SQLite/PostgreSQL/MariaDB storage, search, cases, timelines across runs | built and verified (2026-11-12) |
-| 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | built and verified (2026-11-12); analyst over forensic runs is next |
+| 5 | Forensic triage: read-only collectors (cron, shell history, systemd units, authorized_keys, snapshots), hash manifest, attack timeline | built and verified (2026-11-12), with the checked AI review (`--analyze`); live model evaluation pending |
 | 6 | Local web UI on 127.0.0.1 over the store | February |
 | 7 | Full synthetic scenario across sources (SSH takeover, persistence, lateral movement), rehearsed demo | February |
 
@@ -116,6 +116,17 @@ Each slice runs end to end and ends with gofmt, vet and tests clean.
     `internal/rules/forensic/`. `detect` keeps its 17 rules and its measured behavior unchanged.
 24. **Table cells write `|` as `¦`, not as `/`.** (Changes decision 10's detail from slice 1.) In a
     shell command `curl x / sh` reads as something else than `curl x | sh`. The report says what `¦` is.
+
+25. **The analyst takes a forensic run through the same service.** `analysisrun.Config.Base` gives the
+    service another base report, more files for its folder (the manifest, written byte for byte) and a
+    folder prefix. `analyze` and `forensics --analyze` end in one function, so preview, guard,
+    recording, replay and storage cannot differ between them.
+26. **Code, not the model, says when times are weak.** A finding that cites evidence with
+    `time_source: file_modified` gets `weak_times` and a fixed sentence. The texts of findings live in
+    one place (`analyst.AlertSummary`, `RelatedSummary`, `WeakTimeNote`) and the store uses the same
+    functions, so a stored finding cannot read stronger than a checked one.
+27. **Artifact fields are added to the snapshot, and the note to the request, only when artifacts are
+    there.** A log-only run gives the same request bytes as before, which keeps earlier live recordings valid.
 
 ## Slice 1 verification (2026-11-12)
 
@@ -272,7 +283,26 @@ writes a synthetic system. See [forensics.md](forensics.md).
 
 Not verified: real disk images, real distributions other than the Debian-like layout of the scenario,
 SELinux or immutable-file cases, very large evidence folders, and Windows as the machine that runs the
-tool (`O_NOFOLLOW` and named pipes are Unix). The analyst does not read forensic runs yet.
+tool (`O_NOFOLLOW` and named pipes are Unix).
+
+### Analyst over forensic runs (2026-11-12)
+
+`omamori forensics --analyze` sends the alert snapshot of a triage through the existing analyst service.
+
+- With a fake provider on the seed-3 system: 26 alerts, 26 verified claims, one request, no tools.
+  Seven findings are marked `weak_times` (the account, two cron entries, the unit, two processes and
+  the history link). A secret planted in the history is absent from the preview, the request, the
+  reports, `alerts.json`, the recording and the stored run.
+- The preview sends nothing, writes nothing and makes no database. The manifest of an analyzed run is
+  byte for byte the manifest of the triage, and `forensics verify` accepts it.
+- The recording replays offline with no provider. After one byte of `/etc/passwd` changes, the replay
+  ends as incomplete with no verified finding. An answer that is prose is rejected, and the triage
+  report, the alerts and the manifest are still written.
+- The request of a log-only run is unchanged, which a test compares with the fixed instruction.
+- 13 mutations in a copy of the repository were all caught by test assertions. Two of them compiled
+  only after a second try, and one showed a missing test (an added file with the name of a report),
+  which was written.
+- No live provider was called. How well a real model reviews artifact evidence is not measured.
 
 ## Not decided yet
 

@@ -36,6 +36,10 @@ example `--timeout 90s`, to change the default two-minute run timeout. The servi
 makes one logical analysis request; the existing sender may retry a temporary
 failure up to twice. This is not a strict provider billing cap.
 
+`omamori forensics --analyze` uses the same service for the alerts of a forensic triage. Evidence
+from files of a system carries `time_source`, and a finding that rests on a time that is only the
+last change of a file is marked `weak_times` by the checker. See [forensics.md](forensics.md).
+
 ## What the AI can contribute
 
 The AI can review individual alerts, identify useful groups sharing an address,

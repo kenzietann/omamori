@@ -92,6 +92,34 @@ The report has one timeline of the alerts from the logs and from the artifacts. 
 The last one is weak evidence: the entry can be older than the change, a copy of the file can have a
 new time, and an attacker can set the time of a file. Mount images in a way that keeps the times.
 
+## AI analyst over the triage
+
+Add `--analyze` to let the AI analyst review the alerts of the triage. It is the same service as
+`omamori analyze` ([analyst.md](analyst.md)): one bounded, sanitized snapshot of the alerts goes
+through the outbound guard, the AI has no tools, every claim is checked by code against the
+evidence, and only checked claims are shown.
+
+```sh
+omamori forensics --analyze ./demo-host/root --year 2026 --timezone Asia/Tokyo            # preview only
+omamori forensics --analyze --yes ./demo-host/root --year 2026 --timezone Asia/Tokyo      # send and check
+omamori forensics --analyze --replay recording.json ./demo-host/root --year 2026 --timezone Asia/Tokyo
+```
+
+- Without `--yes` the guarded request is shown. Nothing is sent, no report is written, and no
+  database is opened. `--yes`, `--dry-run` and `--replay` are refused without `--analyze`.
+- The output folder holds the triage report with the checked review added, `analysis.json`,
+  `recording.json`, and the same `manifest.json` and `manifest.sha256` as a run without the analyst.
+- The files of the system are never sent. The snapshot holds the alerts and, for each, a few sampled
+  events with their fields after the filter for secrets. A public key is sent as its fingerprint.
+- **Times.** Evidence from artifacts carries `time_source`. The request tells the AI that
+  `file_modified` is not the time of an action. More important, the checker does not rely on the AI
+  for this: when a checked claim cites an item whose only time is the last change of its file, the
+  finding is marked `weak_times` and its text says that the times do not show when or in which order
+  things happened. The AI has no field to add or remove this mark.
+- A recording is bound to the evidence. After a file of the system changes, the recording no longer
+  fits, the run ends as incomplete, and no old finding is shown.
+- A run over logs alone sends the same request as before. Recordings of earlier `analyze` runs still fit.
+
 ## Measurement on synthetic systems
 
 `go test ./internal/forensics -run HostScenario -v` writes 25 different attacked systems and 25
@@ -118,5 +146,5 @@ gives no alert by itself, and a listening port of an odd process is listed and g
 - A running system with a rootkit can show files that are not what is on the disk. Prefer an image.
 - Snapshot files are text that someone saved. Their content is taken as it is.
 - A rule hit on an artifact means "look at this". Administrators add keys and write cron jobs too.
-- The AI analyst is not connected to this command yet. The result has the same shape as a detection
-  run, so that is a small step, and it is the next one.
+- The AI review has been run with scripted answers and with recordings only. No live model has
+  reviewed a forensic run yet, so nothing is known about the quality of real answers.
