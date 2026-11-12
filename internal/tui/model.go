@@ -58,6 +58,7 @@ var menuItems = []menuItem{
 	{label: "Analyze", note: "detect, then the AI reviews the alerts and every claim is checked", task: TaskAnalyze, ai: true},
 	{label: "Forensics", note: "read a Linux system in the folder: hashes, rules, timeline, no AI", task: TaskForensics},
 	{label: "Forensics + AI review", note: "the same, then the AI reviews the alerts", task: TaskForensicsAnalyze, ai: true},
+	{label: "Dashboard", note: "start the local web dashboard on 127.0.0.1 for alerts, evidence and cases", task: TaskDashboard},
 	{label: "Stored runs", note: "list what is in the local database", task: TaskStored},
 	{label: "Make demo data", note: "write synthetic logs and a synthetic system to try the above", task: TaskDemo},
 	{label: "Settings", kind: menuOpenSettings},
@@ -140,6 +141,7 @@ const (
 	TaskForensicsAnalyze = "forensics-analyze"
 	TaskStored           = "stored"
 	TaskDemo             = "demo"
+	TaskDashboard        = "dashboard"
 )
 
 // A Plan is what the user is asked to confirm. Nothing has been sent when a Plan exists.

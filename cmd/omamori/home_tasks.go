@@ -63,6 +63,52 @@ func (b backend) prepareHome(setup tui.Setup) (tui.Plan, error) {
 			return tui.Result{Complete: true, SavedTo: folder, Report: fmt.Sprintf("# Synthetic demo data\n\nLogs: %s\n\nLinux artifacts: %s\n\nOpen the corresponding folder with omamori ui to inspect it.\n", filepath.Join(folder, "logs"), filepath.Join(folder, "host", "root"))}, nil
 		}), nil
 	}
+	if setup.Task == tui.TaskDashboard {
+		env := b.env
+		if env.home == nil {
+			env.home = os.UserHomeDir
+		}
+		if env.lookupEnv == nil {
+			env.lookupEnv = b.config.LookupEnv
+		}
+		cfg, err := (storageFlags{}).config(env)
+		if err != nil {
+			return tui.Plan{}, err
+		}
+		where := "the configured database server"
+		if cfg.Driver == "sqlite" {
+			where = cfg.DSN
+		}
+		summary := "Start the local dashboard on 127.0.0.1, on a free port, for the folder " + b.config.Target + ".\n" +
+			"It uses the store at " + where + " and makes it when it does not exist.\n" +
+			"A private link is printed. The dashboard runs until you press esc.\n" +
+			"Runs with an AI provider are started in the dashboard, and each one asks you there before anything is sent."
+		plan := localHomePlan("Dashboard", summary, func(ctx context.Context) (tui.Result, error) { return tui.Result{}, nil })
+		run := plan.Run
+		// The step function is needed to show the link while the server runs, so the run is wrapped.
+		plan.Run = func(ctx context.Context, step func(string)) (tui.Result, error) {
+			if _, err := run(ctx, nil); err != nil {
+				return tui.Result{}, err
+			}
+			link := ""
+			err := serveDashboard(ctx, env, b.config.Target, b.config.OutputBase, 0, storageFlags{}, func(url, _ string) {
+				link = url
+				if step != nil {
+					step("the dashboard is running. Open this private link: " + url)
+				}
+			})
+			if err != nil {
+				return tui.Result{}, err
+			}
+			report := "The dashboard was stopped. Its link no longer works."
+			if link == "" {
+				report = "The dashboard did not start."
+			}
+			return tui.Result{Complete: link != "", Report: report}, nil
+		}
+		plan.ConsentText = "Start a web server that only this computer can reach. Nothing is sent by starting it."
+		return plan, nil
+	}
 	if setup.Task == tui.TaskStored {
 		env := b.env
 		if env.home == nil {

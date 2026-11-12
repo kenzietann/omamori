@@ -32,11 +32,28 @@ func runDashboard(args []string, env environment) int {
 		fmt.Fprintln(env.stderr, usageDashboard)
 		return exitUsage
 	}
-	fail := func(err error) int { fmt.Fprintln(env.stderr, "omamori:", err); return exitFailed }
 	root := "."
 	if len(paths) == 1 {
 		root = paths[0]
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	err = serveDashboard(ctx, env, root, output, port, database, func(link, evidence string) {
+		fmt.Fprintf(env.stdout, "Omamori local dashboard\nEvidence root: %s\nOpen this private session link:\n%s\nKeep this terminal open. Press Ctrl+C to stop.\n", evidence, link)
+	})
+	if err != nil {
+		fmt.Fprintln(env.stderr, "omamori:", err)
+		return exitFailed
+	}
+	return exitOK
+}
+
+// serveDashboard runs the local dashboard until the context ends. The command line and the home screen both
+// use it, so there is one way to start the server: bound to 127.0.0.1, with a private link for the session.
+// ready gets that link when the server listens.
+func serveDashboard(ctx context.Context, env environment, root, output string, port int, database storageFlags, ready func(link, evidence string)) error {
+	fail := func(err error) error { return err }
+	var err error
 	root, err = filepath.Abs(root)
 	if err != nil {
 		return fail(dashboard.ErrConfig)
@@ -53,8 +70,6 @@ func runDashboard(args []string, env environment) int {
 	if err != nil {
 		return fail(err)
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	connectionCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	db, err := database.open(connectionCtx, env, nil)
 	cancel()
@@ -88,7 +103,7 @@ func runDashboard(args []string, env environment) int {
 	}
 	defer handler.Close()
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10, BaseContext: func(net.Listener) context.Context { return ctx }}
-	fmt.Fprintf(env.stdout, "Omamori local dashboard\nEvidence root: %s\nOpen this private session link:\n%s\nKeep this terminal open. Press Ctrl+C to stop.\n", root, handler.URL())
+	ready(handler.URL(), root)
 	done := make(chan error, 1)
 	go func() { done <- server.Serve(listener) }()
 	select {
@@ -103,5 +118,5 @@ func runDashboard(args []string, env environment) int {
 			server.Close()
 		}
 	}
-	return exitOK
+	return nil
 }

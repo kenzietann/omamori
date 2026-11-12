@@ -96,7 +96,7 @@ func (backend backend) ReasoningChoices(providerID, model string) []tui.Reasonin
 
 func (backend backend) Prepare(setup tui.Setup) (tui.Plan, error) {
 	switch setup.Task {
-	case tui.TaskDetect, tui.TaskAnalyze, tui.TaskForensics, tui.TaskForensicsAnalyze, tui.TaskStored, tui.TaskDemo:
+	case tui.TaskDetect, tui.TaskAnalyze, tui.TaskForensics, tui.TaskForensicsAnalyze, tui.TaskStored, tui.TaskDemo, tui.TaskDashboard:
 		return backend.prepareHome(setup)
 	}
 	prepared := taskrun.Setup{ProviderID: setup.ProviderID, Model: setup.Model, Key: setup.Key, Reasoning: setup.Reasoning, Log: backend.log}
