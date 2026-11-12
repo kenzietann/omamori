@@ -85,7 +85,7 @@ func StatusError(status int) error {
 type Rejection struct {
 	Status int
 	Code   string
-	Param string
+	Param  string
 }
 
 func (rejection *Rejection) Error() string {

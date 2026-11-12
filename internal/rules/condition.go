@@ -17,7 +17,7 @@ type (
 	orNode   struct{ left, right node }
 	notNode  struct{ inner node }
 	nameNode struct{ name string }
-	ofNode struct {
+	ofNode   struct {
 		all   bool
 		names []string
 	}

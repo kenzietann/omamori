@@ -14,10 +14,10 @@ import (
 const keyActionWait = 15 * time.Second
 
 type backend struct {
-	config taskrun.Config
-	env    environment
+	config       taskrun.Config
+	env          environment
 	settingsPath string
-	log string
+	log          string
 	// recording is what a replay plays back. Without it, there is no replay.
 	recording *replay.Recording
 }

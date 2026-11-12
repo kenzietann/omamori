@@ -18,8 +18,8 @@ var (
 	ErrPathNotAllowed   = errors.New("path not allowed")
 	ErrToolFailed       = errors.New("tool failed")
 	ErrCancelled        = errors.New("cancelled")
-	errBinary    = errors.New("the file is binary")
-	ErrLogFailed = errors.New("the event could not be logged")
+	errBinary           = errors.New("the file is binary")
+	ErrLogFailed        = errors.New("the event could not be logged")
 )
 
 type Limits struct {
@@ -41,8 +41,8 @@ var DefaultLimits = Limits{
 type Result struct {
 	Text      string
 	Truncated bool
-	Skipped int
-	Binary  int
+	Skipped   int
+	Binary    int
 }
 
 // Event holds the tool name and a fixed reason, never an argument value.

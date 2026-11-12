@@ -22,13 +22,13 @@ const (
 )
 
 type settings struct {
-	target    string
-	output    string
-	provider  string
-	model     string
-	maxSteps  int
-	maxTokens int
-	log string
+	target     string
+	output     string
+	provider   string
+	model      string
+	maxSteps   int
+	maxTokens  int
+	log        string
 	year       int
 	zone       string
 	triageFile string

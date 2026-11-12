@@ -74,7 +74,7 @@ type Config struct {
 	OutputBase string
 	Limits     agent.Limits
 	// Triage holds the settings of the log triage. Without it, the defaults are used.
-	Triage *triage.Config
+	Triage      *triage.Config
 	LookupEnv   func(string) string
 	Now         func() time.Time
 	NewProvider ProviderFactory
@@ -95,13 +95,13 @@ type Choice struct {
 
 type Setup struct {
 	Task Task
-	Log string
+	Log  string
 	// Recording makes the run a replay: the answers come from the recording, and nothing is sent.
 	Recording  *replay.Recording
 	ProviderID string
 	Model      string
 	Key        string
-	Reasoning string
+	Reasoning  string
 }
 
 type ReasoningChoice struct {

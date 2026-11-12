@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	Version = 1
+	Version        = 1
 	SourceLive     = "live"
 	SourceScripted = "scripted"
 
@@ -84,14 +84,14 @@ func (settings Settings) valid() bool {
 }
 
 type Recording struct {
-	Version  int    `json:"version"`
-	Source   string `json:"source"`
-	Task     string `json:"task"`
-	Provider string `json:"provider,omitempty"`
-	Model    string `json:"model,omitempty"`
-	Log string `json:"log,omitempty"`
-	Triage *Settings `json:"triage,omitempty"`
-	Steps  []Step    `json:"steps"`
+	Version  int       `json:"version"`
+	Source   string    `json:"source"`
+	Task     string    `json:"task"`
+	Provider string    `json:"provider,omitempty"`
+	Model    string    `json:"model,omitempty"`
+	Log      string    `json:"log,omitempty"`
+	Triage   *Settings `json:"triage,omitempty"`
+	Steps    []Step    `json:"steps"`
 }
 
 func Fingerprint(request outbound.Request) string {

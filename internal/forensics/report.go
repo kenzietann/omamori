@@ -19,8 +19,8 @@ const (
 )
 
 type Result struct {
-	Outcome  detect.Outcome
-	Manifest Manifest
+	Outcome        detect.Outcome
+	Manifest       Manifest
 	ManifestText   string
 	ManifestSHA256 string
 	// Label is the name of the evidence folder, without the folders above it.

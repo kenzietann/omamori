@@ -32,11 +32,11 @@ type Options struct {
 	ProviderID string
 	Model      string
 	Fixtures   string
-	Runs int
+	Runs       int
 	// TokenCap is the most tokens that the whole series may use. It is the cost cap.
-	TokenCap int
+	TokenCap   int
 	OutputBase string
-	Progress func(string)
+	Progress   func(string)
 }
 
 type RunResult struct {

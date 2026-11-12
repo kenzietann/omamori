@@ -42,7 +42,7 @@ const (
 )
 
 const (
-	TimeRecorded = "recorded"
+	TimeRecorded   = "recorded"
 	TimeFileChange = "file_modified"
 	TimeField      = "time_source"
 )
@@ -57,7 +57,7 @@ const (
 	maxValueRunes    = 2048
 	maxNameRunes     = 64
 	maxMatches       = 2000
-	ManifestVersion = 1
+	ManifestVersion  = 1
 )
 
 var (
@@ -67,8 +67,8 @@ var (
 )
 
 type Options struct {
-	Year     int
-	Location *time.Location
+	Year      int
+	Location  *time.Location
 	Processes string
 	Sockets   string
 }
@@ -80,14 +80,14 @@ type Entry struct {
 	Mode     string `json:"mode"`
 	Modified string `json:"modified"`
 	SHA256   string `json:"sha256"`
-	Events int `json:"events"`
-	Note string `json:"note,omitempty"`
+	Events   int    `json:"events"`
+	Note     string `json:"note,omitempty"`
 }
 
 type Manifest struct {
-	Version int     `json:"version"`
-	Note    string  `json:"note"`
-	Entries []Entry `json:"entries"`
+	Version int      `json:"version"`
+	Note    string   `json:"note"`
+	Entries []Entry  `json:"entries"`
 	Skipped []string `json:"skipped"`
 }
 
@@ -109,8 +109,8 @@ func (manifest Manifest) JSON() (text, digest string, err error) {
 }
 
 type pattern struct {
-	glob string
-	kind string
+	glob   string
+	kind   string
 	format string
 }
 
@@ -401,8 +401,8 @@ func owner(name string) string {
 }
 
 type Difference struct {
-	Path   string
-	Reason string
+	Path       string
+	Reason     string
 	NotChecked bool
 }
 

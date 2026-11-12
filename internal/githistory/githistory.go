@@ -21,7 +21,7 @@ var commitID = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 type Answer struct {
 	Checked bool
 	Commits []string
-	More bool
+	More    bool
 }
 
 type Reader struct {

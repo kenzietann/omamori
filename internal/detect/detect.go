@@ -25,9 +25,9 @@ const (
 )
 
 type Outcome struct {
-	Intake intake.Result
-	Result rules.Result
-	Rules  int
+	Intake    intake.Result
+	Result    rules.Result
+	Rules     int
 	RulesFrom string
 	Made      time.Time
 	Location  *time.Location
@@ -181,10 +181,10 @@ func (w *writer) describe(current event.Event) string {
 }
 
 type Extra struct {
-	Title string
-	Intro []string
-	Sections func(format *Formatter) string
-	Limits []string
+	Title       string
+	Intro       []string
+	Sections    func(format *Formatter) string
+	Limits      []string
 	OwnTimeline bool
 }
 

@@ -14,9 +14,9 @@ const (
 var ErrSnapshot = errors.New("the alert evidence cannot be prepared for analysis")
 
 type Coverage struct {
-	TotalAlerts    int `json:"total_alerts"`
-	IncludedAlerts int `json:"included_alerts"`
-	OmittedAlerts  int `json:"omitted_alerts"`
+	TotalAlerts     int `json:"total_alerts"`
+	IncludedAlerts  int `json:"included_alerts"`
+	OmittedAlerts   int `json:"omitted_alerts"`
 	OmittedEvidence int `json:"omitted_evidence"`
 	TruncatedFields int `json:"truncated_fields"`
 	MalformedLines  int `json:"malformed_lines"`
@@ -80,16 +80,16 @@ type Response struct {
 
 // Finding is reconstructed from the supplied evidence. Summary is written by code, never copied from AI prose.
 type Finding struct {
-	Kind     string     `json:"kind"`
-	Alerts   []string   `json:"alerts"`
-	Evidence []Evidence `json:"evidence"`
-	Summary  string     `json:"summary"`
-	Count    int        `json:"count,omitempty"`
-	First    string     `json:"first"`
-	Last     string     `json:"last"`
-	Entity   *Entity    `json:"entity,omitempty"`
-	Actions  []Action   `json:"suggested_actions"`
-	WeakTimes bool `json:"weak_times,omitempty"`
+	Kind      string     `json:"kind"`
+	Alerts    []string   `json:"alerts"`
+	Evidence  []Evidence `json:"evidence"`
+	Summary   string     `json:"summary"`
+	Count     int        `json:"count,omitempty"`
+	First     string     `json:"first"`
+	Last      string     `json:"last"`
+	Entity    *Entity    `json:"entity,omitempty"`
+	Actions   []Action   `json:"suggested_actions"`
+	WeakTimes bool       `json:"weak_times,omitempty"`
 }
 
 type Action struct {

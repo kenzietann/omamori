@@ -20,11 +20,11 @@ const (
 // descriptor is one provider. The address is fixed here and is never typed by a user,
 // so a new place to send data is always a code change that a test and a reviewer see.
 type descriptor struct {
-	id             string
-	name           string
-	keyEnv         string
-	baseURL        string
-	maxTokensField string
+	id                string
+	name              string
+	keyEnv            string
+	baseURL           string
+	maxTokensField    string
 	reasoningFallback string
 	defaultModel      string
 	kind              clientKind
@@ -46,9 +46,9 @@ var descriptors = []descriptor{
 }
 
 type Info struct {
-	ID    string
-	Name  string
-	Local bool
+	ID     string
+	Name   string
+	Local  bool
 	KeyEnv string
 	// DefaultModel is empty when the user must choose the model.
 	DefaultModel string

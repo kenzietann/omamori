@@ -83,10 +83,10 @@ type document struct {
 }
 
 type Set struct {
-	rules  []*Rule
-	byName map[string]*Rule
+	rules   []*Rule
+	byName  map[string]*Rule
 	ordered []*Rule
-	quiet map[*Rule]bool
+	quiet   map[*Rule]bool
 }
 
 func (set Set) Rules() []*Rule { return set.rules }

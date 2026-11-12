@@ -32,10 +32,10 @@ type Config struct {
 	Model   string
 	// MaxTokensField is the name of the output limit. Newer OpenAI models want
 	// max_completion_tokens, and most other providers still want max_tokens.
-	MaxTokensField string
+	MaxTokensField    string
 	ReasoningFallback string
-	Reasoning string
-	Timeout   time.Duration
+	Reasoning         string
+	Timeout           time.Duration
 }
 
 type Client struct {

@@ -76,7 +76,7 @@ func ExtractClaims(text string) (claims []Claim, rest string, err error) {
 type Verdict struct {
 	Verified bool
 	Reasons  []string
-	Finding Finding
+	Finding  Finding
 }
 
 type Checker struct {

@@ -18,7 +18,7 @@ const (
 type Finding struct {
 	Scenario string
 	IP       string
-	Users []string
+	Users    []string
 	// FailureLines are the failed password lines that count, in time order.
 	FailureLines []int
 	// SuccessLine is the accepted password line of the guessing. It is 0 for spraying.

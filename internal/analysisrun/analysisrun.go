@@ -45,13 +45,13 @@ const (
 type Config struct {
 	Provider taskrun.Config
 	Sources  []string
-	Store runstore.Writer
-	Base Base
+	Store    runstore.Writer
+	Base     Base
 }
 
 type Base struct {
 	Report string
-	Files map[string]string
+	Files  map[string]string
 	Prefix string
 }
 

@@ -8,7 +8,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-
 const (
 	selectMarker = "❯ "
 	idleMarker   = "  "
