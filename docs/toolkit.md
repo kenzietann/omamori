@@ -29,7 +29,7 @@ claims is checked by code, and collectors only read.
 |---|---|---|
 | Sigma | A documented subset as the rule format, with correlations, aliases and tests inside the rule | Conversion to other SIEM query languages. Many modifiers |
 | MISP | `--indicators`: a list of addresses, domains and SHA-256 hashes marks events in every source ([demo.md](demo.md)) | Feeds, sharing, sightings, expiry, scores, MISP's own formats |
-| YARA | nothing (the exposure check finds secrets, not malware) | Pattern rules over files |
+| YARA | File rules in `forensics`: text, hex and RE2 strings with a condition and tests in the rule, over `/tmp`, `/dev/shm`, homes, web folders and more; hits are alerts with the SHA-256 from the manifest ([file-rules.md](file-rules.md)) | Modules (`pe`, `elf`), string counts and offsets in the condition, loading YARA rules, a scan outside forensics, AI drafting of file rules |
 | AI rule writing | `rule draft`: the AI writes the matching part of one rule for events you point at; code accepts it only if it loads, passes its tests, matches every example, matches nothing on built-in benign days or `--benign` logs, and is not too broad ([rule-writing.md](rule-writing.md)) | Correlation rules, a live model measurement, the dashboard |
 
 ## 4. SIEM, log management and orchestration

@@ -44,11 +44,14 @@ unpacked copy, or `/` of a running system. Paths in the report and in the manife
 | `shell_history` | `.bash_history` and `.zsh_history` of root and of each home folder | command |
 | `process_snapshot` | the file given with `--processes` (`ps aux` or `ps -ef`) | process |
 | `socket_snapshot` | the file given with `--sockets` (`ss -tulpn` or `netstat -tulpn`) | listening socket |
+| `file_scan` | the files of `tmp`, `var/tmp`, `dev/shm`, home folders, `etc`, `opt`, `srv`, `var/www` and a few more, looked at with the file rules ([file-rules.md](file-rules.md)) | hit of a file rule, or file with a hash of the indicator list |
 
 Every artifact event has `product: linux`, `category: forensics`, the `service` of the table, and
 `time_source`. Rules can ask for one kind with `logsource`. The artifact rules are in
 `internal/rules/forensic/` and follow the same format as all rules ([rules.md](rules.md)). With
-`--rules folder` your own rules are used in place of the built-in ones.
+`--rules folder` your own rules are used in place of the built-in ones. The file rules are a second
+kind of rule, over the content of files: `--file-rules folder` uses your own, and `--no-file-rules`
+turns them off ([file-rules.md](file-rules.md)).
 
 ## What is safe to rely on
 
@@ -58,7 +61,9 @@ Every artifact event has `product: linux`, `category: forensics`, the `service` 
   its target. This holds for links inside the folder too. A folder that is a link to a place outside
   the evidence folder is refused by the operating system interface that is used (`os.Root`).
   Named pipes and devices are skipped.
-- **Never read:** `/etc/shadow` (password hashes) and private keys. Only the fixed list above is opened.
+- **Never read:** `/etc/shadow` (password hashes), private keys and files of credentials (`.aws`,
+  `.netrc`, `.env` and the like). The file rules pass over them without opening them
+  ([file-rules.md](file-rules.md)). Only the places in the table are opened.
 - **Hashes are of whole files.** A file larger than 8 MiB is hashed to its end, and its first 8 MiB are
   looked at. The manifest says so for that file.
 - **Reports go to a new folder** that is not inside the evidence folder and not around it. An existing
@@ -125,11 +130,14 @@ omamori forensics --analyze --replay recording.json ./demo-host/root --year 2026
 `go test ./internal/forensics -run HostScenario -v` writes 25 different attacked systems and 25
 systems without an attack, and runs the real path over each (files, hashes, parsers, rules).
 
-- 600 of 600 expected alerts were found (24 for each system: 13 from the logs, 11 from the artifacts
-  and the logs together).
+- 750 of 750 expected alerts were found (30 for each system: 13 from the logs, 11 from the artifacts
+  and the logs together, 6 from the file rules over the files that the attacker left: a copy of the
+  dropper in `/tmp`, the miner in `/dev/shm` and the helper with a reverse shell in `/var/tmp`).
 - No alert that the scenario does not expect, and no alert on the systems without an attack
   (1,375 artifact events, with a cron job that uses curl, a job that cleans `/tmp`, a key with a
-  forced command, and histories with `nc -zv`, `/dev/tcp` port checks and `tail` of the login log).
+  forced command, and histories with `nc -zv`, `/dev/tcp` port checks and `tail` of the login log;
+  and for the file rules a backup script with curl, a program in `/opt`, notes in `/tmp`, a PHP page,
+  and an install guide with `curl | sh` in a home folder).
 
 These are numbers about made-up systems that I wrote together with the rules. They show that the
 path works end to end and that the rules do what their tests say. They are not an estimate of how
@@ -143,7 +151,8 @@ listening port of an odd process is listed and gives no alert by itself.
 
 ## Limits
 
-- Only the places in the table are read. Not read: kernel modules, shell start files (`.bashrc`,
+- Only the places in the table are read. The file rules look at the content of more files, and
+  have their own limits ([file-rules.md](file-rules.md)). Not read as artifacts: kernel modules, shell start files (`.bashrc`,
   `/etc/profile.d`), `at` jobs, units of installed packages under `/usr/lib/systemd`, changed
   system programs, `wtmp`/`btmp`/`lastlog` (binary), the journal of systemd (binary), browser data,
   and anything that was deleted.

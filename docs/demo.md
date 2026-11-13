@@ -27,7 +27,7 @@ omamori detect ./demo-campaign/logs --assets ./demo-campaign/assets.yml --indica
 omamori dashboard ./demo-campaign/logs
 ```
 
-`detect` reads six files of three hosts and two sensors: 1,820 events, 32 rules, 22 alerts
+`detect` reads six files of three hosts and two sensors: 1,820 events, 33 rules, 22 alerts
 (3 critical, 11 high, 8 medium). Without the two lists it is 20 alerts: the alert that joins the story
 and the alert for the known bad address are missing. The report has one timeline for all sources. With `--store` the run
 is in the local database, and the dashboard shows the alert queue with the evidence beside it.

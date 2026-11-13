@@ -63,7 +63,7 @@ an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all
 
 `detect` reads sshd/Linux syslog, Apache/Nginx access logs, or JSON lines with a
 timestamp. It normalizes supported Suricata EVE, Zeek, Wazuh and Windows/Sysmon
-JSON exports into the shared event fields. It applies 32 built-in rules, including counts, distinct counts and
+JSON exports into the shared event fields. It applies 33 built-in rules, including counts, distinct counts and
 ordered sequences such as password guessing followed by a successful login.
 Rule evaluation uses no API key. The command stays local unless you enable
 storage on a configured database server.
@@ -168,7 +168,13 @@ omamori forensics --year 2026 --timezone Asia/Tokyo \
 omamori forensics verify ~/omamori-output/forensics-<time>/manifest.json ./demo-host/root
 ```
 
-Password hashes and private keys are never read, and links are not followed.
+File rules (a subset of YARA: text, hex and regex strings with a condition)
+look at the content of files in `/tmp`, `/dev/shm`, home folders, web folders
+and other places where an attacker leaves tools: droppers, reverse shells,
+miners, programs in temporary folders, web shells. Each hit is an alert with the
+SHA-256 of the file from the manifest. See the [file rules guide](docs/file-rules.md).
+
+Password hashes, private keys and credential files are never read, and links are not followed.
 Add `--analyze` for the checked AI review of the alerts; findings that rest only
 on a file's last change are marked as having weak times.
 See the [forensics guide](docs/forensics.md) for what is read, what the times
@@ -318,6 +324,7 @@ AI is limited by the guard and can only use read-only tools.
   toward, what exists for each and what is missing.
 - [Demo: one attack through three hosts](docs/demo.md): the synthetic campaign
   across host logs and network sensors, what is found and what is not.
+- [File rules](docs/file-rules.md): YARA-like rules over the content of files, used by forensics.
 - [Forensic triage](docs/forensics.md): read-only collection of Linux artifacts,
   the hash manifest, the timeline and its limits.
 - [My Number test table](docs/mynumber-test-table.md): my test cases for the

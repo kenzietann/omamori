@@ -492,6 +492,36 @@ Measured live after the fixes (gpt-6-luna, 2026-11-13):
 A replay of a recording that was made with older built-in rules stops now, because the new rules give
 more alerts on the same logs. That is the fail-closed behaviour, not a fault of the replay.
 
+### File rules, YARA-like (2026-11-13)
+
+`internal/filerules`: a rule names text, hex (with `??`) and RE2 strings and a condition (`and`, `or`,
+`not`, `any/all/N of them`, lists, prefixes), with tests inside the rule; a failed test refuses the
+folder. `forensics` scans `tmp`, `var/tmp`, `dev/shm`, web folders, `/usr/local`, `opt`, `etc`, and the
+homes last, without following links and without opening files of secrets. Each file read is hashed into
+the manifest (`file_scan`), each hit is an event, and each file rule becomes a detection rule
+(`rules.Match`), so hits are ordinary alerts in the timeline, store and AI review. With an indicator
+list, the scan finds files with a known SHA-256 too. Seven built-in rules; `--file-rules folder`,
+`--no-file-rules`, and a field in the home screen form. A new web rule, `web_shell_command`, finds a
+command sent to a script page that answered with success. Guide: [file-rules.md](file-rules.md).
+
+The synthetic system now holds what its attacker left (dropper, miner, helper) and files that look
+odd and are not; 25+25 systems: 750 of 750, nothing unexpected. Mutations in a copy: 37, of which 36
+are caught (four after a test was added: text at an offset, the two lines of `/dev/tcp` the other way
+round, the size of the manifest before the report, and the writer taking the largest manifest). The
+one left is a check for links that is made twice, so taking out one of the two changes nothing.
+
+Fixed after the live attack on the lab (table in [file-rules.md](file-rules.md)):
+
+- The homes used up the 1 GB limit before `var/www` was scanned, and a web shell was missed. The
+  homes are scanned last now.
+- A 60 MB list of CVEs matched the reverse shell rule. Rules for scripts have a size limit of 1 MB,
+  and the reverse shell rule asks for the shell and `/dev/tcp` on one line.
+- A manifest of a full scan could be larger than one file of a report (5 MB), and the run would stop
+  after the report and before the manifest. The writer takes 64 MB now, the size that `verify` reads,
+  and the size of the manifest is checked before anything is written.
+- The AI got only the title of a file hit. The rule, the matched strings, the excerpt, the path and the
+  hash are in the snapshot now (after the filter for secrets).
+
 ### Home screen forms (2026-11-12)
 
 The rule draft page became one form page for every task with options, so the home screen takes what
