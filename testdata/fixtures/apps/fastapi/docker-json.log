@@ -1,0 +1,43 @@
+{"log":"INFO:     Started server process [1]\n","stream":"stderr","time":"2026-11-13T14:01:37.256707013Z"}
+{"log":"INFO:     Waiting for application startup.\n","stream":"stderr","time":"2026-11-13T14:01:37.25674085Z"}
+{"log":"INFO:     Application startup complete.\n","stream":"stderr","time":"2026-11-13T14:01:37.256746017Z"}
+{"log":"INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)\n","stream":"stderr","time":"2026-11-13T14:01:37.256914783Z"}
+{"log":"INFO:     172.21.0.3:53194 - \"GET /api/items HTTP/1.1\" 200 OK\n","stream":"stdout","time":"2026-11-13T14:01:39.2095941Z"}
+{"log":"WARNING:  Failed login for user1@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.24461584Z"}
+{"log":"INFO:     172.21.0.3:53200 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.244638592Z"}
+{"log":"INFO:     172.21.0.3:53206 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.249274388Z"}
+{"log":"WARNING:  Failed login for user2@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.249289972Z"}
+{"log":"WARNING:  Failed login for user3@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.253533486Z"}
+{"log":"INFO:     172.21.0.3:53222 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.253608075Z"}
+{"log":"INFO:     172.21.0.3:53232 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.257773833Z"}
+{"log":"WARNING:  Failed login for user4@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.257787792Z"}
+{"log":"WARNING:  Failed login for user5@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.261755409Z"}
+{"log":"INFO:     172.21.0.3:53248 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.26183254Z"}
+{"log":"WARNING:  Failed login for user6@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.265791655Z"}
+{"log":"INFO:     172.21.0.3:53254 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.265844618Z"}
+{"log":"INFO:     172.21.0.3:53266 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.2698069Z"}
+{"log":"WARNING:  Failed login for user7@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.269823944Z"}
+{"log":"INFO:     172.21.0.3:53280 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.274139422Z"}
+{"log":"WARNING:  Failed login for user8@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.274152798Z"}
+{"log":"WARNING:  Failed login for user9@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.278434023Z"}
+{"log":"INFO:     172.21.0.3:53288 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.278506487Z"}
+{"log":"WARNING:  Failed login for user10@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.283673076Z"}
+{"log":"INFO:     172.21.0.3:53294 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.283848841Z"}
+{"log":"WARNING:  Failed login for user11@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.288429007Z"}
+{"log":"INFO:     172.21.0.3:53310 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.288454801Z"}
+{"log":"WARNING:  Failed login for user12@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:39.292450294Z"}
+{"log":"INFO:     172.21.0.3:53322 - \"POST /auth/login HTTP/1.1\" 401 Unauthorized\n","stream":"stdout","time":"2026-11-13T14:01:39.292477255Z"}
+{"log":"INFO:     172.21.0.3:53330 - \"POST /auth/login HTTP/1.1\" 200 OK\n","stream":"stdout","time":"2026-11-13T14:01:39.297098383Z"}
+{"log":"INFO:     172.21.0.3:53346 - \"GET /.env HTTP/1.1\" 404 Not Found\n","stream":"stdout","time":"2026-11-13T14:01:39.301149922Z"}
+{"log":"INFO:     172.21.0.3:53362 - \"GET /.git/config HTTP/1.1\" 404 Not Found\n","stream":"stdout","time":"2026-11-13T14:01:39.305559658Z"}
+{"log":"INFO:     172.21.0.3:53370 - \"GET /actuator/env HTTP/1.1\" 404 Not Found\n","stream":"stdout","time":"2026-11-13T14:01:39.309633658Z"}
+{"log":"INFO:     172.21.0.3:53376 - \"GET /wp-login.php HTTP/1.1\" 404 Not Found\n","stream":"stdout","time":"2026-11-13T14:01:39.313609733Z"}
+{"log":"INFO:     172.21.0.3:53390 - \"GET /phpmyadmin/ HTTP/1.1\" 404 Not Found\n","stream":"stdout","time":"2026-11-13T14:01:39.317636104Z"}
+{"log":"INFO:     172.21.0.3:53394 - \"GET /backup.sql HTTP/1.1\" 404 Not Found\n","stream":"stdout","time":"2026-11-13T14:01:39.321548216Z"}
+{"log":"ERROR:    asyncpg.exceptions.PostgresSyntaxError: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:01:39.325343193Z"}
+{"log":"INFO:     172.21.0.3:53406 - \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 Internal Server Error\n","stream":"stdout","time":"2026-11-13T14:01:39.325479579Z"}
+{"log":"ERROR:    asyncpg.exceptions.PostgresSyntaxError: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:01:39.329435194Z"}
+{"log":"INFO:     172.21.0.3:53422 - \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 Internal Server Error\n","stream":"stdout","time":"2026-11-13T14:01:39.329511826Z"}
+{"log":"ERROR:    asyncpg.exceptions.PostgresSyntaxError: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:01:39.333759715Z"}
+{"log":"INFO:     172.21.0.3:53434 - \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 Internal Server Error\n","stream":"stdout","time":"2026-11-13T14:01:39.333821845Z"}
+{"log":"INFO:     172.21.0.3:53444 - \"GET /api/items?id=1 HTTP/1.1\" 200 OK\n","stream":"stdout","time":"2026-11-13T14:01:39.338726121Z"}

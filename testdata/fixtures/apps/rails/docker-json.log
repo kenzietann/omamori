@@ -1,0 +1,122 @@
+{"log":"=\u003e Booting Puma\n","stream":"stdout","time":"2026-11-13T14:05:10.65706822Z"}
+{"log":"=\u003e Rails 8.0.5.2 application starting in production \n","stream":"stdout","time":"2026-11-13T14:05:10.65709397Z"}
+{"log":"=\u003e Run `bin/rails server --help` for more startup options\n","stream":"stdout","time":"2026-11-13T14:05:10.657095511Z"}
+{"log":"Puma starting in single mode...\n","stream":"stdout","time":"2026-11-13T14:05:11.005472963Z"}
+{"log":"* Puma version: 8.0.3 (\"Into the Arena\")\n","stream":"stdout","time":"2026-11-13T14:05:11.005486338Z"}
+{"log":"* Ruby version: ruby 3.3.13 (2026-10-23 revision af48f08f21) +YJIT [aarch64-linux]\n","stream":"stdout","time":"2026-11-13T14:05:11.005487671Z"}
+{"log":"*  Min threads: 3\n","stream":"stdout","time":"2026-11-13T14:05:11.005488546Z"}
+{"log":"*  Max threads: 3\n","stream":"stdout","time":"2026-11-13T14:05:11.005489213Z"}
+{"log":"*  Environment: production\n","stream":"stdout","time":"2026-11-13T14:05:11.005489796Z"}
+{"log":"*          PID: 1\n","stream":"stdout","time":"2026-11-13T14:05:11.00549038Z"}
+{"log":"* Listening on http://0.0.0.0:8080\n","stream":"stdout","time":"2026-11-13T14:05:11.008667339Z"}
+{"log":"Use Ctrl-C to stop\n","stream":"stdout","time":"2026-11-13T14:05:11.013639335Z"}
+{"log":"[bc7e7e90-9be6-4408-b539-928343fd81fc] Started GET \"/api/items\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.263677486Z"}
+{"log":"[bc7e7e90-9be6-4408-b539-928343fd81fc] Processing by ItemsController#index as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.264204722Z"}
+{"log":"[bc7e7e90-9be6-4408-b539-928343fd81fc] Completed 200 OK in 0ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.264571046Z"}
+{"log":"[cde53b67-93a7-4ebf-acaf-52eda54529bd] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.311185514Z"}
+{"log":"[cde53b67-93a7-4ebf-acaf-52eda54529bd] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.313532619Z"}
+{"log":"[cde53b67-93a7-4ebf-acaf-52eda54529bd]   Parameters: {\"username\"=\u003e\"user1@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user1@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.313562909Z"}
+{"log":"[cde53b67-93a7-4ebf-acaf-52eda54529bd] Failed login for user1@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.313720155Z"}
+{"log":"[cde53b67-93a7-4ebf-acaf-52eda54529bd] Completed 401 Unauthorized in 1ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.314956164Z"}
+{"log":"[6281706c-cef6-4cda-b48d-617f20d67f94] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.324312749Z"}
+{"log":"[6281706c-cef6-4cda-b48d-617f20d67f94] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.32558209Z"}
+{"log":"[6281706c-cef6-4cda-b48d-617f20d67f94]   Parameters: {\"username\"=\u003e\"user2@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user2@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.325608839Z"}
+{"log":"[6281706c-cef6-4cda-b48d-617f20d67f94] Failed login for user2@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.325647671Z"}
+{"log":"[6281706c-cef6-4cda-b48d-617f20d67f94] Completed 401 Unauthorized in 1ms (Views: 1.2ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.326912096Z"}
+{"log":"[4e1c1b80-1538-4190-93ad-591f7ac1112d] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.336961412Z"}
+{"log":"[4e1c1b80-1538-4190-93ad-591f7ac1112d] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.339850544Z"}
+{"log":"[4e1c1b80-1538-4190-93ad-591f7ac1112d]   Parameters: {\"username\"=\u003e\"user3@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user3@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.340009998Z"}
+{"log":"[4e1c1b80-1538-4190-93ad-591f7ac1112d] Failed login for user3@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.340140661Z"}
+{"log":"[4e1c1b80-1538-4190-93ad-591f7ac1112d] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.34029124Z"}
+{"log":"[c0dae121-837c-4af1-aa09-a9fb1e28edc0] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.349026175Z"}
+{"log":"[c0dae121-837c-4af1-aa09-a9fb1e28edc0] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.353249229Z"}
+{"log":"[c0dae121-837c-4af1-aa09-a9fb1e28edc0]   Parameters: {\"username\"=\u003e\"user4@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user4@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.35472619Z"}
+{"log":"[c0dae121-837c-4af1-aa09-a9fb1e28edc0] Failed login for user4@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.354932226Z"}
+{"log":"[c0dae121-837c-4af1-aa09-a9fb1e28edc0] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.355506002Z"}
+{"log":"[0b39191f-2983-401c-a886-6ce46c7048eb] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.366522334Z"}
+{"log":"[0b39191f-2983-401c-a886-6ce46c7048eb] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.371275666Z"}
+{"log":"[0b39191f-2983-401c-a886-6ce46c7048eb]   Parameters: {\"username\"=\u003e\"user5@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user5@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.371337331Z"}
+{"log":"[0b39191f-2983-401c-a886-6ce46c7048eb] Failed login for user5@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.371525785Z"}
+{"log":"[0b39191f-2983-401c-a886-6ce46c7048eb] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.37163724Z"}
+{"log":"[0e697514-dec7-482b-881d-d5123dffe19a] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.382470494Z"}
+{"log":"[0e697514-dec7-482b-881d-d5123dffe19a] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.384590229Z"}
+{"log":"[0e697514-dec7-482b-881d-d5123dffe19a]   Parameters: {\"username\"=\u003e\"user6@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user6@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.385843904Z"}
+{"log":"[0e697514-dec7-482b-881d-d5123dffe19a] Failed login for user6@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.386023774Z"}
+{"log":"[0e697514-dec7-482b-881d-d5123dffe19a] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.386312142Z"}
+{"log":"[9b078039-2987-4309-b6c1-255dec7eb763] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.39533986Z"}
+{"log":"[9b078039-2987-4309-b6c1-255dec7eb763] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.40179748Z"}
+{"log":"[9b078039-2987-4309-b6c1-255dec7eb763]   Parameters: {\"username\"=\u003e\"user7@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user7@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.402880368Z"}
+{"log":"[9b078039-2987-4309-b6c1-255dec7eb763] Failed login for user7@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.403491101Z"}
+{"log":"[9b078039-2987-4309-b6c1-255dec7eb763] Completed 401 Unauthorized in 1ms (Views: 0.2ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.403749095Z"}
+{"log":"[297759a1-dc7c-4edf-8dcb-e036a13d271f] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.41331184Z"}
+{"log":"[297759a1-dc7c-4edf-8dcb-e036a13d271f] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.414093319Z"}
+{"log":"[297759a1-dc7c-4edf-8dcb-e036a13d271f]   Parameters: {\"username\"=\u003e\"user8@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user8@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.414097028Z"}
+{"log":"[297759a1-dc7c-4edf-8dcb-e036a13d271f] Failed login for user8@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.414154276Z"}
+{"log":"[297759a1-dc7c-4edf-8dcb-e036a13d271f] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.414232607Z"}
+{"log":"[d94ee4d6-6326-4558-a083-b9704efe4f81] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.424983863Z"}
+{"log":"[d94ee4d6-6326-4558-a083-b9704efe4f81] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.425588347Z"}
+{"log":"[d94ee4d6-6326-4558-a083-b9704efe4f81]   Parameters: {\"username\"=\u003e\"user9@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user9@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.425618055Z"}
+{"log":"[d94ee4d6-6326-4558-a083-b9704efe4f81] Failed login for user9@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.427935951Z"}
+{"log":"[d94ee4d6-6326-4558-a083-b9704efe4f81] Completed 401 Unauthorized in 2ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.428137738Z"}
+{"log":"[3bf181b2-1547-438c-bb21-7f1a4dc3d2dd] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.443530995Z"}
+{"log":"[3bf181b2-1547-438c-bb21-7f1a4dc3d2dd] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.445982763Z"}
+{"log":"[3bf181b2-1547-438c-bb21-7f1a4dc3d2dd]   Parameters: {\"username\"=\u003e\"user10@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user10@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.446011137Z"}
+{"log":"[3bf181b2-1547-438c-bb21-7f1a4dc3d2dd] Failed login for user10@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.446977737Z"}
+{"log":"[3bf181b2-1547-438c-bb21-7f1a4dc3d2dd] Completed 401 Unauthorized in 1ms (Views: 0.3ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.447307811Z"}
+{"log":"[cb0462cb-d7cc-4862-8292-b8b8f8eb198d] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.457493957Z"}
+{"log":"[cb0462cb-d7cc-4862-8292-b8b8f8eb198d] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.458565054Z"}
+{"log":"[cb0462cb-d7cc-4862-8292-b8b8f8eb198d]   Parameters: {\"username\"=\u003e\"user11@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user11@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.458610136Z"}
+{"log":"[cb0462cb-d7cc-4862-8292-b8b8f8eb198d] Failed login for user11@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.458768048Z"}
+{"log":"[cb0462cb-d7cc-4862-8292-b8b8f8eb198d] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.459002042Z"}
+{"log":"[173eff19-6294-43e3-a1de-dc7e889b0e9f] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.469221853Z"}
+{"log":"[173eff19-6294-43e3-a1de-dc7e889b0e9f] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.469869086Z"}
+{"log":"[173eff19-6294-43e3-a1de-dc7e889b0e9f]   Parameters: {\"username\"=\u003e\"user12@example.test\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"user12@example.test\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.469890502Z"}
+{"log":"[173eff19-6294-43e3-a1de-dc7e889b0e9f] Failed login for user12@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:05:12.469975167Z"}
+{"log":"[173eff19-6294-43e3-a1de-dc7e889b0e9f] Completed 401 Unauthorized in 0ms (Views: 0.0ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.470069414Z"}
+{"log":"[47528ea0-5213-45bb-81e6-8da00bc75067] Started POST \"/auth/login\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.478054952Z"}
+{"log":"[47528ea0-5213-45bb-81e6-8da00bc75067] Processing by AuthController#login as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.478330778Z"}
+{"log":"[47528ea0-5213-45bb-81e6-8da00bc75067]   Parameters: {\"username\"=\u003e\"alice\", \"password\"=\u003e\"[FILTERED]\", \"auth\"=\u003e{\"username\"=\u003e\"alice\", \"password\"=\u003e\"[FILTERED]\"}}\n","stream":"stdout","time":"2026-11-13T14:05:12.478350402Z"}
+{"log":"[47528ea0-5213-45bb-81e6-8da00bc75067] Completed 200 OK in 0ms (Views: 0.0ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.478503565Z"}
+{"log":"[06d12551-5e30-46bb-b2d4-179d03255ac7] Started GET \"/.env\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.489711017Z"}
+{"log":"[06d12551-5e30-46bb-b2d4-179d03255ac7]   \n","stream":"stdout","time":"2026-11-13T14:05:12.491622133Z"}
+{"log":"[06d12551-5e30-46bb-b2d4-179d03255ac7] ActionController::RoutingError (No route matches [GET] \"/.env\"):\n","stream":"stdout","time":"2026-11-13T14:05:12.491633216Z"}
+{"log":"[06d12551-5e30-46bb-b2d4-179d03255ac7]   \n","stream":"stdout","time":"2026-11-13T14:05:12.491634632Z"}
+{"log":"[d256362c-b0d7-4655-9796-09d9379cdd95] Started GET \"/.git/config\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.509367119Z"}
+{"log":"[d256362c-b0d7-4655-9796-09d9379cdd95]   \n","stream":"stdout","time":"2026-11-13T14:05:12.51202984Z"}
+{"log":"[d256362c-b0d7-4655-9796-09d9379cdd95] ActionController::RoutingError (No route matches [GET] \"/.git/config\"):\n","stream":"stdout","time":"2026-11-13T14:05:12.512041173Z"}
+{"log":"[d256362c-b0d7-4655-9796-09d9379cdd95]   \n","stream":"stdout","time":"2026-11-13T14:05:12.51204234Z"}
+{"log":"[41f4ae8f-b48c-4a0b-809f-a17aa53137d6] Started GET \"/actuator/env\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.523030881Z"}
+{"log":"[41f4ae8f-b48c-4a0b-809f-a17aa53137d6]   \n","stream":"stdout","time":"2026-11-13T14:05:12.523207085Z"}
+{"log":"[41f4ae8f-b48c-4a0b-809f-a17aa53137d6] ActionController::RoutingError (No route matches [GET] \"/actuator/env\"):\n","stream":"stdout","time":"2026-11-13T14:05:12.523209418Z"}
+{"log":"[41f4ae8f-b48c-4a0b-809f-a17aa53137d6]   \n","stream":"stdout","time":"2026-11-13T14:05:12.523210334Z"}
+{"log":"[ac697a99-105c-46ad-99d0-0afd94bc0641] Started GET \"/wp-login.php\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.533223235Z"}
+{"log":"[ac697a99-105c-46ad-99d0-0afd94bc0641]   \n","stream":"stdout","time":"2026-11-13T14:05:12.53765045Z"}
+{"log":"[ac697a99-105c-46ad-99d0-0afd94bc0641] ActionController::RoutingError (No route matches [GET] \"/wp-login.php\"):\n","stream":"stdout","time":"2026-11-13T14:05:12.537673575Z"}
+{"log":"[ac697a99-105c-46ad-99d0-0afd94bc0641]   \n","stream":"stdout","time":"2026-11-13T14:05:12.537675033Z"}
+{"log":"[c9b7541a-5e6a-499f-9788-00e8040e0f71] Started GET \"/phpmyadmin/\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.548219836Z"}
+{"log":"[c9b7541a-5e6a-499f-9788-00e8040e0f71]   \n","stream":"stdout","time":"2026-11-13T14:05:12.548389332Z"}
+{"log":"[c9b7541a-5e6a-499f-9788-00e8040e0f71] ActionController::RoutingError (No route matches [GET] \"/phpmyadmin\"):\n","stream":"stdout","time":"2026-11-13T14:05:12.548391665Z"}
+{"log":"[c9b7541a-5e6a-499f-9788-00e8040e0f71]   \n","stream":"stdout","time":"2026-11-13T14:05:12.548392582Z"}
+{"log":"[a655ead8-9e70-4972-a9f3-3f74061669af] Started GET \"/backup.sql\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.556864231Z"}
+{"log":"[a655ead8-9e70-4972-a9f3-3f74061669af]   \n","stream":"stdout","time":"2026-11-13T14:05:12.557155682Z"}
+{"log":"[a655ead8-9e70-4972-a9f3-3f74061669af] ActionController::RoutingError (No route matches [GET] \"/backup.sql\"):\n","stream":"stdout","time":"2026-11-13T14:05:12.557158557Z"}
+{"log":"[a655ead8-9e70-4972-a9f3-3f74061669af]   \n","stream":"stdout","time":"2026-11-13T14:05:12.557159473Z"}
+{"log":"[f8cd28e3-0cc7-4c05-bfa4-ff061031c811] Started GET \"/api/items?id=1%27%20OR%20%271%27=%271\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.566176317Z"}
+{"log":"[f8cd28e3-0cc7-4c05-bfa4-ff061031c811] Processing by ItemsController#index as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.566534891Z"}
+{"log":"[f8cd28e3-0cc7-4c05-bfa4-ff061031c811]   Parameters: {\"id\"=\u003e\"1' OR '1'='1\"}\n","stream":"stdout","time":"2026-11-13T14:05:12.566565598Z"}
+{"log":"[f8cd28e3-0cc7-4c05-bfa4-ff061031c811] PG::SyntaxError: ERROR: syntax error at or near \"1' OR '1'='1\"\n","stream":"stdout","time":"2026-11-13T14:05:12.568594211Z"}
+{"log":"[f8cd28e3-0cc7-4c05-bfa4-ff061031c811] Completed 500 Internal Server Error in 3ms (Views: 0.6ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.570568158Z"}
+{"log":"[d8781106-af16-409f-a0ac-98c02b0d643e] Started GET \"/api/items?id=1%27%20OR%20%271%27=%271\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.579174471Z"}
+{"log":"[d8781106-af16-409f-a0ac-98c02b0d643e] Processing by ItemsController#index as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.579639376Z"}
+{"log":"[d8781106-af16-409f-a0ac-98c02b0d643e]   Parameters: {\"id\"=\u003e\"1' OR '1'='1\"}\n","stream":"stdout","time":"2026-11-13T14:05:12.57973979Z"}
+{"log":"[d8781106-af16-409f-a0ac-98c02b0d643e] PG::SyntaxError: ERROR: syntax error at or near \"1' OR '1'='1\"\n","stream":"stdout","time":"2026-11-13T14:05:12.581756778Z"}
+{"log":"[d8781106-af16-409f-a0ac-98c02b0d643e] Completed 500 Internal Server Error in 2ms (Views: 0.4ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.582225015Z"}
+{"log":"[385f0482-5077-487b-a4ef-0a11a5385fd9] Started GET \"/api/items?id=1%27%20OR%20%271%27=%271\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.591397938Z"}
+{"log":"[385f0482-5077-487b-a4ef-0a11a5385fd9] Processing by ItemsController#index as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.591649598Z"}
+{"log":"[385f0482-5077-487b-a4ef-0a11a5385fd9]   Parameters: {\"id\"=\u003e\"1' OR '1'='1\"}\n","stream":"stdout","time":"2026-11-13T14:05:12.591682764Z"}
+{"log":"[385f0482-5077-487b-a4ef-0a11a5385fd9] PG::SyntaxError: ERROR: syntax error at or near \"1' OR '1'='1\"\n","stream":"stdout","time":"2026-11-13T14:05:12.592203458Z"}
+{"log":"[385f0482-5077-487b-a4ef-0a11a5385fd9] Completed 500 Internal Server Error in 1ms (Views: 0.1ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.59237137Z"}
+{"log":"[dba67c19-0e62-4149-84ec-0af6257db69b] Started GET \"/api/items?id=1\" for 172.21.0.3 at 2026-11-13 14:05:12 +0000\n","stream":"stdout","time":"2026-11-13T14:05:12.601140929Z"}
+{"log":"[dba67c19-0e62-4149-84ec-0af6257db69b] Processing by ItemsController#index as */*\n","stream":"stdout","time":"2026-11-13T14:05:12.602967047Z"}
+{"log":"[dba67c19-0e62-4149-84ec-0af6257db69b]   Parameters: {\"id\"=\u003e\"1\"}\n","stream":"stdout","time":"2026-11-13T14:05:12.603004963Z"}
+{"log":"[dba67c19-0e62-4149-84ec-0af6257db69b] Completed 200 OK in 0ms (Views: 0.2ms | GC: 0.0ms)\n","stream":"stdout","time":"2026-11-13T14:05:12.603316663Z"}

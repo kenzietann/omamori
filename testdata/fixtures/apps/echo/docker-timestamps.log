@@ -1,0 +1,49 @@
+2026-11-13T14:03:08.827459467Z 
+2026-11-13T14:03:08.827467799Z    ____    __
+2026-11-13T14:03:08.827468841Z   / __/___/ /  ___
+2026-11-13T14:03:08.827469466Z  / _// __/ _ \/ _ \
+2026-11-13T14:03:08.827471091Z /___/\__/_//_/\___/ v4.13.3
+2026-11-13T14:03:08.827471674Z High performance, minimalist Go web framework
+2026-11-13T14:03:08.827472216Z https://echo.labstack.com
+2026-11-13T14:03:08.827472716Z ____________________________________O/_______
+2026-11-13T14:03:08.827473257Z                                     O\
+2026-11-13T14:03:08.827778233Z ⇨ http server started on [::]:8080
+2026-11-13T14:03:08.981981110Z {"time":"2026-11-13T14:03:08.981879827Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/api/items","user_agent":"curl/8.14.1","status":200,"error":"","latency":23832,"latency_human":"23.832µs","bytes_in":0,"bytes_out":3}
+2026-11-13T14:03:09.022139164Z {"time":"2026-11-13T14:03:09.022091459Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":66036,"latency_human":"66.036µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.022184119Z 2026/11/13 14:03:09 Failed login for user1@example.test from 172.21.0.3
+2026-11-13T14:03:09.026713549Z {"time":"2026-11-13T14:03:09.026648513Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":45704,"latency_human":"45.704µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.026753796Z 2026/11/13 14:03:09 Failed login for user2@example.test from 172.21.0.3
+2026-11-13T14:03:09.032052998Z 2026/11/13 14:03:09 Failed login for user3@example.test from 172.21.0.3
+2026-11-13T14:03:09.032303645Z {"time":"2026-11-13T14:03:09.032027667Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":38163,"latency_human":"38.163µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.036592053Z 2026/11/13 14:03:09 Failed login for user4@example.test from 172.21.0.3
+2026-11-13T14:03:09.036604302Z {"time":"2026-11-13T14:03:09.036532849Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":33206,"latency_human":"33.206µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.040650104Z 2026/11/13 14:03:09 Failed login for user5@example.test from 172.21.0.3
+2026-11-13T14:03:09.040679477Z {"time":"2026-11-13T14:03:09.040579568Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":34955,"latency_human":"34.955µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.044573542Z {"time":"2026-11-13T14:03:09.044417887Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":51038,"latency_human":"51.038µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.044576625Z 2026/11/13 14:03:09 Failed login for user6@example.test from 172.21.0.3
+2026-11-13T14:03:09.048146298Z {"time":"2026-11-13T14:03:09.0481198Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":29914,"latency_human":"29.914µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.048159756Z 2026/11/13 14:03:09 Failed login for user7@example.test from 172.21.0.3
+2026-11-13T14:03:09.052771721Z {"time":"2026-11-13T14:03:09.052713601Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":31747,"latency_human":"31.747µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.052828508Z 2026/11/13 14:03:09 Failed login for user8@example.test from 172.21.0.3
+2026-11-13T14:03:09.056762486Z {"time":"2026-11-13T14:03:09.056717948Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":38580,"latency_human":"38.58µs","bytes_in":57,"bytes_out":32}
+2026-11-13T14:03:09.056783318Z 2026/11/13 14:03:09 Failed login for user9@example.test from 172.21.0.3
+2026-11-13T14:03:09.060847161Z 2026/11/13 14:03:09 Failed login for user10@example.test from 172.21.0.3
+2026-11-13T14:03:09.060880700Z {"time":"2026-11-13T14:03:09.060848869Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":59245,"latency_human":"59.245µs","bytes_in":58,"bytes_out":32}
+2026-11-13T14:03:09.064502702Z 2026/11/13 14:03:09 Failed login for user11@example.test from 172.21.0.3
+2026-11-13T14:03:09.064532825Z {"time":"2026-11-13T14:03:09.064489787Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":33747,"latency_human":"33.747µs","bytes_in":58,"bytes_out":32}
+2026-11-13T14:03:09.069131042Z 2026/11/13 14:03:09 Failed login for user12@example.test from 172.21.0.3
+2026-11-13T14:03:09.069164122Z {"time":"2026-11-13T14:03:09.068575586Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":401,"error":"","latency":30956,"latency_human":"30.956µs","bytes_in":58,"bytes_out":32}
+2026-11-13T14:03:09.072712548Z {"time":"2026-11-13T14:03:09.072358534Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"POST","uri":"/auth/login","user_agent":"curl/8.14.1","status":200,"error":"","latency":15165,"latency_human":"15.165µs","bytes_in":45,"bytes_out":14}
+2026-11-13T14:03:09.076071821Z {"time":"2026-11-13T14:03:09.075981829Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/.env","user_agent":"curl/8.14.1","status":404,"error":"code=404, message=Not Found","latency":20499,"latency_human":"20.499µs","bytes_in":0,"bytes_out":24}
+2026-11-13T14:03:09.079559918Z {"time":"2026-11-13T14:03:09.079517963Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/.git/config","user_agent":"curl/8.14.1","status":404,"error":"code=404, message=Not Found","latency":10791,"latency_human":"10.791µs","bytes_in":0,"bytes_out":24}
+2026-11-13T14:03:09.083517269Z {"time":"2026-11-13T14:03:09.083455233Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/actuator/env","user_agent":"curl/8.14.1","status":404,"error":"code=404, message=Not Found","latency":22206,"latency_human":"22.206µs","bytes_in":0,"bytes_out":24}
+2026-11-13T14:03:09.087871172Z {"time":"2026-11-13T14:03:09.087800386Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/wp-login.php","user_agent":"curl/8.14.1","status":404,"error":"code=404, message=Not Found","latency":16874,"latency_human":"16.874µs","bytes_in":0,"bytes_out":24}
+2026-11-13T14:03:09.092799946Z {"time":"2026-11-13T14:03:09.092302402Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/phpmyadmin/","user_agent":"curl/8.14.1","status":404,"error":"code=404, message=Not Found","latency":15999,"latency_human":"15.999µs","bytes_in":0,"bytes_out":24}
+2026-11-13T14:03:09.096501526Z {"time":"2026-11-13T14:03:09.096116348Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/backup.sql","user_agent":"curl/8.14.1","status":404,"error":"code=404, message=Not Found","latency":13040,"latency_human":"13.04µs","bytes_in":0,"bytes_out":24}
+2026-11-13T14:03:09.100360010Z {"time":"2026-11-13T14:03:09.100328096Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/api/items?id=1%27%20OR%20%271%27=%271","user_agent":"curl/8.14.1","status":500,"error":"","latency":45038,"latency_human":"45.038µs","bytes_in":0,"bytes_out":25}
+2026-11-13T14:03:09.100371467Z 2026/11/13 14:03:09 pq: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:03:09.104461433Z {"time":"2026-11-13T14:03:09.104419061Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/api/items?id=1%27%20OR%20%271%27=%271","user_agent":"curl/8.14.1","status":500,"error":"","latency":12332,"latency_human":"12.332µs","bytes_in":0,"bytes_out":25}
+2026-11-13T14:03:09.104484639Z 2026/11/13 14:03:09 pq: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:03:09.108464238Z 2026/11/13 14:03:09 pq: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:03:09.108977781Z {"time":"2026-11-13T14:03:09.10852365Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/api/items?id=1%27%20OR%20%271%27=%271","user_agent":"curl/8.14.1","status":500,"error":"","latency":105075,"latency_human":"105.075µs","bytes_in":0,"bytes_out":25}
+2026-11-13T14:03:09.114287732Z {"time":"2026-11-13T14:03:09.114244486Z","id":"","remote_ip":"172.21.0.3","host":"lab-echo:8080","method":"GET","uri":"/api/items?id=1","user_agent":"sqlmap/1.8.2#stable (https://sqlmap.org)","status":200,"error":"","latency":13541,"latency_human":"13.541µs","bytes_in":0,"bytes_out":3}

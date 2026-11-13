@@ -1,0 +1,21 @@
+2026-11-13T14:01:19.550601640Z [32m[Nest] 1  - [39m11/13/2026, 2:01:19 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+2026-11-13T14:01:19.553346648Z [32m[Nest] 1  - [39m11/13/2026, 2:01:19 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +4ms[39m
+2026-11-13T14:01:19.555226035Z [32m[Nest] 1  - [39m11/13/2026, 2:01:19 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/}:[39m[38;5;3m +2ms[39m
+2026-11-13T14:01:19.556217971Z [32m[Nest] 1  - [39m11/13/2026, 2:01:19 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/login, POST} route[39m[38;5;3m +1ms[39m
+2026-11-13T14:01:19.556376864Z [32m[Nest] 1  - [39m11/13/2026, 2:01:19 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/items, GET} route[39m[38;5;3m +0ms[39m
+2026-11-13T14:01:19.557318223Z [32m[Nest] 1  - [39m11/13/2026, 2:01:19 PM [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +1ms[39m
+2026-11-13T14:01:21.651474571Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user1@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.656075930Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user2@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.660643240Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user3@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.665218510Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user4@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.669191443Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user5@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.673170461Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user6@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.677267462Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user7@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.681319620Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user8@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.686283307Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user9@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.689929503Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user10@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.693640547Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user11@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.697206768Z [33m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [33m   WARN[39m [38;5;3m[AuthService] [39m[33mFailed login for user12@example.test from ::ffff:172.21.0.3[39m
+2026-11-13T14:01:21.726562630Z [31m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [31m  ERROR[39m [38;5;3m[AuthService] [39m[31mQueryFailedError: syntax error at or near "1' OR '1'='1"[39m
+2026-11-13T14:01:21.730122600Z [31m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [31m  ERROR[39m [38;5;3m[AuthService] [39m[31mQueryFailedError: syntax error at or near "1' OR '1'='1"[39m
+2026-11-13T14:01:21.734015557Z [31m[Nest] 1  - [39m11/13/2026, 2:01:21 PM [31m  ERROR[39m [38;5;3m[AuthService] [39m[31mQueryFailedError: syntax error at or near "1' OR '1'='1"[39m

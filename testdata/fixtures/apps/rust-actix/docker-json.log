@@ -1,0 +1,42 @@
+{"log":"[2026-11-13T14:06:34Z INFO  actix_server::builder] starting 2 workers\n","stream":"stderr","time":"2026-11-13T14:06:34.259111654Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_server::server] Actix runtime found; starting in Actix runtime\n","stream":"stderr","time":"2026-11-13T14:06:34.25957267Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_server::server] starting service: \"actix-web-service-0.0.0.0:8080\", workers: 2, listening on: 0.0.0.0:8080\n","stream":"stderr","time":"2026-11-13T14:06:34.259575545Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /api/items HTTP/1.1\" 200 2 \"-\" \"curl/8.14.1\" 0.000017\n","stream":"stderr","time":"2026-11-13T14:06:34.375376455Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user1@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.408409117Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000035\n","stream":"stderr","time":"2026-11-13T14:06:34.408424282Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user2@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.411958382Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000021\n","stream":"stderr","time":"2026-11-13T14:06:34.411968465Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user3@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.416334477Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000030\n","stream":"stderr","time":"2026-11-13T14:06:34.416349226Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user4@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.41955451Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000025\n","stream":"stderr","time":"2026-11-13T14:06:34.419562635Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user5@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.423227436Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000075\n","stream":"stderr","time":"2026-11-13T14:06:34.423287057Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user6@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.426976523Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000022\n","stream":"stderr","time":"2026-11-13T14:06:34.426986564Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user7@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.43095114Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000023\n","stream":"stderr","time":"2026-11-13T14:06:34.430964223Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user8@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.434775891Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000021\n","stream":"stderr","time":"2026-11-13T14:06:34.43478664Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user9@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.438362279Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000021\n","stream":"stderr","time":"2026-11-13T14:06:34.438374695Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user10@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.442071244Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000021\n","stream":"stderr","time":"2026-11-13T14:06:34.442087535Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user11@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.445477225Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000020\n","stream":"stderr","time":"2026-11-13T14:06:34.445485517Z"}
+{"log":"[2026-11-13T14:06:34Z WARN  lab_actix] Failed login for user12@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:06:34.449335765Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 401 31 \"-\" \"curl/8.14.1\" 0.000031\n","stream":"stderr","time":"2026-11-13T14:06:34.449351973Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"POST /auth/login HTTP/1.1\" 200 13 \"-\" \"curl/8.14.1\" 0.000016\n","stream":"stderr","time":"2026-11-13T14:06:34.453059563Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /.env HTTP/1.1\" 404 0 \"-\" \"curl/8.14.1\" 0.000016\n","stream":"stderr","time":"2026-11-13T14:06:34.457021889Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /.git/config HTTP/1.1\" 404 0 \"-\" \"curl/8.14.1\" 0.000012\n","stream":"stderr","time":"2026-11-13T14:06:34.460929052Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /actuator/env HTTP/1.1\" 404 0 \"-\" \"curl/8.14.1\" 0.000014\n","stream":"stderr","time":"2026-11-13T14:06:34.464922584Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /wp-login.php HTTP/1.1\" 404 0 \"-\" \"curl/8.14.1\" 0.000010\n","stream":"stderr","time":"2026-11-13T14:06:34.46873621Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /phpmyadmin/ HTTP/1.1\" 404 0 \"-\" \"curl/8.14.1\" 0.000011\n","stream":"stderr","time":"2026-11-13T14:06:34.472656705Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /backup.sql HTTP/1.1\" 404 0 \"-\" \"curl/8.14.1\" 0.000012\n","stream":"stderr","time":"2026-11-13T14:06:34.476333089Z"}
+{"log":"[2026-11-13T14:06:34Z ERROR lab_actix] diesel: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:06:34.480310914Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 24 \"-\" \"curl/8.14.1\" 0.000021\n","stream":"stderr","time":"2026-11-13T14:06:34.480327455Z"}
+{"log":"[2026-11-13T14:06:34Z ERROR lab_actix] diesel: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:06:34.483520948Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 24 \"-\" \"curl/8.14.1\" 0.000023\n","stream":"stderr","time":"2026-11-13T14:06:34.483534489Z"}
+{"log":"[2026-11-13T14:06:34Z ERROR lab_actix] diesel: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:06:34.487140167Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 24 \"-\" \"curl/8.14.1\" 0.000018\n","stream":"stderr","time":"2026-11-13T14:06:34.4871485Z"}
+{"log":"[2026-11-13T14:06:34Z INFO  actix_web::middleware::logger] 172.21.0.3 \"GET /api/items?id=1 HTTP/1.1\" 200 2 \"-\" \"sqlmap/1.8.2#stable (https://sqlmap.org)\" 0.000016\n","stream":"stderr","time":"2026-11-13T14:06:34.490885255Z"}

@@ -1,0 +1,484 @@
+# Web applications and APIs: the frameworks that most backends are written with (Express, NestJS, ASP.NET Core,
+# Spring Boot, Django, Flask, FastAPI, Laravel, Rails, Go, Rust), as their logs say it and as the access log of
+# nginx or Apache in front of them says it. A request is category webserver with method, url, status and
+# src_ip, from every source. See docs/apps.md.
+title: Failed login at a web application
+name: app_login_failure
+id: 6f3a2c10-0601-4a6e-9d7b-0a1b2c3d4e01
+description: A login request to a web application or API was refused. It is counted by other rules and gives no alert alone.
+level: low
+logsource: {category: webserver}
+detection:
+  login:
+    method: POST
+    url|re|i: '(^|[/_-])(login|log-in|signin|sign-in|sign_in|session|sessions|token|authenticate|auth)(/?$|[/?.])'
+  refused:
+    status: ['400', '401', '403', '422', '429']
+  condition: login and refused
+tests:
+  - name: refused logins of several frameworks
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/users/sign_in", status: 422, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/v1/auth/token?grant=password", status: 400, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/wp-login.php", status: 403, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/login", status: 429, src_ip: "203.0.113.77"}
+    expect: {alerts: 5}
+  - name: a login that worked, a GET of the page, and an API that is not a login
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 200, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/tokenizer", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/orders", status: 401, src_ip: "203.0.113.77"}
+    expect: {alerts: 0}
+---
+title: Login failure written by the application
+name: app_login_failure_message
+id: 6f3a2c10-0602-4a6e-9d7b-0a1b2c3d4e02
+description: A line that an application wrote says that a login failed. It is counted by other rules and gives no alert alone.
+level: low
+logsource: {product: app}
+detection:
+  failed:
+    message|re|i: '\b(login|log in|logon|sign[- ]?in|authentication|auth)\b.{0,20}\b(failed|failure|unsuccessful|rejected|denied)\b|\b(failed|unsuccessful|invalid)\s+(login|log ?in|logon|sign[- ]?in|authentication)\b|\binvalid (credentials|password|username or password|login)\b|\bbad credentials\b|\b(wrong|incorrect) (password|credentials)\b'
+  condition: failed
+tests:
+  - name: messages of several frameworks
+    events:
+      - {product: "app", message: "Failed login for admin from 203.0.113.77", src_ip: "203.0.113.77"}
+      - {product: "app", message: "Authentication failed for user admin", src_ip: "203.0.113.77"}
+      - {product: "app", message: "Bad credentials", src_ip: "203.0.113.77"}
+      - {product: "app", message: "Invalid credentials supplied", src_ip: "203.0.113.77"}
+      - {product: "app", message: "login attempt failed: wrong password", src_ip: "203.0.113.77"}
+    expect: {alerts: 5}
+  - name: ordinary messages
+    events:
+      - {product: "app", message: "User admin logged in", src_ip: "203.0.113.77"}
+      - {product: "app", message: "Mapped {/auth/login, POST} route", src_ip: "203.0.113.77"}
+      - {product: "app", message: "Failed to connect to the database", src_ip: "203.0.113.77"}
+      - {product: "app", message: "Password reset mail sent", src_ip: "203.0.113.77"}
+    expect: {alerts: 0}
+---
+title: Password guessing at a web application
+name: app_login_bruteforce
+id: 6f3a2c10-0603-4a6e-9d7b-0a1b2c3d4e03
+description: One address had ten or more refused logins at a web application or API in ten minutes, from the access log or from the lines of the application. A request and the line that the application writes about it can both be counted.
+level: high
+tags: [attack.credential_access, attack.t1110]
+correlation:
+  type: event_count
+  rules: [app_login_failure, app_login_failure_message]
+  group-by: [src_ip]
+  timespan: 10m
+  condition: {gte: 10}
+tests:
+  - name: ten refused logins are one alert
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+    expect: {alerts: 1}
+  - name: nine are not yet guessing, and other addresses are apart
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "198.51.100.4"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "198.51.100.4"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "198.51.100.4"}
+    expect: {alerts: 0}
+---
+title: Many accounts tried at a web application
+name: app_credential_stuffing
+id: 6f3a2c10-0604-4a6e-9d7b-0a1b2c3d4e04
+description: One address had refused logins for ten or more different accounts in ten minutes. This is how lists of leaked passwords are tried. It needs logs that name the account.
+level: high
+tags: [attack.credential_access, attack.t1110.004]
+correlation:
+  type: value_count
+  rules: [app_login_failure, app_login_failure_message]
+  group-by: [src_ip]
+  timespan: 10m
+  condition: {gte: 10, field: user}
+tests:
+  - name: ten accounts are one alert
+    events:
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user0@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user1@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user2@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user3@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user4@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user5@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user6@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user7@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user8@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "user9@example.test"}
+    expect: {alerts: 1}
+  - name: one account ten times is guessing, not this
+    events:
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+      - {product: "app", message: "Login failed", src_ip: "203.0.113.77", user: "admin@example.test"}
+    expect: {alerts: 0}
+---
+title: Login to a web application
+name: app_login_success
+id: 6f3a2c10-0605-4a6e-9d7b-0a1b2c3d4e05
+description: A login request that was answered with success. It is used by another rule and gives no alert alone.
+level: informational
+logsource: {category: webserver}
+detection:
+  login:
+    method: POST
+    url|re|i: '(^|[/_-])(login|log-in|signin|sign-in|sign_in|session|sessions|token|authenticate|auth)(/?$|[/?.])'
+  done:
+    status: ['200', '201', '204']
+  condition: login and done
+tests:
+  - name: a login that worked
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 200, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/v1/auth/token", status: 201, src_ip: "203.0.113.77"}
+    expect: {alerts: 2}
+  - name: a refused login
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+    expect: {alerts: 0}
+---
+title: Login to a web application after password guessing
+name: app_login_after_bruteforce
+id: 6f3a2c10-0606-4a6e-9d7b-0a1b2c3d4e06
+description: An address guessed passwords at a web application and then logged in. Treat the account as taken over until it is checked.
+level: critical
+tags: [attack.initial_access, attack.t1078, attack.t1110]
+correlation:
+  type: temporal_ordered
+  rules: [app_login_bruteforce, app_login_success]
+  group-by: [src_ip]
+  timespan: 30m
+tests:
+  - name: guessing and then a success are one alert
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 200, src_ip: "203.0.113.77"}
+    expect: {alerts: 1}
+  - name: a success before the guessing, or from another address, is no alert
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 200, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 200, src_ip: "198.51.100.4"}
+    expect: {alerts: 0}
+---
+title: Refused request at a web application
+name: app_request_denied
+id: 6f3a2c10-0607-4a6e-9d7b-0a1b2c3d4e07
+description: A request that the application refused (401 or 403). It is counted by another rule and gives no alert alone.
+level: informational
+logsource: {category: webserver}
+detection:
+  selection:
+    status: ['401', '403']
+  condition: selection
+tests:
+  - name: refused requests
+    events:
+      - {category: "webserver", method: "POST", url: "/api/orders", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/admin", status: 403, src_ip: "203.0.113.77"}
+    expect: {alerts: 2}
+  - name: other answers
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 404, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 200, src_ip: "203.0.113.77"}
+    expect: {alerts: 0}
+---
+title: Many refused requests at a web application
+name: app_denied_burst
+id: 6f3a2c10-0608-4a6e-9d7b-0a1b2c3d4e08
+description: One address had fifty or more requests refused (401 or 403) in five minutes. Someone tries tokens, keys or the objects of other users. A client with an expired token that retries can do it too.
+level: medium
+tags: [attack.credential_access, attack.discovery]
+correlation:
+  type: event_count
+  rules: [app_request_denied]
+  group-by: [src_ip]
+  timespan: 5m
+  condition: {gte: 50}
+tests:
+  - name: fifty refused requests are one alert
+    events:
+      - {category: "webserver", method: "GET", url: "/api/orders/0", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/1", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/2", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/3", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/4", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/5", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/6", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/7", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/8", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/9", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/10", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/11", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/12", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/13", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/14", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/15", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/16", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/17", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/18", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/19", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/20", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/21", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/22", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/23", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/24", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/25", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/26", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/27", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/28", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/29", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/30", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/31", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/32", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/33", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/34", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/35", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/36", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/37", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/38", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/39", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/40", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/41", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/42", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/43", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/44", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/45", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/46", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/47", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/48", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/49", status: 401, src_ip: "203.0.113.77"}
+    expect: {alerts: 1}
+  - name: forty-nine are not
+    events:
+      - {category: "webserver", method: "GET", url: "/api/orders/0", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/1", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/2", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/3", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/4", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/5", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/6", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/7", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/8", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/9", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/10", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/11", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/12", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/13", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/14", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/15", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/16", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/17", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/18", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/19", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/20", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/21", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/22", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/23", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/24", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/25", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/26", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/27", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/28", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/29", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/30", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/31", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/32", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/33", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/34", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/35", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/36", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/37", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/38", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/39", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/40", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/41", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/42", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/43", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/44", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/45", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/46", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/47", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/orders/48", status: 401, src_ip: "203.0.113.77"}
+    expect: {alerts: 0}
+---
+title: Server error at a web application
+name: app_server_error
+id: 6f3a2c10-0609-4a6e-9d7b-0a1b2c3d4e09
+description: A request that ended with a server error (5xx). It is counted by another rule and gives no alert alone.
+level: informational
+logsource: {category: webserver}
+detection:
+  selection:
+    status|re: '^5\d\d$'
+  condition: selection
+tests:
+  - name: server errors
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 502, src_ip: "203.0.113.77"}
+    expect: {alerts: 2}
+  - name: other answers
+    events:
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 404, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", status: 200, src_ip: "203.0.113.77"}
+    expect: {alerts: 0}
+---
+title: Many server errors caused by one address
+name: app_server_error_burst
+id: 6f3a2c10-0610-4a6e-9d7b-0a1b2c3d4e10
+description: Requests of one address ended with a server error twenty or more times in five minutes. Inputs that break an application are how injections and other exploits are tried. A broken release does it too, for every address.
+level: medium
+tags: [attack.initial_access, attack.t1190]
+correlation:
+  type: event_count
+  rules: [app_server_error]
+  group-by: [src_ip]
+  timespan: 5m
+  condition: {gte: 20}
+tests:
+  - name: twenty server errors of one address are one alert
+    events:
+      - {category: "webserver", method: "GET", url: "/api/items?id=0'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=1'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=2'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=3'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=4'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=5'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=6'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=7'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=8'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=9'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=10'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=11'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=12'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=13'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=14'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=15'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=16'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=17'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=18'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=19'", status: 500, src_ip: "203.0.113.77"}
+    expect: {alerts: 1}
+  - name: nineteen are not
+    events:
+      - {category: "webserver", method: "GET", url: "/api/items?id=0'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=1'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=2'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=3'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=4'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=5'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=6'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=7'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=8'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=9'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=10'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=11'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=12'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=13'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=14'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=15'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=16'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=17'", status: 500, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/api/items?id=18'", status: 500, src_ip: "203.0.113.77"}
+    expect: {alerts: 0}
+---
+title: Debug or admin endpoint of a framework answered
+name: app_debug_endpoint_exposed
+id: 6f3a2c10-0611-4a6e-9d7b-0a1b2c3d4e11
+description: An endpoint for debugging or monitoring of a framework answered with success. These show settings, secrets, memory or the code of the application, and should not be reachable from outside. Examples - Spring Boot Actuator env and heapdump, the Django and Symfony debug tools, Laravel Telescope, the Rails info page, the H2 console, the Go pprof handlers and the ELMAH page of ASP.NET.
+level: high
+tags: [attack.discovery, attack.t1190, attack.collection]
+logsource: {category: webserver}
+detection:
+  endpoint:
+    url|re|i: '^/(actuator/(env|heapdump|threaddump|configprops|beans|mappings|loggers|jolokia|gateway|httptrace|logfile)|__debug__/|_profiler|_debugbar|telescope|horizon/api|rails/info|h2-console|elmah\.axd|debug/pprof|debug/vars|phpinfo\.php|_ignition/)'
+  answered:
+    status: ['200']
+  condition: endpoint and answered
+tests:
+  - name: debug endpoints that answered
+    events:
+      - {category: "webserver", method: "GET", url: "/actuator/env", status: 200, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/actuator/heapdump", status: 200, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/debug/pprof/heap", status: 200, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/telescope/requests", status: 200, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/rails/info/routes", status: 200, src_ip: "203.0.113.77"}
+    expect: {alerts: 5}
+  - name: refused or not there, and the health check
+    events:
+      - {category: "webserver", method: "GET", url: "/actuator/env", status: 404, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/actuator/env", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/actuator/health", status: 200, src_ip: "203.0.113.77"}
+    expect: {alerts: 0}
+---
+title: Database error from an input
+name: app_sql_error
+id: 6f3a2c10-0612-4a6e-9d7b-0a1b2c3d4e12
+description: The application wrote that a database query had a syntax error. When an input reaches a query, this is what an SQL injection attempt looks like from inside. A bug in a query does it too.
+level: medium
+tags: [attack.initial_access, attack.t1190]
+logsource: {product: app}
+detection:
+  selection:
+    message|re|i: 'SQLSTATE\[42|syntax error at or near|You have an error in your SQL syntax|ER_PARSE_ERROR|unterminated quoted string|SQLITE_ERROR.{0,40}syntax|ORA-0(0933|0936|1756)|psycopg2?\.errors\.SyntaxError|QueryFailedError.{0,80}syntax|Incorrect syntax near'
+  condition: selection
+tests:
+  - name: errors of several databases and frameworks
+    events:
+      - {product: "app", message: "SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax", src_ip: "203.0.113.77"}
+      - {product: "app", message: 'QueryFailedError: syntax error at or near "OR"', src_ip: "203.0.113.77"}
+      - {product: "app", message: "psycopg.errors.SyntaxError: unterminated quoted string", src_ip: "203.0.113.77"}
+      - {product: "app", message: "Incorrect syntax near 'admin'.", src_ip: "203.0.113.77"}
+    expect: {alerts: 4}
+  - name: other database messages
+    events:
+      - {product: "app", message: "Connection to the database restored", src_ip: "203.0.113.77"}
+      - {product: "app", message: "SQLSTATE[23000]: Integrity constraint violation", src_ip: "203.0.113.77"}
+    expect: {alerts: 0}

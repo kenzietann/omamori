@@ -1,0 +1,15 @@
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user1@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user2@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user3@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user4@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user5@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user6@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user7@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user8@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user9@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user10@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user11@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.WARNING: Failed login {"email":"user12@example.test","ip":"172.21.0.3"} 
+[2026-11-13 14:06:26] production.ERROR: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax near '1' OR '1'='1'  
+[2026-11-13 14:06:26] production.ERROR: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax near '1' OR '1'='1'  
+[2026-11-13 14:06:26] production.ERROR: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax near '1' OR '1'='1'  

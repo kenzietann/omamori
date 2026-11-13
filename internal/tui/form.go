@@ -55,7 +55,7 @@ var (
 	fieldAssets     = formField{key: "assets", label: "Asset list, optional (YAML: names and addresses of your machines):", limit: pathLimit}
 	fieldIndicators = formField{key: "indicators", label: "Indicator list, optional (YAML: known bad addresses, domains, hashes):", limit: pathLimit}
 	fieldFormat     = formField{key: "format", label: "Log format:", choices: []choice{{"", "look at the first lines"}, {"syslog", "syslog"}, {"web", "web"},
-		{"json", "json"}, {"suricata", "suricata"}, {"zeek", "zeek"}, {"wazuh", "wazuh"}, {"windows", "windows"}, {"pcap", "pcap"}}}
+		{"json", "json"}, {"suricata", "suricata"}, {"zeek", "zeek"}, {"wazuh", "wazuh"}, {"windows", "windows"}, {"pcap", "pcap"}, {"app", "app (framework logs)"}}}
 	fieldStore     = formField{key: "store", label: "Store the run for search, cases and timelines:", choices: []choice{{"", "no"}, {"yes", "yes"}}}
 	fieldRecording = formField{key: "recording", label: "Replay a recording, optional (recording.json; nothing is sent):", limit: pathLimit}
 	fieldProcesses = formField{key: "processes", label: "Saved \"ps aux\" or \"ps -ef\" output, optional:", limit: pathLimit}

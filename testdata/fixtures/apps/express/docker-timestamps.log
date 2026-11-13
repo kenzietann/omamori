@@ -1,0 +1,40 @@
+2026-11-13T14:01:15.359711030Z listening on 8080
+2026-11-13T14:01:15.449116346Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /api/items HTTP/1.1" 200 2 "-" "curl/8.14.1"
+2026-11-13T14:01:15.510286537Z Failed login for user1@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.511495599Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.519579889Z Failed login for user2@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.520467709Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.530021813Z Failed login for user3@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.530863682Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.539815879Z Failed login for user4@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.540208568Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.551366923Z Failed login for user5@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.551903090Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.556935727Z Failed login for user6@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.557754142Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.565666749Z Failed login for user7@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.567051160Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.574635193Z Failed login for user8@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.576465326Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.583151957Z Failed login for user9@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.583443870Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.592359114Z Failed login for user10@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.593687242Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.600276346Z Failed login for user11@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.600493104Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.608238529Z Failed login for user12@example.test from ::ffff:172.21.0.3
+2026-11-13T14:01:15.608506696Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 401 31 "-" "curl/8.14.1"
+2026-11-13T14:01:15.620246502Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "POST /auth/login HTTP/1.1" 200 13 "-" "curl/8.14.1"
+2026-11-13T14:01:15.627761255Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /.env HTTP/1.1" 404 143 "-" "curl/8.14.1"
+2026-11-13T14:01:15.637634309Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /.git/config HTTP/1.1" 404 150 "-" "curl/8.14.1"
+2026-11-13T14:01:15.646804346Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /actuator/env HTTP/1.1" 404 151 "-" "curl/8.14.1"
+2026-11-13T14:01:15.654605138Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /wp-login.php HTTP/1.1" 404 151 "-" "curl/8.14.1"
+2026-11-13T14:01:15.660610457Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /phpmyadmin/ HTTP/1.1" 404 150 "-" "curl/8.14.1"
+2026-11-13T14:01:15.667929907Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /backup.sql HTTP/1.1" 404 149 "-" "curl/8.14.1"
+2026-11-13T14:01:15.677519046Z QueryFailedError: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:01:15.678211148Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1" 500 24 "-" "curl/8.14.1"
+2026-11-13T14:01:15.686294270Z QueryFailedError: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:01:15.686576143Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1" 500 24 "-" "curl/8.14.1"
+2026-11-13T14:01:15.694026322Z QueryFailedError: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:01:15.696869424Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1" 500 24 "-" "curl/8.14.1"
+2026-11-13T14:01:15.702868328Z ::ffff:172.21.0.3 - - [13/Nov/2026:14:01:15 +0000] "GET /api/items?id=1 HTTP/1.1" 200 2 "-" "sqlmap/1.8.2#stable (https://sqlmap.org)"

@@ -49,7 +49,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 	if got.code != exitOK {
 		t.Fatalf("forensics: %d %s", got.code, got.stderr)
 	}
-	if !strings.Contains(got.stdout, "Read and hashed 31 files: 1254 log events and 83 artifacts. 55 rules. 34 alerts, 3 critical, 20 high, 11 medium.") ||
+	if !strings.Contains(got.stdout, "Read and hashed 31 files: 1254 log events and 83 artifacts. 67 rules. 34 alerts, 3 critical, 20 high, 11 medium.") ||
 		!strings.Contains(got.stdout, "Stored run:") {
 		t.Errorf("the summary is %q", got.stdout)
 	}
@@ -125,7 +125,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 func TestForensicsOnTheSystemWithoutAnAttack(t *testing.T) {
 	host := hostFixture(t, true)
 	got := runAt(t, detectNow, forensicsArgs(host, filepath.Join(t.TempDir(), "out"))...)
-	if got.code != exitOK || !strings.Contains(got.stdout, "55 rules. 0 alerts.") {
+	if got.code != exitOK || !strings.Contains(got.stdout, "67 rules. 0 alerts.") {
 		t.Fatalf("code %d, stdout %q, stderr %q", got.code, got.stdout, got.stderr)
 	}
 }

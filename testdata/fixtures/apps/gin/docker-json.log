@@ -1,0 +1,50 @@
+{"log":"[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.\n","stream":"stdout","time":"2026-11-13T14:03:04.921436964Z"}
+{"log":"\n","stream":"stdout","time":"2026-11-13T14:03:04.921460462Z"}
+{"log":"[GIN-debug] [WARNING] Running in \"debug\" mode. Switch to \"release\" mode in production.\n","stream":"stdout","time":"2026-11-13T14:03:04.921461837Z"}
+{"log":" - using env:\u0009export GIN_MODE=release\n","stream":"stdout","time":"2026-11-13T14:03:04.92146267Z"}
+{"log":" - using code:\u0009gin.SetMode(gin.ReleaseMode)\n","stream":"stdout","time":"2026-11-13T14:03:04.921463462Z"}
+{"log":"\n","stream":"stdout","time":"2026-11-13T14:03:04.921464045Z"}
+{"log":"[GIN-debug] POST   /auth/login               --\u003e main.main.func1 (3 handlers)\n","stream":"stdout","time":"2026-11-13T14:03:04.921464586Z"}
+{"log":"[GIN-debug] GET    /api/items                --\u003e main.main.func2 (3 handlers)\n","stream":"stdout","time":"2026-11-13T14:03:04.921465253Z"}
+{"log":"[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.\n","stream":"stdout","time":"2026-11-13T14:03:04.921465795Z"}
+{"log":"Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.\n","stream":"stdout","time":"2026-11-13T14:03:04.92146642Z"}
+{"log":"[GIN-debug] Listening and serving HTTP on :8080\n","stream":"stdout","time":"2026-11-13T14:03:04.921506583Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 200 |      36.122µs |      172.21.0.3 | GET      \"/api/items\"\n","stream":"stdout","time":"2026-11-13T14:03:05.060611204Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user1@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.100480078Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      173.32µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.10105695Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user2@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.104581257Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      40.289µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.104593297Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user3@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.108264426Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      40.164µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.108264135Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      40.663µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.112870315Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user4@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.112881064Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user5@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.116335627Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      35.997µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.116738762Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user6@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.12056217Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |       29.04µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.120592335Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user7@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.124203926Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      38.455µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.124608186Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user8@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.127888387Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      26.332µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.128513297Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      24.748µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.131618387Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user9@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.131627303Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user10@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.135338345Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      33.247µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.135369301Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user11@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.138626795Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      27.082µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.138675208Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 401 |      30.914µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.142695685Z"}
+{"log":"2026/11/13 14:03:05 Failed login for user12@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:03:05.142712308Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 200 |      23.081µs |      172.21.0.3 | POST     \"/auth/login\"\n","stream":"stdout","time":"2026-11-13T14:03:05.146037589Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 404 |         250ns |      172.21.0.3 | GET      \"/.env\"\n","stream":"stdout","time":"2026-11-13T14:03:05.149904578Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 404 |         125ns |      172.21.0.3 | GET      \"/.git/config\"\n","stream":"stdout","time":"2026-11-13T14:03:05.15372357Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 404 |         291ns |      172.21.0.3 | GET      \"/actuator/env\"\n","stream":"stdout","time":"2026-11-13T14:03:05.157706299Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 404 |         208ns |      172.21.0.3 | GET      \"/wp-login.php\"\n","stream":"stdout","time":"2026-11-13T14:03:05.160935629Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 404 |         208ns |      172.21.0.3 | GET      \"/phpmyadmin/\"\n","stream":"stdout","time":"2026-11-13T14:03:05.164754538Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 404 |         292ns |      172.21.0.3 | GET      \"/backup.sql\"\n","stream":"stdout","time":"2026-11-13T14:03:05.168430333Z"}
+{"log":"2026/11/13 14:03:05 pq: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:03:05.172116794Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 500 |      26.248µs |      172.21.0.3 | GET      \"/api/items?id=1%27%20OR%20%271%27=%271\"\n","stream":"stdout","time":"2026-11-13T14:03:05.172173623Z"}
+{"log":"2026/11/13 14:03:05 pq: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:03:05.175847377Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 500 |       28.29µs |      172.21.0.3 | GET      \"/api/items?id=1%27%20OR%20%271%27=%271\"\n","stream":"stdout","time":"2026-11-13T14:03:05.175891082Z"}
+{"log":"2026/11/13 14:03:05 pq: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:03:05.17940539Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 500 |      48.913µs |      172.21.0.3 | GET      \"/api/items?id=1%27%20OR%20%271%27=%271\"\n","stream":"stdout","time":"2026-11-13T14:03:05.179470884Z"}
+{"log":"[GIN] 2026/11/13 - 14:03:05 | 200 |      16.957µs |      172.21.0.3 | GET      \"/api/items?id=1\"\n","stream":"stdout","time":"2026-11-13T14:03:05.185990582Z"}

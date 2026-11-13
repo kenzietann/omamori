@@ -1,0 +1,43 @@
+2026-11-13T14:01:37.256707013Z INFO:     Started server process [1]
+2026-11-13T14:01:37.256740850Z INFO:     Waiting for application startup.
+2026-11-13T14:01:37.256746017Z INFO:     Application startup complete.
+2026-11-13T14:01:37.256914783Z INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+2026-11-13T14:01:39.209594100Z INFO:     172.21.0.3:53194 - "GET /api/items HTTP/1.1" 200 OK
+2026-11-13T14:01:39.244615840Z WARNING:  Failed login for user1@example.test from 172.21.0.3
+2026-11-13T14:01:39.244638592Z INFO:     172.21.0.3:53200 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.249274388Z INFO:     172.21.0.3:53206 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.249289972Z WARNING:  Failed login for user2@example.test from 172.21.0.3
+2026-11-13T14:01:39.253533486Z WARNING:  Failed login for user3@example.test from 172.21.0.3
+2026-11-13T14:01:39.253608075Z INFO:     172.21.0.3:53222 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.257773833Z INFO:     172.21.0.3:53232 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.257787792Z WARNING:  Failed login for user4@example.test from 172.21.0.3
+2026-11-13T14:01:39.261755409Z WARNING:  Failed login for user5@example.test from 172.21.0.3
+2026-11-13T14:01:39.261832540Z INFO:     172.21.0.3:53248 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.265791655Z WARNING:  Failed login for user6@example.test from 172.21.0.3
+2026-11-13T14:01:39.265844618Z INFO:     172.21.0.3:53254 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.269806900Z INFO:     172.21.0.3:53266 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.269823944Z WARNING:  Failed login for user7@example.test from 172.21.0.3
+2026-11-13T14:01:39.274139422Z INFO:     172.21.0.3:53280 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.274152798Z WARNING:  Failed login for user8@example.test from 172.21.0.3
+2026-11-13T14:01:39.278434023Z WARNING:  Failed login for user9@example.test from 172.21.0.3
+2026-11-13T14:01:39.278506487Z INFO:     172.21.0.3:53288 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.283673076Z WARNING:  Failed login for user10@example.test from 172.21.0.3
+2026-11-13T14:01:39.283848841Z INFO:     172.21.0.3:53294 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.288429007Z WARNING:  Failed login for user11@example.test from 172.21.0.3
+2026-11-13T14:01:39.288454801Z INFO:     172.21.0.3:53310 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.292450294Z WARNING:  Failed login for user12@example.test from 172.21.0.3
+2026-11-13T14:01:39.292477255Z INFO:     172.21.0.3:53322 - "POST /auth/login HTTP/1.1" 401 Unauthorized
+2026-11-13T14:01:39.297098383Z INFO:     172.21.0.3:53330 - "POST /auth/login HTTP/1.1" 200 OK
+2026-11-13T14:01:39.301149922Z INFO:     172.21.0.3:53346 - "GET /.env HTTP/1.1" 404 Not Found
+2026-11-13T14:01:39.305559658Z INFO:     172.21.0.3:53362 - "GET /.git/config HTTP/1.1" 404 Not Found
+2026-11-13T14:01:39.309633658Z INFO:     172.21.0.3:53370 - "GET /actuator/env HTTP/1.1" 404 Not Found
+2026-11-13T14:01:39.313609733Z INFO:     172.21.0.3:53376 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+2026-11-13T14:01:39.317636104Z INFO:     172.21.0.3:53390 - "GET /phpmyadmin/ HTTP/1.1" 404 Not Found
+2026-11-13T14:01:39.321548216Z INFO:     172.21.0.3:53394 - "GET /backup.sql HTTP/1.1" 404 Not Found
+2026-11-13T14:01:39.325343193Z ERROR:    asyncpg.exceptions.PostgresSyntaxError: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:01:39.325479579Z INFO:     172.21.0.3:53406 - "GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1" 500 Internal Server Error
+2026-11-13T14:01:39.329435194Z ERROR:    asyncpg.exceptions.PostgresSyntaxError: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:01:39.329511826Z INFO:     172.21.0.3:53422 - "GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1" 500 Internal Server Error
+2026-11-13T14:01:39.333759715Z ERROR:    asyncpg.exceptions.PostgresSyntaxError: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:01:39.333821845Z INFO:     172.21.0.3:53434 - "GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1" 500 Internal Server Error
+2026-11-13T14:01:39.338726121Z INFO:     172.21.0.3:53444 - "GET /api/items?id=1 HTTP/1.1" 200 OK

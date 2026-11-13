@@ -1,0 +1,260 @@
+{
+ "aspnet": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_sensitive_scan"
+  ]
+ },
+ "chi": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ]
+ },
+ "django": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ]
+ },
+ "echo": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ]
+ },
+ "express": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ]
+ },
+ "fastapi": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ]
+ },
+ "flask": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ]
+ },
+ "gin": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ]
+ },
+ "laravel": {
+  "docker-json.log": [],
+  "docker-timestamps.log": [],
+  "laravel.log": [
+   "app_credential_stuffing",
+   "app_login_bruteforce",
+   "app_sql_error"
+  ]
+ },
+ "nest": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_bruteforce",
+   "app_sql_error"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_bruteforce",
+   "app_sql_error"
+  ]
+ },
+ "nestpino": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ]
+ },
+ "rails": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ]
+ },
+ "rust-actix": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_scanner_tool",
+   "web_sensitive_scan"
+  ]
+ },
+ "rust-axum": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_bruteforce",
+   "app_sql_error"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_bruteforce",
+   "app_sql_error"
+  ]
+ },
+ "spring": {
+  "docker-json.log": [
+   "app_credential_stuffing",
+   "app_login_bruteforce",
+   "app_sql_error"
+  ],
+  "docker-timestamps.log": [
+   "app_credential_stuffing",
+   "app_login_bruteforce",
+   "app_sql_error"
+  ],
+  "tomcat-access.log": [
+   "app_debug_endpoint_exposed",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ]
+ }
+}

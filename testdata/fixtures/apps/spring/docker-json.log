@@ -1,0 +1,38 @@
+{"log":"\n","stream":"stdout","time":"2026-11-13T14:03:57.028127567Z"}
+{"log":"  .   ____          _            __ _ _\n","stream":"stdout","time":"2026-11-13T14:03:57.028154736Z"}
+{"log":" /\\\\ / ___'_ __ _ _(_)_ __  __ _ \\ \\ \\ \\\n","stream":"stdout","time":"2026-11-13T14:03:57.028156277Z"}
+{"log":"( ( )\\___ | '_ | '_| | '_ \\/ _` | \\ \\ \\ \\\n","stream":"stdout","time":"2026-11-13T14:03:57.028157152Z"}
+{"log":" \\\\/  ___)| |_)| | | | | || (_| |  ) ) ) )\n","stream":"stdout","time":"2026-11-13T14:03:57.028157902Z"}
+{"log":"  '  |____| .__|_| |_|_| |_\\__, | / / / /\n","stream":"stdout","time":"2026-11-13T14:03:57.028158569Z"}
+{"log":" =========|_|==============|___/=/_/_/_/\n","stream":"stdout","time":"2026-11-13T14:03:57.028159194Z"}
+{"log":"\n","stream":"stdout","time":"2026-11-13T14:03:57.028159778Z"}
+{"log":" :: Spring Boot ::                (v3.4.1)\n","stream":"stdout","time":"2026-11-13T14:03:57.031742284Z"}
+{"log":"\n","stream":"stdout","time":"2026-11-13T14:03:57.031750701Z"}
+{"log":"2026-11-13T14:03:57.102Z  INFO 1 --- [           main] lab.LabApplication                       : Starting LabApplication v1.0 using Java 21.0.13 with PID 1 (/app.jar started by root in /)\n","stream":"stdout","time":"2026-11-13T14:03:57.103370246Z"}
+{"log":"2026-11-13T14:03:57.103Z  INFO 1 --- [           main] lab.LabApplication                       : No active profile set, falling back to 1 default profile: \"default\"\n","stream":"stdout","time":"2026-11-13T14:03:57.103756186Z"}
+{"log":"2026-11-13T14:03:57.822Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)\n","stream":"stdout","time":"2026-11-13T14:03:57.82250079Z"}
+{"log":"2026-11-13T14:03:57.835Z  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]\n","stream":"stdout","time":"2026-11-13T14:03:57.835613159Z"}
+{"log":"2026-11-13T14:03:57.835Z  INFO 1 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.34]\n","stream":"stdout","time":"2026-11-13T14:03:57.835845756Z"}
+{"log":"2026-11-13T14:03:57.849Z  INFO 1 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext\n","stream":"stdout","time":"2026-11-13T14:03:57.849519952Z"}
+{"log":"2026-11-13T14:03:57.850Z  INFO 1 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 702 ms\n","stream":"stdout","time":"2026-11-13T14:03:57.850439798Z"}
+{"log":"2026-11-13T14:03:58.147Z  INFO 1 --- [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'\n","stream":"stdout","time":"2026-11-13T14:03:58.147991982Z"}
+{"log":"2026-11-13T14:03:58.181Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'\n","stream":"stdout","time":"2026-11-13T14:03:58.183171232Z"}
+{"log":"2026-11-13T14:03:58.196Z  INFO 1 --- [           main] lab.LabApplication                       : Started LabApplication in 1.341 seconds (process running for 1.665)\n","stream":"stdout","time":"2026-11-13T14:03:58.19707033Z"}
+{"log":"2026-11-13T14:03:58.795Z  INFO 1 --- [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'\n","stream":"stdout","time":"2026-11-13T14:03:58.795834986Z"}
+{"log":"2026-11-13T14:03:58.796Z  INFO 1 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'\n","stream":"stdout","time":"2026-11-13T14:03:58.796901173Z"}
+{"log":"2026-11-13T14:03:58.798Z  INFO 1 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms\n","stream":"stdout","time":"2026-11-13T14:03:58.798569895Z"}
+{"log":"2026-11-13T14:03:58.982Z  WARN 1 --- [nio-8080-exec-3] AuthService                              : Failed login for user1@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:58.983176314Z"}
+{"log":"2026-11-13T14:03:59.038Z  WARN 1 --- [nio-8080-exec-4] AuthService                              : Failed login for user2@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.038434657Z"}
+{"log":"2026-11-13T14:03:59.050Z  WARN 1 --- [nio-8080-exec-5] AuthService                              : Failed login for user3@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.051222708Z"}
+{"log":"2026-11-13T14:03:59.060Z  WARN 1 --- [nio-8080-exec-6] AuthService                              : Failed login for user4@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.060353679Z"}
+{"log":"2026-11-13T14:03:59.068Z  WARN 1 --- [nio-8080-exec-7] AuthService                              : Failed login for user5@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.069037666Z"}
+{"log":"2026-11-13T14:03:59.076Z  WARN 1 --- [nio-8080-exec-8] AuthService                              : Failed login for user6@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.077467514Z"}
+{"log":"2026-11-13T14:03:59.087Z  WARN 1 --- [io-8080-exec-10] AuthService                              : Failed login for user7@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.087288856Z"}
+{"log":"2026-11-13T14:03:59.104Z  WARN 1 --- [nio-8080-exec-1] AuthService                              : Failed login for user8@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.104662206Z"}
+{"log":"2026-11-13T14:03:59.113Z  WARN 1 --- [nio-8080-exec-3] AuthService                              : Failed login for user9@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.11374109Z"}
+{"log":"2026-11-13T14:03:59.122Z  WARN 1 --- [nio-8080-exec-4] AuthService                              : Failed login for user10@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.122302529Z"}
+{"log":"2026-11-13T14:03:59.130Z  WARN 1 --- [nio-8080-exec-5] AuthService                              : Failed login for user11@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.130394358Z"}
+{"log":"2026-11-13T14:03:59.137Z  WARN 1 --- [nio-8080-exec-6] AuthService                              : Failed login for user12@example.test from 172.21.0.3\n","stream":"stdout","time":"2026-11-13T14:03:59.138128292Z"}
+{"log":"2026-11-13T14:03:59.315Z ERROR 1 --- [nio-8080-exec-7] AuthService                              : org.postgresql.util.PSQLException: ERROR: syntax error at or near \"1' OR '1'='1\"\n","stream":"stdout","time":"2026-11-13T14:03:59.315363443Z"}
+{"log":"2026-11-13T14:03:59.328Z ERROR 1 --- [nio-8080-exec-8] AuthService                              : org.postgresql.util.PSQLException: ERROR: syntax error at or near \"1' OR '1'='1\"\n","stream":"stdout","time":"2026-11-13T14:03:59.328775528Z"}
+{"log":"2026-11-13T14:03:59.339Z ERROR 1 --- [nio-8080-exec-9] AuthService                              : org.postgresql.util.PSQLException: ERROR: syntax error at or near \"1' OR '1'='1\"\n","stream":"stdout","time":"2026-11-13T14:03:59.3398654Z"}

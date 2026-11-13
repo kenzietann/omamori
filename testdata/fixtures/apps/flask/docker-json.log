@@ -1,0 +1,46 @@
+{"log":" * Serving Flask app 'app'\n","stream":"stdout","time":"2026-11-13T14:01:33.2584113Z"}
+{"log":" * Debug mode: off\n","stream":"stdout","time":"2026-11-13T14:01:33.258735463Z"}
+{"log":"INFO:werkzeug:\u001b[31m\u001b[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\u001b[0m\n","stream":"stderr","time":"2026-11-13T14:01:33.260501087Z"}
+{"log":" * Running on all addresses (0.0.0.0)\n","stream":"stderr","time":"2026-11-13T14:01:33.26050538Z"}
+{"log":" * Running on http://127.0.0.1:8080\n","stream":"stderr","time":"2026-11-13T14:01:33.260506296Z"}
+{"log":" * Running on http://127.0.0.1:8080\n","stream":"stderr","time":"2026-11-13T14:01:33.260506963Z"}
+{"log":"INFO:werkzeug:\u001b[33mPress CTRL+C to quit\u001b[0m\n","stream":"stderr","time":"2026-11-13T14:01:33.260932138Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"GET /api/items HTTP/1.1\" 200 -\n","stream":"stderr","time":"2026-11-13T14:01:33.335562593Z"}
+{"log":"WARNING:app:Failed login for user1@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.385224315Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.385387834Z"}
+{"log":"WARNING:app:Failed login for user2@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.390070719Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.39022157Z"}
+{"log":"WARNING:app:Failed login for user3@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.394392061Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.394609295Z"}
+{"log":"WARNING:app:Failed login for user4@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.39933281Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.399363563Z"}
+{"log":"WARNING:app:Failed login for user5@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.403680113Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.403843133Z"}
+{"log":"WARNING:app:Failed login for user6@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.409019909Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.409196138Z"}
+{"log":"WARNING:app:Failed login for user7@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.414120551Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.414221063Z"}
+{"log":"WARNING:app:Failed login for user8@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.418574326Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.41864275Z"}
+{"log":"WARNING:app:Failed login for user9@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.423144072Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.423240083Z"}
+{"log":"WARNING:app:Failed login for user10@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.42741395Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.427564676Z"}
+{"log":"WARNING:app:Failed login for user11@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.431820969Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.431936982Z"}
+{"log":"WARNING:app:Failed login for user12@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:33.436192275Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[31m\u001b[1mPOST /auth/login HTTP/1.1\u001b[0m\" 401 -\n","stream":"stderr","time":"2026-11-13T14:01:33.43624724Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"POST /auth/login HTTP/1.1\" 200 -\n","stream":"stderr","time":"2026-11-13T14:01:33.440797026Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[33mGET /.env HTTP/1.1\u001b[0m\" 404 -\n","stream":"stderr","time":"2026-11-13T14:01:33.445100491Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[33mGET /.git/config HTTP/1.1\u001b[0m\" 404 -\n","stream":"stderr","time":"2026-11-13T14:01:33.450160336Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[33mGET /actuator/env HTTP/1.1\u001b[0m\" 404 -\n","stream":"stderr","time":"2026-11-13T14:01:33.454533351Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[33mGET /wp-login.php HTTP/1.1\u001b[0m\" 404 -\n","stream":"stderr","time":"2026-11-13T14:01:33.459455889Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[33mGET /phpmyadmin/ HTTP/1.1\u001b[0m\" 404 -\n","stream":"stderr","time":"2026-11-13T14:01:33.463675095Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[33mGET /backup.sql HTTP/1.1\u001b[0m\" 404 -\n","stream":"stderr","time":"2026-11-13T14:01:33.468474618Z"}
+{"log":"ERROR:app:sqlite3.OperationalError: SQLITE_ERROR near \"1' OR '1'='1\": syntax error\n","stream":"stderr","time":"2026-11-13T14:01:33.48673481Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[35m\u001b[1mGET /api/items?id=1'%20OR%20'1'='1 HTTP/1.1\u001b[0m\" 500 -\n","stream":"stderr","time":"2026-11-13T14:01:33.487112896Z"}
+{"log":"ERROR:app:sqlite3.OperationalError: SQLITE_ERROR near \"1' OR '1'='1\": syntax error\n","stream":"stderr","time":"2026-11-13T14:01:33.492718139Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[35m\u001b[1mGET /api/items?id=1'%20OR%20'1'='1 HTTP/1.1\u001b[0m\" 500 -\n","stream":"stderr","time":"2026-11-13T14:01:33.492744309Z"}
+{"log":"ERROR:app:sqlite3.OperationalError: SQLITE_ERROR near \"1' OR '1'='1\": syntax error\n","stream":"stderr","time":"2026-11-13T14:01:33.500207813Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"\u001b[35m\u001b[1mGET /api/items?id=1'%20OR%20'1'='1 HTTP/1.1\u001b[0m\" 500 -\n","stream":"stderr","time":"2026-11-13T14:01:33.500644698Z"}
+{"log":"INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] \"GET /api/items?id=1 HTTP/1.1\" 200 -\n","stream":"stderr","time":"2026-11-13T14:01:33.512684657Z"}

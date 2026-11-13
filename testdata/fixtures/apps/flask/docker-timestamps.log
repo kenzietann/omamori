@@ -1,0 +1,46 @@
+2026-11-13T14:01:33.258411300Z  * Serving Flask app 'app'
+2026-11-13T14:01:33.258735463Z  * Debug mode: off
+2026-11-13T14:01:33.260501087Z INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2026-11-13T14:01:33.260505380Z  * Running on all addresses (0.0.0.0)
+2026-11-13T14:01:33.260506296Z  * Running on http://127.0.0.1:8080
+2026-11-13T14:01:33.260506963Z  * Running on http://127.0.0.1:8080
+2026-11-13T14:01:33.260932138Z INFO:werkzeug:[33mPress CTRL+C to quit[0m
+2026-11-13T14:01:33.335562593Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "GET /api/items HTTP/1.1" 200 -
+2026-11-13T14:01:33.385224315Z WARNING:app:Failed login for user1@example.test from 172.21.0.3
+2026-11-13T14:01:33.385387834Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.390070719Z WARNING:app:Failed login for user2@example.test from 172.21.0.3
+2026-11-13T14:01:33.390221570Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.394392061Z WARNING:app:Failed login for user3@example.test from 172.21.0.3
+2026-11-13T14:01:33.394609295Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.399332810Z WARNING:app:Failed login for user4@example.test from 172.21.0.3
+2026-11-13T14:01:33.399363563Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.403680113Z WARNING:app:Failed login for user5@example.test from 172.21.0.3
+2026-11-13T14:01:33.403843133Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.409019909Z WARNING:app:Failed login for user6@example.test from 172.21.0.3
+2026-11-13T14:01:33.409196138Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.414120551Z WARNING:app:Failed login for user7@example.test from 172.21.0.3
+2026-11-13T14:01:33.414221063Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.418574326Z WARNING:app:Failed login for user8@example.test from 172.21.0.3
+2026-11-13T14:01:33.418642750Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.423144072Z WARNING:app:Failed login for user9@example.test from 172.21.0.3
+2026-11-13T14:01:33.423240083Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.427413950Z WARNING:app:Failed login for user10@example.test from 172.21.0.3
+2026-11-13T14:01:33.427564676Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.431820969Z WARNING:app:Failed login for user11@example.test from 172.21.0.3
+2026-11-13T14:01:33.431936982Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.436192275Z WARNING:app:Failed login for user12@example.test from 172.21.0.3
+2026-11-13T14:01:33.436247240Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[31m[1mPOST /auth/login HTTP/1.1[0m" 401 -
+2026-11-13T14:01:33.440797026Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "POST /auth/login HTTP/1.1" 200 -
+2026-11-13T14:01:33.445100491Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[33mGET /.env HTTP/1.1[0m" 404 -
+2026-11-13T14:01:33.450160336Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[33mGET /.git/config HTTP/1.1[0m" 404 -
+2026-11-13T14:01:33.454533351Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[33mGET /actuator/env HTTP/1.1[0m" 404 -
+2026-11-13T14:01:33.459455889Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[33mGET /wp-login.php HTTP/1.1[0m" 404 -
+2026-11-13T14:01:33.463675095Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[33mGET /phpmyadmin/ HTTP/1.1[0m" 404 -
+2026-11-13T14:01:33.468474618Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[33mGET /backup.sql HTTP/1.1[0m" 404 -
+2026-11-13T14:01:33.486734810Z ERROR:app:sqlite3.OperationalError: SQLITE_ERROR near "1' OR '1'='1": syntax error
+2026-11-13T14:01:33.487112896Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[35m[1mGET /api/items?id=1'%20OR%20'1'='1 HTTP/1.1[0m" 500 -
+2026-11-13T14:01:33.492718139Z ERROR:app:sqlite3.OperationalError: SQLITE_ERROR near "1' OR '1'='1": syntax error
+2026-11-13T14:01:33.492744309Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[35m[1mGET /api/items?id=1'%20OR%20'1'='1 HTTP/1.1[0m" 500 -
+2026-11-13T14:01:33.500207813Z ERROR:app:sqlite3.OperationalError: SQLITE_ERROR near "1' OR '1'='1": syntax error
+2026-11-13T14:01:33.500644698Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "[35m[1mGET /api/items?id=1'%20OR%20'1'='1 HTTP/1.1[0m" 500 -
+2026-11-13T14:01:33.512684657Z INFO:werkzeug:172.21.0.3 - - [13/Nov/2026 14:01:33] "GET /api/items?id=1 HTTP/1.1" 200 -

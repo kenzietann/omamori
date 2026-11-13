@@ -43,7 +43,7 @@ func runAnalyze(args []string, env environment) int {
 	flags.StringVar(&chosen.model, "model", lookup("OMAMORI_MODEL"), "model name")
 	flags.StringVar(&reasoning, "reasoning", "", "reasoning level")
 	flags.StringVar(&rulesFolder, "rules", "", "custom rules, replacing the built-in set")
-	flags.StringVar(&format, "format", "", "syslog, web, json, suricata, zeek, wazuh or windows")
+	flags.StringVar(&format, "format", "", "syslog, web, json, app, suricata, zeek, wazuh, windows or pcap")
 	flags.IntVar(&chosen.year, "year", 0, "year of classic syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of classic syslog lines")
 	var assetsPath string

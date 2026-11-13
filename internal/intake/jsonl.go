@@ -18,7 +18,7 @@ const (
 	maxJSONFields = 300
 )
 
-var timeKeys = []string{"timestamp", "@timestamp", "time", "ts", "UtcTime", "EventTime", "eventTime", "datetime"}
+var timeKeys = []string{"timestamp", "@timestamp", "time", "ts", "UtcTime", "EventTime", "eventTime", "datetime", "@t", "Timestamp", "asctime"}
 
 var timeLayouts = []string{time.RFC3339Nano, "2006-01-02T15:04:05.999999999Z0700", "2006-01-02 15:04:05.999999999Z07:00"}
 
@@ -33,7 +33,26 @@ func jsonParser(options Options) lineParser {
 }
 
 func jsonSourceParser(options Options) func(string) (map[string]string, time.Time, string, bool) {
+	var inner *innerParser
+	object := jsonObjectParser(options)
 	return func(line string) (map[string]string, time.Time, string, bool) {
+		// The json-file logs of Docker and the JSON export of the journal wrap the real line. The line inside is
+		// read with every reader of Omamori, and the time of the wrapper is used when the line has none.
+		if inner == nil {
+			inner = newInnerParser(options, object)
+		}
+		if fields, moment, source, ok, wrapped := inner.unwrap(line); wrapped {
+			return fields, moment, source, ok
+		}
+
+		return object(line, time.Time{})
+	}
+}
+
+// jsonObjectParser reads one JSON object. fallback is the time to use when the object has none (a JSON line
+// inside a Docker log); a zero fallback means that an object without a time is refused.
+func jsonObjectParser(options Options) func(string, time.Time) (map[string]string, time.Time, string, bool) {
+	return func(line string, fallback time.Time) (map[string]string, time.Time, string, bool) {
 		trimmed := strings.TrimSpace(line)
 		if !strings.HasPrefix(trimmed, "{") {
 			return nil, time.Time{}, "", false
@@ -84,6 +103,9 @@ func jsonSourceParser(options Options) func(string) (map[string]string, time.Tim
 				}
 			}
 		}
+		if !found && !fallback.IsZero() {
+			moment, found = fallback, true
+		}
 		if !found {
 			return nil, time.Time{}, "", false
 		}
@@ -111,6 +133,7 @@ func jsonSourceParser(options Options) func(string) (map[string]string, time.Tim
 		}
 		fields = map[string]string{}
 		flatten("", object, fields, 0)
+		appFields(fields)
 
 		return fields, moment, FormatJSON, true
 	}
@@ -180,7 +203,7 @@ func jsonTime(raw any, location *time.Location) (time.Time, bool) {
 				return moment, true
 			}
 		}
-		for _, layout := range []string{"2006-01-02T15:04:05.999999999", "2006-01-02 15:04:05.999999999"} {
+		for _, layout := range []string{"2006-01-02T15:04:05.999999999", "2006-01-02 15:04:05.999999999", "2006-01-02 15:04:05,000"} {
 			if moment, err := time.ParseInLocation(layout, typed, location); err == nil {
 				return moment, true
 			}

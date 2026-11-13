@@ -1,0 +1,122 @@
+2026-11-13T14:05:10.657068220Z => Booting Puma
+2026-11-13T14:05:10.657093970Z => Rails 8.0.5.2 application starting in production 
+2026-11-13T14:05:10.657095511Z => Run `bin/rails server --help` for more startup options
+2026-11-13T14:05:11.005472963Z Puma starting in single mode...
+2026-11-13T14:05:11.005486338Z * Puma version: 8.0.3 ("Into the Arena")
+2026-11-13T14:05:11.005487671Z * Ruby version: ruby 3.3.13 (2026-10-23 revision af48f08f21) +YJIT [aarch64-linux]
+2026-11-13T14:05:11.005488546Z *  Min threads: 3
+2026-11-13T14:05:11.005489213Z *  Max threads: 3
+2026-11-13T14:05:11.005489796Z *  Environment: production
+2026-11-13T14:05:11.005490380Z *          PID: 1
+2026-11-13T14:05:11.008667339Z * Listening on http://0.0.0.0:8080
+2026-11-13T14:05:11.013639335Z Use Ctrl-C to stop
+2026-11-13T14:05:12.263677486Z [bc7e7e90-9be6-4408-b539-928343fd81fc] Started GET "/api/items" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.264204722Z [bc7e7e90-9be6-4408-b539-928343fd81fc] Processing by ItemsController#index as */*
+2026-11-13T14:05:12.264571046Z [bc7e7e90-9be6-4408-b539-928343fd81fc] Completed 200 OK in 0ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.311185514Z [cde53b67-93a7-4ebf-acaf-52eda54529bd] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.313532619Z [cde53b67-93a7-4ebf-acaf-52eda54529bd] Processing by AuthController#login as */*
+2026-11-13T14:05:12.313562909Z [cde53b67-93a7-4ebf-acaf-52eda54529bd]   Parameters: {"username"=>"user1@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user1@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.313720155Z [cde53b67-93a7-4ebf-acaf-52eda54529bd] Failed login for user1@example.test from 172.21.0.3
+2026-11-13T14:05:12.314956164Z [cde53b67-93a7-4ebf-acaf-52eda54529bd] Completed 401 Unauthorized in 1ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.324312749Z [6281706c-cef6-4cda-b48d-617f20d67f94] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.325582090Z [6281706c-cef6-4cda-b48d-617f20d67f94] Processing by AuthController#login as */*
+2026-11-13T14:05:12.325608839Z [6281706c-cef6-4cda-b48d-617f20d67f94]   Parameters: {"username"=>"user2@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user2@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.325647671Z [6281706c-cef6-4cda-b48d-617f20d67f94] Failed login for user2@example.test from 172.21.0.3
+2026-11-13T14:05:12.326912096Z [6281706c-cef6-4cda-b48d-617f20d67f94] Completed 401 Unauthorized in 1ms (Views: 1.2ms | GC: 0.0ms)
+2026-11-13T14:05:12.336961412Z [4e1c1b80-1538-4190-93ad-591f7ac1112d] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.339850544Z [4e1c1b80-1538-4190-93ad-591f7ac1112d] Processing by AuthController#login as */*
+2026-11-13T14:05:12.340009998Z [4e1c1b80-1538-4190-93ad-591f7ac1112d]   Parameters: {"username"=>"user3@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user3@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.340140661Z [4e1c1b80-1538-4190-93ad-591f7ac1112d] Failed login for user3@example.test from 172.21.0.3
+2026-11-13T14:05:12.340291240Z [4e1c1b80-1538-4190-93ad-591f7ac1112d] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.349026175Z [c0dae121-837c-4af1-aa09-a9fb1e28edc0] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.353249229Z [c0dae121-837c-4af1-aa09-a9fb1e28edc0] Processing by AuthController#login as */*
+2026-11-13T14:05:12.354726190Z [c0dae121-837c-4af1-aa09-a9fb1e28edc0]   Parameters: {"username"=>"user4@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user4@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.354932226Z [c0dae121-837c-4af1-aa09-a9fb1e28edc0] Failed login for user4@example.test from 172.21.0.3
+2026-11-13T14:05:12.355506002Z [c0dae121-837c-4af1-aa09-a9fb1e28edc0] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.366522334Z [0b39191f-2983-401c-a886-6ce46c7048eb] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.371275666Z [0b39191f-2983-401c-a886-6ce46c7048eb] Processing by AuthController#login as */*
+2026-11-13T14:05:12.371337331Z [0b39191f-2983-401c-a886-6ce46c7048eb]   Parameters: {"username"=>"user5@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user5@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.371525785Z [0b39191f-2983-401c-a886-6ce46c7048eb] Failed login for user5@example.test from 172.21.0.3
+2026-11-13T14:05:12.371637240Z [0b39191f-2983-401c-a886-6ce46c7048eb] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.382470494Z [0e697514-dec7-482b-881d-d5123dffe19a] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.384590229Z [0e697514-dec7-482b-881d-d5123dffe19a] Processing by AuthController#login as */*
+2026-11-13T14:05:12.385843904Z [0e697514-dec7-482b-881d-d5123dffe19a]   Parameters: {"username"=>"user6@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user6@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.386023774Z [0e697514-dec7-482b-881d-d5123dffe19a] Failed login for user6@example.test from 172.21.0.3
+2026-11-13T14:05:12.386312142Z [0e697514-dec7-482b-881d-d5123dffe19a] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.395339860Z [9b078039-2987-4309-b6c1-255dec7eb763] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.401797480Z [9b078039-2987-4309-b6c1-255dec7eb763] Processing by AuthController#login as */*
+2026-11-13T14:05:12.402880368Z [9b078039-2987-4309-b6c1-255dec7eb763]   Parameters: {"username"=>"user7@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user7@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.403491101Z [9b078039-2987-4309-b6c1-255dec7eb763] Failed login for user7@example.test from 172.21.0.3
+2026-11-13T14:05:12.403749095Z [9b078039-2987-4309-b6c1-255dec7eb763] Completed 401 Unauthorized in 1ms (Views: 0.2ms | GC: 0.0ms)
+2026-11-13T14:05:12.413311840Z [297759a1-dc7c-4edf-8dcb-e036a13d271f] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.414093319Z [297759a1-dc7c-4edf-8dcb-e036a13d271f] Processing by AuthController#login as */*
+2026-11-13T14:05:12.414097028Z [297759a1-dc7c-4edf-8dcb-e036a13d271f]   Parameters: {"username"=>"user8@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user8@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.414154276Z [297759a1-dc7c-4edf-8dcb-e036a13d271f] Failed login for user8@example.test from 172.21.0.3
+2026-11-13T14:05:12.414232607Z [297759a1-dc7c-4edf-8dcb-e036a13d271f] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.424983863Z [d94ee4d6-6326-4558-a083-b9704efe4f81] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.425588347Z [d94ee4d6-6326-4558-a083-b9704efe4f81] Processing by AuthController#login as */*
+2026-11-13T14:05:12.425618055Z [d94ee4d6-6326-4558-a083-b9704efe4f81]   Parameters: {"username"=>"user9@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user9@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.427935951Z [d94ee4d6-6326-4558-a083-b9704efe4f81] Failed login for user9@example.test from 172.21.0.3
+2026-11-13T14:05:12.428137738Z [d94ee4d6-6326-4558-a083-b9704efe4f81] Completed 401 Unauthorized in 2ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.443530995Z [3bf181b2-1547-438c-bb21-7f1a4dc3d2dd] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.445982763Z [3bf181b2-1547-438c-bb21-7f1a4dc3d2dd] Processing by AuthController#login as */*
+2026-11-13T14:05:12.446011137Z [3bf181b2-1547-438c-bb21-7f1a4dc3d2dd]   Parameters: {"username"=>"user10@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user10@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.446977737Z [3bf181b2-1547-438c-bb21-7f1a4dc3d2dd] Failed login for user10@example.test from 172.21.0.3
+2026-11-13T14:05:12.447307811Z [3bf181b2-1547-438c-bb21-7f1a4dc3d2dd] Completed 401 Unauthorized in 1ms (Views: 0.3ms | GC: 0.0ms)
+2026-11-13T14:05:12.457493957Z [cb0462cb-d7cc-4862-8292-b8b8f8eb198d] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.458565054Z [cb0462cb-d7cc-4862-8292-b8b8f8eb198d] Processing by AuthController#login as */*
+2026-11-13T14:05:12.458610136Z [cb0462cb-d7cc-4862-8292-b8b8f8eb198d]   Parameters: {"username"=>"user11@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user11@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.458768048Z [cb0462cb-d7cc-4862-8292-b8b8f8eb198d] Failed login for user11@example.test from 172.21.0.3
+2026-11-13T14:05:12.459002042Z [cb0462cb-d7cc-4862-8292-b8b8f8eb198d] Completed 401 Unauthorized in 0ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.469221853Z [173eff19-6294-43e3-a1de-dc7e889b0e9f] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.469869086Z [173eff19-6294-43e3-a1de-dc7e889b0e9f] Processing by AuthController#login as */*
+2026-11-13T14:05:12.469890502Z [173eff19-6294-43e3-a1de-dc7e889b0e9f]   Parameters: {"username"=>"user12@example.test", "password"=>"[FILTERED]", "auth"=>{"username"=>"user12@example.test", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.469975167Z [173eff19-6294-43e3-a1de-dc7e889b0e9f] Failed login for user12@example.test from 172.21.0.3
+2026-11-13T14:05:12.470069414Z [173eff19-6294-43e3-a1de-dc7e889b0e9f] Completed 401 Unauthorized in 0ms (Views: 0.0ms | GC: 0.0ms)
+2026-11-13T14:05:12.478054952Z [47528ea0-5213-45bb-81e6-8da00bc75067] Started POST "/auth/login" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.478330778Z [47528ea0-5213-45bb-81e6-8da00bc75067] Processing by AuthController#login as */*
+2026-11-13T14:05:12.478350402Z [47528ea0-5213-45bb-81e6-8da00bc75067]   Parameters: {"username"=>"alice", "password"=>"[FILTERED]", "auth"=>{"username"=>"alice", "password"=>"[FILTERED]"}}
+2026-11-13T14:05:12.478503565Z [47528ea0-5213-45bb-81e6-8da00bc75067] Completed 200 OK in 0ms (Views: 0.0ms | GC: 0.0ms)
+2026-11-13T14:05:12.489711017Z [06d12551-5e30-46bb-b2d4-179d03255ac7] Started GET "/.env" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.491622133Z [06d12551-5e30-46bb-b2d4-179d03255ac7]   
+2026-11-13T14:05:12.491633216Z [06d12551-5e30-46bb-b2d4-179d03255ac7] ActionController::RoutingError (No route matches [GET] "/.env"):
+2026-11-13T14:05:12.491634632Z [06d12551-5e30-46bb-b2d4-179d03255ac7]   
+2026-11-13T14:05:12.509367119Z [d256362c-b0d7-4655-9796-09d9379cdd95] Started GET "/.git/config" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.512029840Z [d256362c-b0d7-4655-9796-09d9379cdd95]   
+2026-11-13T14:05:12.512041173Z [d256362c-b0d7-4655-9796-09d9379cdd95] ActionController::RoutingError (No route matches [GET] "/.git/config"):
+2026-11-13T14:05:12.512042340Z [d256362c-b0d7-4655-9796-09d9379cdd95]   
+2026-11-13T14:05:12.523030881Z [41f4ae8f-b48c-4a0b-809f-a17aa53137d6] Started GET "/actuator/env" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.523207085Z [41f4ae8f-b48c-4a0b-809f-a17aa53137d6]   
+2026-11-13T14:05:12.523209418Z [41f4ae8f-b48c-4a0b-809f-a17aa53137d6] ActionController::RoutingError (No route matches [GET] "/actuator/env"):
+2026-11-13T14:05:12.523210334Z [41f4ae8f-b48c-4a0b-809f-a17aa53137d6]   
+2026-11-13T14:05:12.533223235Z [ac697a99-105c-46ad-99d0-0afd94bc0641] Started GET "/wp-login.php" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.537650450Z [ac697a99-105c-46ad-99d0-0afd94bc0641]   
+2026-11-13T14:05:12.537673575Z [ac697a99-105c-46ad-99d0-0afd94bc0641] ActionController::RoutingError (No route matches [GET] "/wp-login.php"):
+2026-11-13T14:05:12.537675033Z [ac697a99-105c-46ad-99d0-0afd94bc0641]   
+2026-11-13T14:05:12.548219836Z [c9b7541a-5e6a-499f-9788-00e8040e0f71] Started GET "/phpmyadmin/" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.548389332Z [c9b7541a-5e6a-499f-9788-00e8040e0f71]   
+2026-11-13T14:05:12.548391665Z [c9b7541a-5e6a-499f-9788-00e8040e0f71] ActionController::RoutingError (No route matches [GET] "/phpmyadmin"):
+2026-11-13T14:05:12.548392582Z [c9b7541a-5e6a-499f-9788-00e8040e0f71]   
+2026-11-13T14:05:12.556864231Z [a655ead8-9e70-4972-a9f3-3f74061669af] Started GET "/backup.sql" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.557155682Z [a655ead8-9e70-4972-a9f3-3f74061669af]   
+2026-11-13T14:05:12.557158557Z [a655ead8-9e70-4972-a9f3-3f74061669af] ActionController::RoutingError (No route matches [GET] "/backup.sql"):
+2026-11-13T14:05:12.557159473Z [a655ead8-9e70-4972-a9f3-3f74061669af]   
+2026-11-13T14:05:12.566176317Z [f8cd28e3-0cc7-4c05-bfa4-ff061031c811] Started GET "/api/items?id=1%27%20OR%20%271%27=%271" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.566534891Z [f8cd28e3-0cc7-4c05-bfa4-ff061031c811] Processing by ItemsController#index as */*
+2026-11-13T14:05:12.566565598Z [f8cd28e3-0cc7-4c05-bfa4-ff061031c811]   Parameters: {"id"=>"1' OR '1'='1"}
+2026-11-13T14:05:12.568594211Z [f8cd28e3-0cc7-4c05-bfa4-ff061031c811] PG::SyntaxError: ERROR: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:05:12.570568158Z [f8cd28e3-0cc7-4c05-bfa4-ff061031c811] Completed 500 Internal Server Error in 3ms (Views: 0.6ms | GC: 0.0ms)
+2026-11-13T14:05:12.579174471Z [d8781106-af16-409f-a0ac-98c02b0d643e] Started GET "/api/items?id=1%27%20OR%20%271%27=%271" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.579639376Z [d8781106-af16-409f-a0ac-98c02b0d643e] Processing by ItemsController#index as */*
+2026-11-13T14:05:12.579739790Z [d8781106-af16-409f-a0ac-98c02b0d643e]   Parameters: {"id"=>"1' OR '1'='1"}
+2026-11-13T14:05:12.581756778Z [d8781106-af16-409f-a0ac-98c02b0d643e] PG::SyntaxError: ERROR: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:05:12.582225015Z [d8781106-af16-409f-a0ac-98c02b0d643e] Completed 500 Internal Server Error in 2ms (Views: 0.4ms | GC: 0.0ms)
+2026-11-13T14:05:12.591397938Z [385f0482-5077-487b-a4ef-0a11a5385fd9] Started GET "/api/items?id=1%27%20OR%20%271%27=%271" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.591649598Z [385f0482-5077-487b-a4ef-0a11a5385fd9] Processing by ItemsController#index as */*
+2026-11-13T14:05:12.591682764Z [385f0482-5077-487b-a4ef-0a11a5385fd9]   Parameters: {"id"=>"1' OR '1'='1"}
+2026-11-13T14:05:12.592203458Z [385f0482-5077-487b-a4ef-0a11a5385fd9] PG::SyntaxError: ERROR: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:05:12.592371370Z [385f0482-5077-487b-a4ef-0a11a5385fd9] Completed 500 Internal Server Error in 1ms (Views: 0.1ms | GC: 0.0ms)
+2026-11-13T14:05:12.601140929Z [dba67c19-0e62-4149-84ec-0af6257db69b] Started GET "/api/items?id=1" for 172.21.0.3 at 2026-11-13 14:05:12 +0000
+2026-11-13T14:05:12.602967047Z [dba67c19-0e62-4149-84ec-0af6257db69b] Processing by ItemsController#index as */*
+2026-11-13T14:05:12.603004963Z [dba67c19-0e62-4149-84ec-0af6257db69b]   Parameters: {"id"=>"1"}
+2026-11-13T14:05:12.603316663Z [dba67c19-0e62-4149-84ec-0af6257db69b] Completed 200 OK in 0ms (Views: 0.2ms | GC: 0.0ms)

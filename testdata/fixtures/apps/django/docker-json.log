@@ -1,0 +1,43 @@
+{"log":"[2026-11-13 14:01:29 +0000] [1] [INFO] Starting gunicorn 23.0.0\n","stream":"stderr","time":"2026-11-13T14:01:29.142473018Z"}
+{"log":"[2026-11-13 14:01:29 +0000] [1] [INFO] Listening at: http://0.0.0.0:8080 (1)\n","stream":"stderr","time":"2026-11-13T14:01:29.142577908Z"}
+{"log":"[2026-11-13 14:01:29 +0000] [1] [INFO] Using worker: sync\n","stream":"stderr","time":"2026-11-13T14:01:29.142611038Z"}
+{"log":"[2026-11-13 14:01:29 +0000] [7] [INFO] Booting worker with pid: 7\n","stream":"stderr","time":"2026-11-13T14:01:29.145116612Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /api/items HTTP/1.1\" 200 2 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.295218833Z"}
+{"log":"Failed login for user1@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.332133216Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.332363916Z"}
+{"log":"Failed login for user2@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.336473057Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.336613203Z"}
+{"log":"Failed login for user3@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.341086188Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.341241211Z"}
+{"log":"Failed login for user4@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.345586469Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.345735158Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.349774205Z"}
+{"log":"Failed login for user5@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.349782748Z"}
+{"log":"Failed login for user6@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.353900432Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.354018991Z"}
+{"log":"Failed login for user7@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.358352039Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.358633664Z"}
+{"log":"Failed login for user8@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.36335331Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.36335431Z"}
+{"log":"Failed login for user9@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.368219436Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.368272652Z"}
+{"log":"Failed login for user10@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.372396671Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.372546942Z"}
+{"log":"Failed login for user11@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.378195933Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.378353497Z"}
+{"log":"Failed login for user12@example.test from 172.21.0.3\n","stream":"stderr","time":"2026-11-13T14:01:29.382398379Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 401 32 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.382633913Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"POST /auth/login HTTP/1.1\" 200 14 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.386743054Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /.env HTTP/1.1\" 404 179 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.391527544Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /.git/config HTTP/1.1\" 404 179 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.395716654Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /actuator/env HTTP/1.1\" 404 179 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.399480995Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /wp-login.php HTTP/1.1\" 404 179 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.403180826Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /phpmyadmin/ HTTP/1.1\" 404 179 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.407700277Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /backup.sql HTTP/1.1\" 404 179 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.412083999Z"}
+{"log":"psycopg.errors.SyntaxError: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:01:29.415335348Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 25 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.415341766Z"}
+{"log":"psycopg.errors.SyntaxError: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:01:29.419309261Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 25 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.419825837Z"}
+{"log":"psycopg.errors.SyntaxError: syntax error at or near \"1' OR '1'='1\"\n","stream":"stderr","time":"2026-11-13T14:01:29.423152363Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /api/items?id=1%27%20OR%20%271%27=%271 HTTP/1.1\" 500 25 \"-\" \"curl/8.14.1\"\n","stream":"stdout","time":"2026-11-13T14:01:29.423274756Z"}
+{"log":"172.21.0.3 - - [13/Nov/2026:14:01:29 +0000] \"GET /api/items?id=1 HTTP/1.1\" 200 2 \"-\" \"sqlmap/1.8.2#stable (https://sqlmap.org)\"\n","stream":"stdout","time":"2026-11-13T14:01:29.427581676Z"}

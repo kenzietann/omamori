@@ -1,0 +1,50 @@
+2026-11-13T14:03:04.921436964Z [GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+2026-11-13T14:03:04.921460462Z 
+2026-11-13T14:03:04.921461837Z [GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+2026-11-13T14:03:04.921462670Z  - using env:	export GIN_MODE=release
+2026-11-13T14:03:04.921463462Z  - using code:	gin.SetMode(gin.ReleaseMode)
+2026-11-13T14:03:04.921464045Z 
+2026-11-13T14:03:04.921464586Z [GIN-debug] POST   /auth/login               --> main.main.func1 (3 handlers)
+2026-11-13T14:03:04.921465253Z [GIN-debug] GET    /api/items                --> main.main.func2 (3 handlers)
+2026-11-13T14:03:04.921465795Z [GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+2026-11-13T14:03:04.921466420Z Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
+2026-11-13T14:03:04.921506583Z [GIN-debug] Listening and serving HTTP on :8080
+2026-11-13T14:03:05.060611204Z [GIN] 2026/11/13 - 14:03:05 | 200 |      36.122µs |      172.21.0.3 | GET      "/api/items"
+2026-11-13T14:03:05.100480078Z 2026/11/13 14:03:05 Failed login for user1@example.test from 172.21.0.3
+2026-11-13T14:03:05.101056950Z [GIN] 2026/11/13 - 14:03:05 | 401 |      173.32µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.104581257Z 2026/11/13 14:03:05 Failed login for user2@example.test from 172.21.0.3
+2026-11-13T14:03:05.104593297Z [GIN] 2026/11/13 - 14:03:05 | 401 |      40.289µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.108264426Z 2026/11/13 14:03:05 Failed login for user3@example.test from 172.21.0.3
+2026-11-13T14:03:05.108264135Z [GIN] 2026/11/13 - 14:03:05 | 401 |      40.164µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.112870315Z [GIN] 2026/11/13 - 14:03:05 | 401 |      40.663µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.112881064Z 2026/11/13 14:03:05 Failed login for user4@example.test from 172.21.0.3
+2026-11-13T14:03:05.116335627Z 2026/11/13 14:03:05 Failed login for user5@example.test from 172.21.0.3
+2026-11-13T14:03:05.116738762Z [GIN] 2026/11/13 - 14:03:05 | 401 |      35.997µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.120562170Z 2026/11/13 14:03:05 Failed login for user6@example.test from 172.21.0.3
+2026-11-13T14:03:05.120592335Z [GIN] 2026/11/13 - 14:03:05 | 401 |       29.04µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.124203926Z 2026/11/13 14:03:05 Failed login for user7@example.test from 172.21.0.3
+2026-11-13T14:03:05.124608186Z [GIN] 2026/11/13 - 14:03:05 | 401 |      38.455µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.127888387Z 2026/11/13 14:03:05 Failed login for user8@example.test from 172.21.0.3
+2026-11-13T14:03:05.128513297Z [GIN] 2026/11/13 - 14:03:05 | 401 |      26.332µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.131618387Z [GIN] 2026/11/13 - 14:03:05 | 401 |      24.748µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.131627303Z 2026/11/13 14:03:05 Failed login for user9@example.test from 172.21.0.3
+2026-11-13T14:03:05.135338345Z 2026/11/13 14:03:05 Failed login for user10@example.test from 172.21.0.3
+2026-11-13T14:03:05.135369301Z [GIN] 2026/11/13 - 14:03:05 | 401 |      33.247µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.138626795Z 2026/11/13 14:03:05 Failed login for user11@example.test from 172.21.0.3
+2026-11-13T14:03:05.138675208Z [GIN] 2026/11/13 - 14:03:05 | 401 |      27.082µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.142695685Z [GIN] 2026/11/13 - 14:03:05 | 401 |      30.914µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.142712308Z 2026/11/13 14:03:05 Failed login for user12@example.test from 172.21.0.3
+2026-11-13T14:03:05.146037589Z [GIN] 2026/11/13 - 14:03:05 | 200 |      23.081µs |      172.21.0.3 | POST     "/auth/login"
+2026-11-13T14:03:05.149904578Z [GIN] 2026/11/13 - 14:03:05 | 404 |         250ns |      172.21.0.3 | GET      "/.env"
+2026-11-13T14:03:05.153723570Z [GIN] 2026/11/13 - 14:03:05 | 404 |         125ns |      172.21.0.3 | GET      "/.git/config"
+2026-11-13T14:03:05.157706299Z [GIN] 2026/11/13 - 14:03:05 | 404 |         291ns |      172.21.0.3 | GET      "/actuator/env"
+2026-11-13T14:03:05.160935629Z [GIN] 2026/11/13 - 14:03:05 | 404 |         208ns |      172.21.0.3 | GET      "/wp-login.php"
+2026-11-13T14:03:05.164754538Z [GIN] 2026/11/13 - 14:03:05 | 404 |         208ns |      172.21.0.3 | GET      "/phpmyadmin/"
+2026-11-13T14:03:05.168430333Z [GIN] 2026/11/13 - 14:03:05 | 404 |         292ns |      172.21.0.3 | GET      "/backup.sql"
+2026-11-13T14:03:05.172116794Z 2026/11/13 14:03:05 pq: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:03:05.172173623Z [GIN] 2026/11/13 - 14:03:05 | 500 |      26.248µs |      172.21.0.3 | GET      "/api/items?id=1%27%20OR%20%271%27=%271"
+2026-11-13T14:03:05.175847377Z 2026/11/13 14:03:05 pq: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:03:05.175891082Z [GIN] 2026/11/13 - 14:03:05 | 500 |       28.29µs |      172.21.0.3 | GET      "/api/items?id=1%27%20OR%20%271%27=%271"
+2026-11-13T14:03:05.179405390Z 2026/11/13 14:03:05 pq: syntax error at or near "1' OR '1'='1"
+2026-11-13T14:03:05.179470884Z [GIN] 2026/11/13 - 14:03:05 | 500 |      48.913µs |      172.21.0.3 | GET      "/api/items?id=1%27%20OR%20%271%27=%271"
+2026-11-13T14:03:05.185990582Z [GIN] 2026/11/13 - 14:03:05 | 200 |      16.957µs |      172.21.0.3 | GET      "/api/items?id=1"

@@ -138,9 +138,13 @@ detection:
   # "union select" as two whole words. A search for "student union selection" must not match.
   union:
     url|re|i: '(^|[^a-z])union(\+|%20| |/\*\*/)+(all(\+|%20| )+)?select([^a-z]|$)'
+  # A quote, then OR or AND as a word, then a quote or a digit, in any mix of raw and encoded characters:
+  # Flask writes "1'%20OR%20'1'='1", nginx "1%27%20OR%20%271%27=%271".
+  sqli_mixed:
+    url|re|i: "(%27|')(\\s|%20|\\+|/\\*\\*/)+(or|and)(\\s|%20|\\+|/\\*\\*/)+(%27|'|\\d)"
   traversal:
     url|contains: ['../..', '..%2f..', '%2e%2e%2f', '%2e%2e/', '..%5c..', '....//']
-  condition: sqli or union or traversal
+  condition: sqli or sqli_mixed or union or traversal
 tests:
   - name: injection and traversal match
     events:
@@ -148,6 +152,16 @@ tests:
       - {category: webserver, url: "/download?file=../../../../etc/shadow", src_ip: 203.0.113.77}
       - {category: webserver, url: "/img?f=..%2F..%2F..%2Fetc%2Fhosts", src_ip: 203.0.113.77}
     expect: {alerts: 3}
+  - name: a quote and OR in a mix of raw and encoded characters, as Flask writes it
+    events:
+      - {category: webserver, url: "/api/items?id=1'%20OR%20'1'='1", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/api/items?id=1%27+and+1=1", src_ip: 203.0.113.77}
+    expect: {alerts: 2}
+  - name: a quote in ordinary text is not an injection
+    events:
+      - {category: webserver, url: "/search?q=children's%20or%20adults%20books", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/search?q=rock'n'roll%20or%20jazz", src_ip: 198.51.100.4}
+    expect: {alerts: 0}
   - name: ordinary queries do not match
     events:
       - {category: webserver, url: "/search?q=student+union+selection+results", src_ip: 198.51.100.4}

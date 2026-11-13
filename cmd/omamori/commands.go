@@ -104,7 +104,8 @@ Flags for detect:
                       address are then known to be one machine, and rules and the AI review can join them
   --indicators file   addresses, domains and SHA-256 hashes that are known to be bad (YAML). Events that name
                       one are marked in every kind of log, and one alert is given for each indicator
-  --format name       syslog, web, json, suricata, zeek, wazuh, windows or pcap (default: look at the first bytes and lines of each file)
+  --format name       syslog, web, json, app (framework logs), suricata, zeek, wazuh, windows or pcap (default:
+                      look at the first bytes and lines of each file; Docker and journald logs are unwrapped)
   --year, --timezone  for syslog lines, which have no year and no time zone
   --output folder     where the report folder is made (default ~/omamori-output)
   --store             persist the sanitized run for search, cases and timelines

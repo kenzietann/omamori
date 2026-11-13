@@ -12,7 +12,7 @@ func TestFileRulesThroughTheCommandLine(t *testing.T) {
 	base := t.TempDir()
 
 	none := runAt(t, detectNow, forensicsArgs(host, filepath.Join(base, "none"), "--no-file-rules")...)
-	if none.code != exitOK || !strings.Contains(none.stdout, "Read and hashed 22 files: 1254 log events and 77 artifacts. 48 rules. 28 alerts") {
+	if none.code != exitOK || !strings.Contains(none.stdout, "Read and hashed 22 files: 1254 log events and 77 artifacts. 60 rules. 28 alerts") {
 		t.Fatalf("--no-file-rules: %d %s %s", none.code, none.stdout, none.stderr)
 	}
 
@@ -28,7 +28,7 @@ tests:
   - {text: 'stratum', match: false}
 `), 0o600)
 	custom := runAt(t, detectNow, forensicsArgs(host, filepath.Join(base, "custom"), "--file-rules", own)...)
-	if custom.code != exitOK || !strings.Contains(custom.stdout, "49 rules. 29 alerts, 4 critical") {
+	if custom.code != exitOK || !strings.Contains(custom.stdout, "61 rules. 29 alerts, 4 critical") {
 		t.Fatalf("--file-rules: %d %s %s", custom.code, custom.stdout, custom.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(base, "custom", "forensics-20261111-030405", "alerts.json"))
