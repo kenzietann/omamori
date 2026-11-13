@@ -444,6 +444,54 @@ became `<home>/~`; fixed. 11 mutations in a copy, all caught.
 Not done: a live provider run (none has been made for any AI feature), correlation rules, the
 dashboard, real clean logs as a built-in benign set.
 
+### Fixes from the live test on the owner's projects (2026-11-13)
+
+All features were run live (gpt-6-luna) on the 14 projects in ~/code and on a real attack in a
+local Docker lab (Debian with sshd, rsyslog, cron, nginx and sudo; a second container attacked it).
+That found four bugs and three missing detections. All are fixed:
+
+- **Repeated scans in the exposure check.** When `run_detectors` was cut at its limit, the model
+  called it again and again (flash4d, millelith: 15 steps, about 480k tokens, runs incomplete). The
+  agent now answers a repeated call with a fixed text instead of running it, stops the run after two
+  steps that only repeat, and the cut note says to scan subfolders.
+- **Task B read nothing from a current Debian auth.log.** The parser now reads the ISO header of
+  current rsyslog and the `sshd-session`/`sshd-auth` names of OpenSSH 9.8 and later. A report that read
+  no password event says so and must not be read as clean; the limits say which lines had their own
+  year and zone.
+- **detect on a project folder** said "more events than one run can take" when it hit 2000 files in
+  `node_modules`. Dependency folders and folders with `CACHEDIR.TAG` are skipped and listed; too many
+  files has its own message; a folder with no log says how many files it looked at.
+- **`omamori replay` of an analyst run** could not take the lists or rules of the run, so it always
+  failed for such runs. It takes `--rules`, `--assets`, `--indicators` and `--format` now, refuses them
+  for other recordings, and sends rule draft recordings to `rule draft --replay`.
+- **New rules (32 built-in, 45 with the forensic rules):** `linux_admin_group_add` (usermod or gpasswd
+  into sudo, wheel or admin; the gshadow line is not counted twice), `ssh_source_penalized` (sshd
+  dropped connections of a penalized address, one alert per address and hour) and, in the forensic
+  set, `forensics_key_after_password_login` (authorized_keys changed within a day after a password
+  login of the same account; weak times). The synthetic scenarios had the sudo group change and the
+  key all along, and now expect these alerts; the bundled scripted analyst recording was rebuilt for
+  the new alert IDs (15 alerts, 16 claims).
+- Tests and checks: table, negative and fuzz tests for the parser lines; 29 mutations in a copy, all
+  caught after two tests were added (a new call between repeated steps; a key changed shortly before
+  the login). Forensic measurement on 25+25 synthetic systems: 600 of 600, nothing unexpected.
+
+- Task B also refused the right answer once fixed: the model wrote the times of ISO lines the classic
+  way (`Nov 12 14:03:28`), as the example in the instruction shows. For a line with an ISO header the
+  checker now accepts the same second written as ISO or classic; a classic line must still be cited
+  exactly as written. The instruction is unchanged, so earlier recordings still replay.
+
+Measured live after the fixes (gpt-6-luna, 2026-11-13):
+
+| Run | Before | After |
+|---|---|---|
+| Exposure check, flash4d | incomplete, 15 steps, 220,188 tokens | complete, 6 steps, 29,100 tokens |
+| Exposure check, millelith | incomplete, 15 steps, 262,095 tokens | complete, 11 steps, 108,650 tokens |
+| Task B on the lab auth.log (ISO, sshd-session) | 0 events, 0 of 2 claims | 16 events, 2 of 2 claims verified |
+| omamori replay of an analyst run with both lists | always stopped | 17 of 17 claims, no provider; stops without the lists |
+
+A replay of a recording that was made with older built-in rules stops now, because the new rules give
+more alerts on the same logs. That is the fail-closed behaviour, not a fault of the replay.
+
 ### Home screen forms (2026-11-12)
 
 The rule draft page became one form page for every task with options, so the home screen takes what

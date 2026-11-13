@@ -125,7 +125,8 @@ omamori forensics --analyze --replay recording.json ./demo-host/root --year 2026
 `go test ./internal/forensics -run HostScenario -v` writes 25 different attacked systems and 25
 systems without an attack, and runs the real path over each (files, hashes, parsers, rules).
 
-- 550 of 550 expected alerts were found (22 for each system: 12 from the logs, 10 from the artifacts).
+- 600 of 600 expected alerts were found (24 for each system: 13 from the logs, 11 from the artifacts
+  and the logs together).
 - No alert that the scenario does not expect, and no alert on the systems without an attack
   (1,375 artifact events, with a cron job that uses curl, a job that cleans `/tmp`, a key with a
   forced command, and histories with `nc -zv`, `/dev/tcp` port checks and `tail` of the login log).
@@ -134,8 +135,11 @@ These are numbers about made-up systems that I wrote together with the rules. Th
 path works end to end and that the rules do what their tests say. They are not an estimate of how
 many real intrusions would be found.
 
-Known gaps that the scenario names: a key in `authorized_keys` is listed with its fingerprint and
-gives no alert by itself, and a listening port of an odd process is listed and gives no alert by itself.
+A key in `authorized_keys` gives an alert when the file was changed within a day after a password
+login over SSH of the same account (`forensics_key_after_password_login`). The time of the key is the
+last change of the file, so the finding is marked as having weak times. A key alone, without such a
+login, is listed with its fingerprint and gives no alert. Known gap that the scenario names: a
+listening port of an odd process is listed and gives no alert by itself.
 
 ## Limits
 

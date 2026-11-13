@@ -11,6 +11,12 @@ access logs, and JSON lines. Use `--format syslog`, `web`, `json`, `suricata`,
 JSON shapes and leaves other timestamped objects generic. A specific source
 format rejects other shapes and counts those lines as unread.
 
+Inside a folder, dependency folders (`node_modules`, `vendor`, `venv`, `site-packages`, `Pods` and
+the like) and folders marked as a cache with a `CACHEDIR.TAG` file (the `target` folder of Rust) are
+skipped and listed as skipped, so a project folder can be read for its logs. A folder that you give
+directly is always read. More than 2000 files is refused with its own message: give the folder of the
+logs, not a whole project.
+
 ## Supported JSON shapes
 
 | Source | Supported records | Normalized source metadata |

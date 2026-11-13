@@ -121,7 +121,11 @@ Numbers and booleans in rule values are converted to text for ordinary matching.
 `logsource` supports `product`, `service` and `category`. Every specified value
 must be present and equal, ignoring case. `definition` is allowed as descriptive
 metadata. Syslog intake sets `product: linux` and the parsed service, such as
-`sshd`, `sudo` or `cron`. Web intake sets `category: webserver`. Generic JSON uses
+`sshd`, `sudo` or `cron` (`sshd-session` and `sshd-auth` of OpenSSH 9.8 and later are `sshd`). It
+also sets `action` for the lines it knows: `login` (with `outcome`, `user`, `src_ip`, `auth_method`),
+`invalid_user`, `max_auth_attempts`, `connection_dropped` (sshd refused a penalized address, with
+`reason`), `sudo`, `user_created`, `group_add` (with `group`; the second line that `usermod` writes
+for `/etc/gshadow` also has `group_file: gshadow`), `cron_run` and `cron_edit`. Web intake sets `category: webserver`. Generic JSON uses
 the fields in the input. Recognized Suricata, Zeek, Wazuh and Windows JSON shapes
 have explicit source mappings; their original scalar fields are retained under
 `raw.*`. See the [intake field dictionary](intake.md) for product/service/category

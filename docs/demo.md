@@ -9,7 +9,7 @@ for the steps below.
 | Time | Step | Seen in | Found by |
 |---|---|---|---|
 | 02:10 | An outside address guesses the password of root on web01 and logs in | `web01/auth.log` | SSH login succeeded after password guessing (critical) |
-| 02:14 | A new account and a cron job that downloads a script are made on web01 | `web01/auth.log` | A new user account was made; Cron runs a download that is piped into a shell |
+| 02:14 | A new account, put into the sudo group, and a cron job that downloads a script are made on web01 | `web01/auth.log` | A new user account was made; An account was added to an admin group; Cron runs a download that is piped into a shell |
 | 02:25 | web01 looks for hosts with SSH in the server network | `sensor/conn.log` (Zeek), `sensor/eve.json` (Suricata) | One internal address tries many internal addresses; Network sensor raised its highest severity |
 | 02:31 | web01 guesses the password of deploy on app01 and logs in | `app01/auth.log` | SSH login succeeded after guessing from an internal address (critical) |
 | 02:41 | app01 logs in to db01 with a key that was found on app01 | `db01/auth.log` | **nothing** (see below) |
@@ -27,8 +27,8 @@ omamori detect ./demo-campaign/logs --assets ./demo-campaign/assets.yml --indica
 omamori dashboard ./demo-campaign/logs
 ```
 
-`detect` reads six files of three hosts and two sensors: 1,820 events, 29 rules, 21 alerts
-(3 critical, 10 high, 8 medium). Without the two lists it is 19 alerts: the alert that joins the story
+`detect` reads six files of three hosts and two sensors: 1,820 events, 32 rules, 22 alerts
+(3 critical, 11 high, 8 medium). Without the two lists it is 20 alerts: the alert that joins the story
 and the alert for the known bad address are missing. The report has one timeline for all sources. With `--store` the run
 is in the local database, and the dashboard shows the alert queue with the evidence beside it.
 `./demo-campaign/expected.json` holds the story, the alerts that must fire and the known misses.

@@ -63,7 +63,7 @@ an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all
 
 `detect` reads sshd/Linux syslog, Apache/Nginx access logs, or JSON lines with a
 timestamp. It normalizes supported Suricata EVE, Zeek, Wazuh and Windows/Sysmon
-JSON exports into the shared event fields. It applies 29 built-in rules, including counts, distinct counts and
+JSON exports into the shared event fields. It applies 32 built-in rules, including counts, distinct counts and
 ordered sequences such as password guessing followed by a successful login.
 Rule evaluation uses no API key. The command stays local unless you enable
 storage on a configured database server.
@@ -200,7 +200,8 @@ numbers changed between runs.
 
 - **Task A: exposure check.** Look through a local project folder for leaked
   secrets and personal data. Give fix advice, like "rotate this key".
-- **Task B: log triage.** Read an sshd `auth.log`. Find two cases: many failed
+- **Task B: log triage.** Read an sshd `auth.log` (classic or ISO time stamps, `sshd` or
+  the `sshd-session` of OpenSSH 9.8 and later). Find two cases: many failed
   logins followed by a success, and one IP trying many usernames. A normal
   program checks the AI's answer, so the AI cannot just make things up.
 - **Task C: detection rules.** You point at log lines and say what you want. The AI writes

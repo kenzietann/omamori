@@ -102,8 +102,10 @@ omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo \
 
 `omamori replay ./saved-run/recording.json ./demo-logs` also routes an analyst
 recording to the analyst service. Pass the original year and timezone if they
-differ from the current defaults. For custom rules or multiple input paths,
-use `analyze --replay` and repeat the original detection flags.
+differ from the current defaults, and the `--rules`, `--assets`, `--indicators`
+and `--format` that the run used: without them the alerts differ and the replay
+stops. For multiple input paths, use `analyze --replay` and repeat the original
+detection flags.
 
 Replay requires no provider key, is labeled `REPLAY`, and never falls back to a
 live call. Live recordings match the fingerprint of the guarded request. Changing
