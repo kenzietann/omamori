@@ -42,6 +42,7 @@ its own server.
 | Stands in for | What exists | What is missing |
 |---|---|---|
 | Elastic / OpenSearch | Store on SQLite, PostgreSQL or MariaDB with exact and substring search, the local dashboard | Full-text index, aggregations, live ingestion (everything is batch) |
+| Application logs (Loki, Datadog Logs) | Reads the logs of the most used backend frameworks, Docker and the systemd journal, with rules for attacks on login APIs and applications, measured on fifteen real setups ([apps.md](apps.md)) | Live collection, retention, search over months of logs |
 | Wazuh | Reads Wazuh alert JSON. Syslog and web log rules | File integrity monitoring, agents, active response (not planned without your say) |
 | TheHive | Cases with linked alerts, versions and timelines | Tasks, assignment, several users, observables |
 

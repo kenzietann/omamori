@@ -6,8 +6,10 @@ and the future local dashboard. No collector is installed and no remote system
 is contacted.
 
 Automatic format detection supports classic/ISO Linux syslog, Apache/Nginx
-access logs, and JSON lines. Use `--format syslog`, `web`, `json`, `suricata`,
-`zeek`, `wazuh` or `windows` to choose explicitly. `json` recognizes all supported
+access logs, JSON lines, the logs of web frameworks, Docker and the systemd
+journal ([apps.md](apps.md)), and packet captures ([pcap.md](pcap.md)). Use
+`--format syslog`, `web`, `json`, `app`, `suricata`, `zeek`, `wazuh`, `windows`
+or `pcap` to choose explicitly. `json` recognizes all supported
 JSON shapes and leaves other timestamped objects generic. A specific source
 format rejects other shapes and counts those lines as unread.
 

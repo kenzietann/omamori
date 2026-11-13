@@ -6,6 +6,24 @@ flags and file formats.
 
 ## [Unreleased]
 
+### Added
+
+- **Logs of web frameworks.** Express, NestJS, Django, Flask, FastAPI, Spring Boot, ASP.NET Core, Laravel,
+  Rails, Go (Gin, Echo, chi, slog, zap, zerolog, logrus) and Rust (actix-web, Axum with tracing): their text
+  formats (`--format app`) and the field names of their JSON loggers. A logged request is read like an nginx
+  line, so the web rules work on every framework; behind a proxy the client comes from `X-Forwarded-For`.
+- **Docker and journald.** Docker json-file logs, `docker logs --timestamps`, and `journalctl -o json` (system
+  programs as syslog, applications with the framework readers). Servers without `auth.log` can be read now.
+- **Rules for applications and APIs:** login guessing, many accounts tried, a login after guessing, bursts of
+  refused requests and of server errors, exposed debug endpoints of frameworks, database errors from inputs.
+- **Real logs as tests.** Fifteen framework setups were attacked in Docker; their logs are fixtures, and a
+  test checks that every line is read and the same rules fire.
+
+### Fixed
+
+- The injection rule missed an injection written with a raw quote and encoded spaces, as Flask logs it.
+- The message for a folder without logs did not name `pcap` among the formats.
+
 ## [0.1.0] - 2026-11-13
 
 The first public preview. Every feature below runs and has tests, and the main paths were tested live, but

@@ -492,6 +492,22 @@ Measured live after the fixes (gpt-6-luna, 2026-11-13):
 A replay of a recording that was made with older built-in rules stops now, because the new rules give
 more alerts on the same logs. That is the fail-closed behaviour, not a fault of the replay.
 
+### Web applications, Docker and the journal (2026-11-13)
+
+Readers for the text formats of NestJS, Gin, chi, Spring Boot (2 and 3), Rails (Logger format and the bare
+production format, start and end joined by request id), Laravel (with its JSON context), Flask and Django's
+development servers, uvicorn, Rust tracing and actix-web; field names of the JSON loggers of the same
+frameworks; Docker json-file, `docker logs --timestamps` and `journalctl -o json` unwrapped and read with every
+reader. A logged request becomes `category: webserver` like nginx; `X-Forwarded-For` is used only behind a
+private or local peer. Twelve rules for applications in `app.yml`; the injection rule reads mixed encodings.
+
+Measured on real applications: fifteen setups built in Docker and attacked in the same way; all 31 log files
+read with no unread line; the logs and the expected rules are fixtures (`TestRealLogsOfTheFrameworks`). The
+real logs found what samples would not have: Rust tracing times that look like Docker's prefix, Node's
+`::ffff:` addresses in messages, Flask's half-decoded URLs, Serilog's capitalized names, Rails writing no end
+for an unknown route, Docker's empty lines counted as unread. Mutations in a copy: 22, all caught after three
+tests were added. Fuzzed 2.1 million inputs. Guide: [apps.md](apps.md).
+
 ### Attack lab and packet captures (2026-11-13)
 
 `omamori lab` (also on the home screen): two images built from files inside Omamori, an `--internal` Docker

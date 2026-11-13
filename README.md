@@ -121,7 +121,7 @@ Everything here uses made-up data and runs offline.
 # 1. Make a day of synthetic logs with planted attacks, and find them with the rules.
 omamori scenario --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-logs
 omamori detect ./demo-logs --year 2026 --timezone Asia/Tokyo
-#    -> Read 2 files and 1254 events. 35 rules. 15 alerts, 1 critical, 6 high, 8 medium.
+#    -> Read 2 files and 1254 events. 47 rules. 15 alerts, 1 critical, 6 high, 8 medium.
 
 # 2. Watch the AI analyst work, with recorded answers instead of a live AI.
 omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo \
@@ -132,7 +132,7 @@ omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo \
 omamori scenario --host --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-host
 omamori forensics --year 2026 --timezone Asia/Tokyo \
   --processes ./demo-host/snapshots/ps.txt --sockets ./demo-host/snapshots/ss.txt ./demo-host/root
-#    -> Read and hashed 31 files ... 55 rules. 34 alerts, 3 critical, 20 high, 11 medium.
+#    -> Read and hashed 31 files ... 67 rules. 34 alerts, 3 critical, 20 high, 11 medium.
 
 # 4. Open the home screen and try the other tasks.
 omamori ui ./demo-logs
@@ -217,15 +217,18 @@ result is never read as "clean".
 **What it does.** `detect` reads logs, runs detection rules over them, and writes a report of alerts. No AI
 and no API key are used.
 
-**What it reads.** sshd and Linux syslog, nginx and Apache access logs, JSON lines, Suricata EVE, Zeek JSON,
+**What it reads.** sshd and Linux syslog, the systemd journal (`journalctl -o json`), nginx and Apache access
+logs, the logs of web frameworks (see below), Docker container logs, JSON lines, Suricata EVE, Zeek JSON,
 Wazuh alerts, Windows and Sysmon events (Winlogbeat or NXLog JSON), and packet captures (see
 [7](#7-packet-captures)). Give files or folders; the format of each file is found from its first bytes and
 lines, or set it with `--format`. Dependency folders like `node_modules` are skipped and listed.
 
-**The rules.** 35 built-in rules for SSH (guessing, spraying, a login after guessing, sshd penalties), Linux
+**The rules.** 47 built-in rules for SSH (guessing, spraying, a login after guessing, sshd penalties), Linux
 hosts (sudo refused, new users, admin groups, cron jobs that download a script), web servers (scans for
-sensitive files, path enumeration, injection, scanner tools, commands sent to a web shell), and networks
-(internal sweeps, port scans, large uploads, IDS alerts). The format is a documented subset of
+sensitive files, path enumeration, injection, scanner tools, commands sent to a web shell), web applications
+and APIs (login guessing, many accounts tried, a login after guessing, bursts of refused requests and server
+errors, exposed debug endpoints, database errors from inputs), and networks (internal sweeps, port scans,
+large uploads, IDS alerts). The format is a documented subset of
 [Sigma](https://sigmahq.io), with counts, distinct counts and ordered sequences. Every rule carries tests, and
 a rule set whose tests fail is refused.
 
@@ -240,8 +243,20 @@ omamori detect ./logs --assets assets.yml --indicators bad.yml
 - **Indicator list** (`--indicators`): addresses, domains and SHA-256 hashes known to be bad. Every event
   that names one is marked, in every kind of log, and one alert is given per indicator.
 
+**Web applications and APIs.** Omamori reads the logs of Express, NestJS, Django, Flask, FastAPI, Spring
+Boot, ASP.NET Core, Laravel, Rails, Go (Gin, Echo, chi and the usual JSON loggers) and Rust (actix-web, Axum),
+in files, in Docker (`docker logs --timestamps` or the json-file log) and in the systemd journal. A request
+that a framework logs is read like a line of nginx, so the same rules work everywhere; behind a proxy, the
+client is taken from `X-Forwarded-For`. This was measured on real applications of fifteen setups attacked in
+Docker; the [web applications guide](docs/apps.md) says what each setup shows and how to log more.
+
+```sh
+docker logs --timestamps api > api.log
+omamori detect api.log /var/log/nginx/access.log
+```
+
 **What you get.** A new `detect-<time>` folder with `report.md`, `report.html` and `alerts.json`. The logs are
-not changed. Guides: [rules](docs/rules.md), [log intake](docs/intake.md).
+not changed. Guides: [rules](docs/rules.md), [log intake](docs/intake.md), [web applications](docs/apps.md).
 
 ### 4. AI analyst
 
@@ -471,6 +486,7 @@ completed on two real projects of mine. The details and the faults these runs fo
 | [Platform plan](docs/platform-plan.md) | design, decisions, verification results, what was fixed and why |
 | [Toolkit map](docs/toolkit.md) | which blue-team tools Omamori stands in for, and what is missing |
 | [Log intake](docs/intake.md) | formats, field maps and limits |
+| [Web applications](docs/apps.md) | framework, Docker and journald logs, the app rules, measured on fifteen setups |
 | [Rules](docs/rules.md) | the detection and correlation rule format |
 | [AI analyst](docs/analyst.md) | checked reviews, schema, replay |
 | [Forensics](docs/forensics.md) | what is read, the manifest, times, limits |
