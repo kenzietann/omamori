@@ -11,7 +11,9 @@ import (
 )
 
 const (
-	maxContentBytes = 5 << 20
+	// maxContentBytes is the most that one file of a report can hold. It is as large as the manifest of a
+	// forensic run can be (forensics.MaxManifestBytes), so that a manifest that was made can be written.
+	maxContentBytes = 64 << 20
 	maxLogBytes     = 50 << 20
 )
 

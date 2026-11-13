@@ -13,6 +13,7 @@ import (
 	"github.com/kenzietann/omamori/internal/analysisrun"
 	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/detect"
+	"github.com/kenzietann/omamori/internal/filerules"
 	"github.com/kenzietann/omamori/internal/forensics"
 	"github.com/kenzietann/omamori/internal/htmlreport"
 	"github.com/kenzietann/omamori/internal/indicators"
@@ -24,10 +25,10 @@ import (
 )
 
 const (
-	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--rules folder] [--assets file] [--indicators file] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
+	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--rules folder] [--file-rules folder | --no-file-rules] [--assets file] [--indicators file] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
 		"       omamori forensics --analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] ... <evidence folder>\n" +
 		"       omamori forensics verify <manifest.json> <evidence folder>"
-	maxManifestBytes = 64 << 20
+	maxManifestBytes = forensics.MaxManifestBytes
 )
 
 func runForensics(args []string, env environment) int {
@@ -41,6 +42,10 @@ func runForensics(args []string, env environment) int {
 	database.bind(flags, true)
 	var rulesFolder, processes, sockets string
 	flags.StringVar(&rulesFolder, "rules", "", "folder with rules, in place of the built-in rules")
+	var fileRulesFolder string
+	var noFileRules bool
+	flags.StringVar(&fileRulesFolder, "file-rules", "", "folder with file rules, in place of the built-in file rules")
+	flags.BoolVar(&noFileRules, "no-file-rules", false, "do not look at the content of files with file rules")
 	flags.StringVar(&processes, "processes", "", "file with the output of ps aux or ps -ef")
 	flags.StringVar(&sockets, "sockets", "", "file with the output of ss -tulpn or netstat -tulpn")
 	flags.IntVar(&chosen.year, "year", 0, "year of syslog lines")
@@ -67,7 +72,7 @@ func runForensics(args []string, env environment) int {
 	// The choices of the analyst mean nothing without --analyze. They are refused, so that nobody thinks
 	// that --yes alone sent something, or that --dry-run alone kept the reports from being written.
 	alone := !analyze && (review.confirmed || review.dryRun || review.recordingPath != "")
-	if err != nil || len(paths) != 1 || alone || review.confirmed && review.dryRun || review.timeout <= 0 {
+	if err != nil || len(paths) != 1 || alone || noFileRules && fileRulesFolder != "" || review.confirmed && review.dryRun || review.timeout <= 0 {
 		fmt.Fprintln(env.stderr, usageForensics)
 		return exitUsage
 	}
@@ -99,6 +104,11 @@ func runForensics(args []string, env environment) int {
 	}
 	if len(loaded.Rules()) == 0 {
 		return fail(errors.New("the rules folder has no rule"))
+	}
+
+	fileRules, err := loadFileRules(fileRulesFolder, noFileRules)
+	if err != nil {
+		return fail(err)
 	}
 
 	var machines *assets.List
@@ -135,7 +145,7 @@ func runForensics(args []string, env environment) int {
 		}
 	}
 
-	result, err := forensics.Run(evidence, loaded, rulesFrom, forensics.Options{Year: chosen.year, Location: location, Processes: processes, Sockets: sockets, Assets: machines, Indicators: known}, now)
+	result, err := forensics.Run(evidence, loaded, rulesFrom, forensics.Options{Year: chosen.year, Location: location, Processes: processes, Sockets: sockets, Assets: machines, Indicators: known, FileRules: fileRules}, now)
 	if err != nil {
 		return fail(err)
 	}
@@ -211,6 +221,25 @@ func runForensics(args []string, env environment) int {
 	}
 
 	return exitOK
+}
+
+// loadFileRules gives the built-in file rules, the file rules of a folder, or none.
+func loadFileRules(folder string, none bool) (*filerules.Set, error) {
+	if none {
+		return nil, nil
+	}
+	set, err := filerules.Builtin()
+	if folder != "" {
+		set, err = filerules.Load(folder)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(set.Rules()) == 0 {
+		return nil, errors.New("the file rules folder has no file rule")
+	}
+
+	return &set, nil
 }
 
 func runForensicsVerify(args []string, env environment) int {

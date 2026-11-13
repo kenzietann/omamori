@@ -27,6 +27,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/event"
+	"github.com/kenzietann/omamori/internal/filerules"
 	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/intake"
 )
@@ -60,6 +61,8 @@ const (
 	maxNameRunes     = 64
 	maxMatches       = 2000
 	ManifestVersion  = 1
+	// MaxManifestBytes is the largest manifest that a run makes and that verify reads.
+	MaxManifestBytes = 64 << 20
 )
 
 var (
@@ -76,6 +79,9 @@ type Options struct {
 	// Assets and Indicators are optional, as for the detection in logs.
 	Assets     *assets.List
 	Indicators *indicators.List
+	// FileRules look at the content of the files in the places where an attacker leaves tools. Nil looks at
+	// no content, and only the hashes of the indicator list are looked for.
+	FileRules *filerules.Set
 }
 
 type Entry struct {
@@ -184,6 +190,10 @@ func Collect(folder string, options Options) (Collection, error) {
 		if err := c.snapshot(snapshot.file, snapshot.kind); err != nil {
 			return Collection{}, err
 		}
+	}
+
+	if err := c.scan(); err != nil {
+		return Collection{}, err
 	}
 
 	options.Assets.Enrich(c.result.Events)

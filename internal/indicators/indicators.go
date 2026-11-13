@@ -128,6 +128,11 @@ func (list *List) Len() int {
 	return list.count
 }
 
+// HasHash says whether a SHA-256 hash (in small or capital letters) is on the list.
+func (list *List) HasHash(hash string) bool {
+	return list != nil && list.hashes[strings.ToLower(hash)]
+}
+
 func (list *List) address(text string) (string, bool) {
 	address, err := netip.ParseAddr(text)
 	if err != nil {

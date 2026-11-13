@@ -42,3 +42,28 @@ func TestForensicRulesLoadWithTheBuiltinRulesAndPassTheirOwnTests(t *testing.T) 
 		}
 	}
 }
+
+func TestMatchMakesARuleWithItsOwnTests(t *testing.T) {
+	rule, err := Match("file_x", "id-x", "A file", "It matches.", "high", []string{"attack.t1"}, map[string]string{"product": "linux", "service": "file_scan"}, "file_rule", "file_x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := NewSet([]*Rule{rule})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rule.tests) != 2 || rule.Level != "high" {
+		t.Fatalf("rule: %+v", rule)
+	}
+	given, err := testEvents([]map[string]any{{"product": "linux", "service": "file_scan", "file_rule": "file_x"}, {"product": "linux", "service": "cron", "file_rule": "file_x"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits := set.Evaluate(given)
+	if len(hits.Alerts) != 1 {
+		t.Fatalf("%d alerts", len(hits.Alerts))
+	}
+	if _, err := Match("x", "", "x", "", "urgent", nil, nil, "f", "v"); err == nil {
+		t.Error("a level that is not known was taken")
+	}
+}

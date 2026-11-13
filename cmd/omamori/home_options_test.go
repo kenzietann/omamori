@@ -223,6 +223,17 @@ func TestHomeForensicsReadsTheSnapshotsAndVerifyChecksTheHashes(t *testing.T) {
 		t.Fatal("a missing ps file was accepted")
 	}
 
+	if !strings.Contains(result.Report, "File holds a reverse shell") {
+		t.Error("the built-in file rules were not used")
+	}
+	noFiles, err := homeBackend(t, system, nil).Prepare(tui.Setup{Task: tui.TaskForensics, Options: tui.Options{FileRules: "none"}})
+	if err != nil || noFiles.Summary == without.Summary {
+		t.Fatalf("none did not turn the file rules off: %v\n%s", err, noFiles.Summary)
+	}
+	if _, err := homeBackend(t, system, nil).Prepare(tui.Setup{Task: tui.TaskForensics, Options: tui.Options{FileRules: filepath.Join(t.TempDir(), "missing")}}); err == nil {
+		t.Fatal("a missing file rules folder was accepted")
+	}
+
 	manifest := filepath.Join(result.SavedTo, "manifest.json")
 	verify := homeBackend(t, system, nil)
 	plan, checked := runPlan(t, verify, tui.Setup{Task: tui.TaskVerify, Options: tui.Options{Manifest: manifest}})

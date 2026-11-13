@@ -22,6 +22,7 @@ type RuleInput struct {
 // the files and refuses what is wrong. An empty value means the default of the command.
 type Options struct {
 	Rules      string
+	FileRules  string
 	Assets     string
 	Indicators string
 	Format     string
@@ -50,6 +51,7 @@ const pathLimit = 1000
 
 var (
 	fieldRules      = formField{key: "rules", label: "Rules folder, optional (empty: the built-in rules):", limit: pathLimit}
+	fieldFileRules  = formField{key: "filerules", label: "File rules folder, optional (empty: the built-in file rules, none: no file rules):", limit: pathLimit}
 	fieldAssets     = formField{key: "assets", label: "Asset list, optional (YAML: names and addresses of your machines):", limit: pathLimit}
 	fieldIndicators = formField{key: "indicators", label: "Indicator list, optional (YAML: known bad addresses, domains, hashes):", limit: pathLimit}
 	fieldFormat     = formField{key: "format", label: "Log format:", choices: []choice{{"", "look at the first lines"}, {"syslog", "syslog"}, {"web", "web"},
@@ -62,8 +64,8 @@ var (
 	forms = map[string][]formField{
 		TaskDetect:           {fieldRules, fieldAssets, fieldIndicators, fieldFormat, fieldStore},
 		TaskAnalyze:          {fieldRules, fieldAssets, fieldIndicators, fieldFormat, fieldStore, fieldRecording},
-		TaskForensics:        {fieldProcesses, fieldSockets, fieldRules, fieldAssets, fieldIndicators, fieldStore},
-		TaskForensicsAnalyze: {fieldProcesses, fieldSockets, fieldRules, fieldAssets, fieldIndicators, fieldStore, fieldRecording},
+		TaskForensics:        {fieldProcesses, fieldSockets, fieldRules, fieldFileRules, fieldAssets, fieldIndicators, fieldStore},
+		TaskForensicsAnalyze: {fieldProcesses, fieldSockets, fieldRules, fieldFileRules, fieldAssets, fieldIndicators, fieldStore, fieldRecording},
 		TaskRuleDraft: {
 			{key: "goal", label: "Goal, what the rule is for:", limit: 300, required: "Type what the rule is for."},
 			{key: "examples", label: "Example events (like web01/auth.log:68, separated by spaces):", limit: 2000, required: "Type at least one example event, as a report names it."},
@@ -153,7 +155,7 @@ func (model Model) ruleSetup() RuleInput {
 }
 
 func (model Model) formOptions() Options {
-	return Options{Rules: model.formValue("rules"), Assets: model.formValue("assets"), Indicators: model.formValue("indicators"),
+	return Options{Rules: model.formValue("rules"), FileRules: model.formValue("filerules"), Assets: model.formValue("assets"), Indicators: model.formValue("indicators"),
 		Format: model.formValue("format"), Store: model.formValue("store") == "yes", Processes: model.formValue("processes"),
 		Sockets: model.formValue("sockets"), Attempts: model.formValue("attempts"), Recording: model.formValue("recording"),
 		Kind: model.formValue("kind"), Seed: model.formValue("seed"), Manifest: model.formValue("manifest")}

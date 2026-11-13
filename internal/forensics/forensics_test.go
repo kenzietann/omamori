@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kenzietann/omamori/internal/event"
+	"github.com/kenzietann/omamori/internal/filerules"
 	"github.com/kenzietann/omamori/internal/htmlreport"
 	"github.com/kenzietann/omamori/internal/intake"
 	"github.com/kenzietann/omamori/internal/rules"
@@ -280,7 +281,11 @@ func TestManifestHashesEveryFileThatWasRead(t *testing.T) {
 		t.Error("the manifest holds the full path of the evidence folder")
 	}
 
-	again, err := Collect(filepath.Join(folder, "root"), Options{Year: 2026, Location: tokyo, Processes: filepath.Join(folder, "snapshots/ps.txt"), Sockets: filepath.Join(folder, "snapshots/ss.txt")})
+	fileRules, err := filerules.Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := Collect(filepath.Join(folder, "root"), Options{FileRules: &fileRules, Year: 2026, Location: tokyo, Processes: filepath.Join(folder, "snapshots/ps.txt"), Sockets: filepath.Join(folder, "snapshots/ss.txt")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -494,7 +499,7 @@ func TestReportOfTheHostScenario(t *testing.T) {
 		"| etc/crontab:5 | root | 17 * * * * | cd / && run-parts --report /etc/cron.hourly |",
 		"## Keys that can log in", "| root/.ssh/authorized_keys:1 | root | ssh-ed25519 | SHA256:",
 		"| snapshot:ss.txt:7 | tcp | 0.0.0.0 | 31337 | kworker | 7731 |", "## Evidence manifest", "| etc/passwd | passwd |",
-		"Password hashes (/etc/shadow) and private keys are never read.",
+		"Password hashes (/etc/shadow), private keys and files of credentials are never read.",
 	} {
 		if !strings.Contains(report, want) {
 			t.Errorf("the report does not have %q", want)

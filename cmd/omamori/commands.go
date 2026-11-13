@@ -84,10 +84,11 @@ Flags for detect:
 Flags for forensics (also --rules, --year, --timezone, --output, --store and --db, as for detect):
   --processes file    saved output of "ps aux" or "ps -ef" from the system
   --sockets file      saved output of "ss -tulpn" or "netstat -tulpn" from the system
+  --file-rules folder file rules (YARA-like) in place of the built-in ones; --no-file-rules turns them off
   --analyze           let the AI analyst review the alerts; takes --yes, --dry-run, --replay, --provider and
                       --model as analyze does. Without --yes it only shows the guarded request
 The evidence folder is the top of the system: a mounted image, an unpacked copy, or / itself.
-Nothing in it is changed or run. Password hashes and private keys are never read.
+Nothing in it is changed or run. Password hashes, private keys and credential files are never read.
 
 SQL storage defaults to SQLite. For PostgreSQL or MariaDB, set OMAMORI_DB_DRIVER
 to postgres or mariadb and provide OMAMORI_DB_DSN in the environment. Database

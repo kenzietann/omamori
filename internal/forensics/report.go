@@ -27,7 +27,18 @@ type Result struct {
 	Label string
 }
 
+// manifestLimit is MaxManifestBytes. A test makes it small, because a real manifest of that size needs
+// hundreds of thousands of files.
+var manifestLimit = MaxManifestBytes
+
 func Run(folder string, set rules.Set, rulesFrom string, options Options, now time.Time) (Result, error) {
+	if options.FileRules != nil {
+		merged, err := WithFileRules(set, *options.FileRules)
+		if err != nil {
+			return Result{}, err
+		}
+		set = merged
+	}
 	collected, err := Collect(folder, options)
 	if err != nil {
 		return Result{}, err
@@ -35,6 +46,10 @@ func Run(folder string, set rules.Set, rulesFrom string, options Options, now ti
 	text, digest, err := collected.Manifest.JSON()
 	if err != nil {
 		return Result{}, err
+	}
+	// Checked before any file of the report is written, so that a run never stops with half a report.
+	if len(text) > manifestLimit {
+		return Result{}, fmt.Errorf("%w: the manifest would be larger than %d MB", ErrTooBig, MaxManifestBytes>>20)
 	}
 
 	return Result{
@@ -71,8 +86,9 @@ func Markdown(result Result) string {
 		OwnTimeline: true,
 		Sections:    func(format *detect.Formatter) string { return sections(result, format) },
 		Limits: []string{
-			"Only a fixed list of places was read: login and web logs, crontabs, systemd units in /etc and in home folders, authorized_keys, shell histories, /etc/passwd, and the snapshot files that were given. Other places to hide (kernel modules, shell start files, changed programs, at jobs) were not looked at.",
-			"Password hashes (/etc/shadow) and private keys are never read.",
+			"Only a fixed list of places was read as artifacts: login and web logs, crontabs, systemd units in /etc and in home folders, authorized_keys, shell histories, /etc/passwd, and the snapshot files that were given. Other places to hide (kernel modules, shell start files, changed programs, at jobs) were not read as artifacts.",
+			"The file rules (when they were on) looked at the content of the files in tmp, var/tmp, dev/shm, root, home, etc, var/spool/cron, usr/local, opt, srv and var/www, without following links. Programs of the system in /usr/bin and /usr/lib were not looked at. A packed or encrypted program shows none of its strings.",
+			"Password hashes (/etc/shadow), private keys and files of credentials are never read.",
 			"Most artifacts do not say when they were made. Their time in the timeline is the last change of the file. A copy of a file can have a new time, and an attacker can set the time of a file.",
 			"Deleted files are not seen. A system that is still running and has a rootkit can show files that are not what is on the disk.",
 			"A hit of a rule on an artifact says that it needs a look. An administrator can have made it.",

@@ -12,6 +12,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/analysisrun"
 	"github.com/kenzietann/omamori/internal/detect"
+	"github.com/kenzietann/omamori/internal/filerules"
 	"github.com/kenzietann/omamori/internal/forensics"
 	"github.com/kenzietann/omamori/internal/htmlreport"
 	"github.com/kenzietann/omamori/internal/intake"
@@ -249,6 +250,11 @@ func (s *Server) prepare(ctx context.Context, id string, input jobRequest) (func
 	base := analysisrun.Base{}
 	var outcome detect.Outcome
 	if isForensic {
+		files, fileErr := filerules.Builtin()
+		if fileErr != nil {
+			return fail(fileErr)
+		}
+		options.FileRules = &files
 		result, readErr := forensics.Run(target, set, from, options, now)
 		if readErr != nil {
 			return fail(readErr)

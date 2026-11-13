@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kenzietann/omamori/internal/filerules"
 	"github.com/kenzietann/omamori/internal/rules"
 	"github.com/kenzietann/omamori/internal/scenario"
 )
@@ -24,8 +25,12 @@ func triage(t *testing.T, host scenario.Host) (Result, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	files, err := filerules.Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err := Run(filepath.Join(folder, "root"), set, "built-in", Options{
-		Year: 2026, Location: tokyo, Processes: filepath.Join(folder, "snapshots", "ps.txt"), Sockets: filepath.Join(folder, "snapshots", "ss.txt"),
+		FileRules: &files, Year: 2026, Location: tokyo, Processes: filepath.Join(folder, "snapshots", "ps.txt"), Sockets: filepath.Join(folder, "snapshots", "ss.txt"),
 	}, day().Add(30*time.Hour))
 	if err != nil {
 		t.Fatal(err)

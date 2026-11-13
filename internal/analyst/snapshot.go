@@ -37,6 +37,9 @@ var evidenceFields = []string{
 	// log-only run, and with it every earlier recording, stays the same byte for byte.
 	"asset", "src_asset", "dst_asset", "indicator", "indicator_type", "indicator_where",
 	TimeSourceField, "unit", "exec_key", "schedule", "key_type", "fingerprint", "key_options", "target", "shell", "pid", "local_address", "local_port",
+	// Fields of a hit of a file rule: which rule, which strings, the first text that was found (data of the
+	// attacker, after the filter for secrets), the file and its hash from the manifest.
+	"file_rule", "matched", "excerpt", "file", "sha256",
 }
 
 const (

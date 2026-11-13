@@ -11,6 +11,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/detect"
+	"github.com/kenzietann/omamori/internal/filerules"
 	"github.com/kenzietann/omamori/internal/indicators"
 	"github.com/kenzietann/omamori/internal/replay"
 	"github.com/kenzietann/omamori/internal/rules"
@@ -68,6 +69,19 @@ func (b backend) homeRules(options tui.Options, forensic bool) (rules.Set, strin
 	}
 
 	return set, "from a folder", nil
+}
+
+// homeFileRules gives the built-in file rules, the file rules of the folder from the form, or none for "none".
+func (b backend) homeFileRules(options tui.Options) (*filerules.Set, error) {
+	if options.FileRules == "" || options.FileRules == "none" {
+		return loadFileRules("", options.FileRules == "none")
+	}
+	folder, err := b.expandPath(options.FileRules)
+	if err != nil {
+		return nil, err
+	}
+
+	return loadFileRules(folder, false)
 }
 
 // homeLists reads the asset list and the indicator list of the form, when they are given.

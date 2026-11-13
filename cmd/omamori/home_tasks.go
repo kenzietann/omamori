@@ -128,7 +128,11 @@ func (b backend) prepareHome(setup tui.Setup) (tui.Plan, error) {
 				sources = append(sources, snapshot)
 			}
 		}
-		result, err := forensics.Run(b.config.Target, set, rulesFrom, forensics.Options{Year: year, Location: location, Processes: processes, Sockets: sockets, Assets: machines, Indicators: known}, now)
+		fileRules, err := b.homeFileRules(options)
+		if err != nil {
+			return tui.Plan{}, err
+		}
+		result, err := forensics.Run(b.config.Target, set, rulesFrom, forensics.Options{Year: year, Location: location, Processes: processes, Sockets: sockets, Assets: machines, Indicators: known, FileRules: fileRules}, now)
 		if err != nil {
 			return tui.Plan{}, err
 		}

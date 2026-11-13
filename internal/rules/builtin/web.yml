@@ -174,3 +174,29 @@ tests:
       - {category: webserver, url: "/item?id=1%27%20OR%20%271%27=%271", src_ip: 203.0.113.77}
       - {category: webserver, url: "/item?id=1;select+sleep(5)", src_ip: 203.0.113.77}
     expect: {alerts: 1}
+---
+title: Command sent to a web shell
+name: web_shell_command
+id: 6f3a2c10-0209-4a6e-9d7b-0a1b2c3d4e09
+description: A request to a script page carries a shell command in a parameter like c or cmd, and the server answered with success. This is how a web shell is used after it was put on the server.
+level: high
+tags: [attack.persistence, attack.t1505.003, attack.execution]
+logsource: {category: webserver}
+detection:
+  selection:
+    url|re|i: '\.(php\d?|phtml|jsp|aspx?)\?(\S*&)?(c|cmd|exec|command|shell|run)=(id|whoami|uname|pwd|ls|cat|wget|curl|bash|sh|nc|python3?|perl)(\b|%20|\+|$)'
+    status|re: '^2'
+  condition: selection
+tests:
+  - name: a command that the server answered
+    events:
+      - {category: webserver, url: "/uploads/x.php?c=id", status: 200, src_ip: 203.0.113.77}
+      - {category: webserver, url: "/wp-content/a.php?x=1&cmd=cat%20/etc/passwd", status: 200, src_ip: 203.0.113.77}
+    expect: {alerts: 2}
+  - name: a page that is not there, and ordinary parameters
+    events:
+      - {category: webserver, url: "/uploads/x.php?c=id", status: 404, src_ip: 203.0.113.77}
+      - {category: webserver, url: "/index.php?c=idea", status: 200, src_ip: 198.51.100.4}
+      - {category: webserver, url: "/shop.php?cat=shoes", status: 200, src_ip: 198.51.100.4}
+      - {category: webserver, url: "/run?cmd=id", status: 200, src_ip: 198.51.100.4}
+    expect: {alerts: 0}
