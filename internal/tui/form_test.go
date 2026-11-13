@@ -183,8 +183,8 @@ func TestChoiceFieldsTurnAndCannotBeTyped(t *testing.T) {
 	if model.formOptions().Store || model.formValues["store"] != "" {
 		t.Fatalf("a choice field took text or did not turn: %q", model.formValues["store"])
 	}
-	format := choose(t, model, "format", "windows")
-	if format.formOptions().Format != "windows" {
+	format := choose(t, model, "format", "pcap")
+	if format.formOptions().Format != "pcap" {
 		t.Fatal("the format was not chosen")
 	}
 	format = pressType(t, format, tea.KeyRight)

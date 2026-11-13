@@ -22,6 +22,7 @@ import (
 	"github.com/kenzietann/omamori/internal/assets"
 	"github.com/kenzietann/omamori/internal/event"
 	"github.com/kenzietann/omamori/internal/indicators"
+	"github.com/kenzietann/omamori/internal/pcap"
 )
 
 const (
@@ -33,6 +34,7 @@ const (
 	FormatZeek     = "zeek"
 	FormatWazuh    = "wazuh"
 	FormatWindows  = "windows"
+	FormatPCAP     = "pcap"
 )
 
 const (
@@ -50,7 +52,7 @@ var (
 	// not a folder of logs.
 	ErrTooManyFiles = errors.New("the folder holds more than 2000 files to read. Give the folder of the logs, not a whole project")
 	ErrBadInput     = errors.New("the log cannot be read")
-	ErrFormat       = errors.New("the format is not known. Use syslog, web, json, suricata, zeek, wazuh or windows")
+	ErrFormat       = errors.New("the format is not known. Use syslog, web, json, suricata, zeek, wazuh, windows or pcap")
 )
 
 // Options say how to read lines that do not say everything themselves.
@@ -85,7 +87,7 @@ func (options Options) valid() error {
 		return ErrBadInput
 	}
 	switch options.Format {
-	case FormatAuto, FormatSyslog, FormatWeb, FormatJSON, FormatSuricata, FormatZeek, FormatWazuh, FormatWindows:
+	case FormatAuto, FormatSyslog, FormatWeb, FormatJSON, FormatSuricata, FormatZeek, FormatWazuh, FormatWindows, FormatPCAP:
 		return nil
 	}
 
@@ -251,6 +253,28 @@ func (reader contextReader) Read(buffer []byte) (int, error) {
 	return reader.reader.Read(buffer)
 }
 
+func readCapture(reader io.Reader, name string) ([]event.Event, Stats, error) {
+	events, read, err := pcap.Read(reader, name)
+	switch {
+	case errors.Is(err, pcap.ErrFormat):
+		return nil, Stats{}, ErrFormat
+	case errors.Is(err, pcap.ErrTooBig):
+		return nil, Stats{}, ErrTooBig
+	case err != nil:
+		return nil, Stats{}, ErrBadInput
+	}
+	if len(events) > maxEvents {
+		return nil, Stats{}, ErrTooBig
+	}
+	// For a capture, a line is a packet. Packets of kinds that are not read count as blank.
+	stats := Stats{File: name, Format: FormatPCAP, Lines: read.Packets + read.NoTime, Events: len(events), Blank: read.Skipped + read.NoTime, Malformed: read.Malformed}
+	if len(events) > 0 {
+		stats.Sources = []string{pcap.Product}
+	}
+
+	return events, stats, nil
+}
+
 func compressed(name string) bool {
 	for _, suffix := range []string{".gz", ".bz2", ".xz", ".zst", ".zip"} {
 		if strings.HasSuffix(strings.ToLower(name), suffix) {
@@ -273,6 +297,10 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 
 	buffered := bufio.NewReaderSize(reader, 128<<10)
 	format := options.Format
+	// A capture is binary. It is known by its first bytes, and read by its own reader.
+	if head, _ := buffered.Peek(4); format == FormatPCAP || format == FormatAuto && pcap.Sniff(head) {
+		return readCapture(buffered, name)
+	}
 	if format == FormatAuto {
 		head, _ := buffered.Peek(32 << 10)
 		if format = sniff(string(head), options); format == FormatAuto {

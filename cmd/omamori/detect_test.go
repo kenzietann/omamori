@@ -116,7 +116,7 @@ func TestScenarioThenDetect(t *testing.T) {
 	if found.code != exitOK {
 		t.Fatalf("detect: %d %s", found.code, found.stderr)
 	}
-	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 33 rules. 15 alerts, 1 critical, 6 high, 8 medium.") {
+	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 35 rules. 15 alerts, 1 critical, 6 high, 8 medium.") {
 		t.Errorf("the summary is %q", found.stdout)
 	}
 
@@ -328,7 +328,7 @@ func TestCampaignScenarioThenDetect(t *testing.T) {
 	before := snapshot(t, campaign)
 
 	found := runAt(t, detectNow, "detect", filepath.Join(campaign, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", output)
-	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "33 rules. 20 alerts, 2 critical, 10 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "35 rules. 20 alerts, 2 critical, 10 high, 8 medium.") {
 		t.Fatalf("detect: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(output, "detect-20261111-030405", "alerts.json"))
@@ -353,7 +353,7 @@ func TestCampaignScenarioThenDetect(t *testing.T) {
 		t.Fatal(made.stderr)
 	}
 	calm := runAt(t, detectNow, "detect", filepath.Join(quiet, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", filepath.Join(base, "out2"))
-	if calm.code != exitOK || !strings.Contains(calm.stdout, "33 rules. 0 alerts.") {
+	if calm.code != exitOK || !strings.Contains(calm.stdout, "35 rules. 0 alerts.") {
 		t.Fatalf("the quiet campaign: %d %s", calm.code, calm.stdout)
 	}
 }
@@ -371,7 +371,7 @@ func TestCampaignWithTheAssetList(t *testing.T) {
 	common := []string{logs, "--assets", list, "--year", "2026", "--timezone", "Asia/Tokyo"}
 
 	found := runAt(t, detectNow, append([]string{"detect", "--output", filepath.Join(base, "out")}, common...)...)
-	if found.code != exitOK || !strings.Contains(found.stdout, "33 rules. 21 alerts, 3 critical, 10 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "35 rules. 21 alerts, 3 critical, 10 high, 8 medium.") {
 		t.Fatalf("detect with assets: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(base, "out", "detect-20261111-030405", "alerts.json"))
@@ -467,7 +467,7 @@ func TestIndicatorListThroughTheCommandLine(t *testing.T) {
 	common := []string{logs, "--indicators", known, "--assets", machines, "--year", "2026", "--timezone", "Asia/Tokyo"}
 
 	found := runAt(t, detectNow, append([]string{"detect", "--output", filepath.Join(base, "out")}, common...)...)
-	if found.code != exitOK || !strings.Contains(found.stdout, "33 rules. 22 alerts, 3 critical, 11 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "35 rules. 22 alerts, 3 critical, 11 high, 8 medium.") {
 		t.Fatalf("detect with both lists: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	report, _ := os.ReadFile(filepath.Join(base, "out", "detect-20261111-030405", "report.md"))
@@ -490,7 +490,7 @@ func TestIndicatorListThroughTheCommandLine(t *testing.T) {
 	// The forensic triage marks the artifacts too: the cron job and the shell history name the same address.
 	host := hostFixture(t, false)
 	triage := runAt(t, detectNow, forensicsArgs(host, filepath.Join(base, "forensics"), "--indicators", known)...)
-	if triage.code != exitOK || !strings.Contains(triage.stdout, "53 rules. 35 alerts") {
+	if triage.code != exitOK || !strings.Contains(triage.stdout, "55 rules. 35 alerts") {
 		t.Fatalf("forensics with indicators: %d %s %s", triage.code, triage.stdout, triage.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(base, "forensics", "forensics-20261111-030405", "alerts.json"))
