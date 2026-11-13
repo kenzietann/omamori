@@ -58,6 +58,7 @@ var menuItems = []menuItem{
 	{label: "Dashboard", note: "start the local web dashboard on 127.0.0.1 for alerts, evidence and cases", task: TaskDashboard},
 	{label: "Stored runs", note: "list what is in the local database", task: TaskStored},
 	{label: "Verify hashes", note: "check a forensic manifest against the folder, no AI", task: TaskVerify},
+	{label: "Attack lab", note: "check Omamori on a real attack against its own Docker server, no AI", task: TaskLab},
 	{label: "Make demo data", note: "write synthetic logs, a synthetic system or a campaign to try the above", task: TaskDemo},
 	{label: "Settings", kind: menuOpenSettings},
 	{label: "Quit", kind: menuLeave},
@@ -138,6 +139,7 @@ const (
 	TaskDashboard        = "dashboard"
 	TaskRuleDraft        = "rule-draft"
 	TaskVerify           = "verify"
+	TaskLab              = "lab"
 )
 
 type Plan struct {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,8 @@ func (b backend) prepareHome(setup tui.Setup) (tui.Plan, error) {
 		return b.prepareDemo(options, now, location, year)
 	case tui.TaskVerify:
 		return b.prepareVerify(options)
+	case tui.TaskLab:
+		return b.prepareLab(now)
 	}
 	if setup.Task == tui.TaskDashboard {
 		env := b.storageEnv()
@@ -372,4 +375,21 @@ func localHomePlan(title, summary string, run func(context.Context) (tui.Result,
 		}
 		return run(ctx)
 	}}
+}
+
+// prepareLab runs the attack lab. It needs Docker, takes about a minute (ten the first time, for the images),
+// and touches nothing but the containers and the network that it makes.
+func (b backend) prepareLab(now time.Time) (tui.Plan, error) {
+	base := filepath.Join(b.config.OutputBase, "lab-"+now.UTC().Format("20060102-150405"))
+	summary := "Build a Debian server (web01) and an attacker in Docker, on a network with no way out. Run a fixed attack on web01 only, " +
+		"copy its logs, files and traffic to " + base + ", read them with forensics and detect, and score what was found. Needs Docker."
+	return localHomePlan("Attack lab", summary, func(ctx context.Context) (tui.Result, error) {
+		var out strings.Builder
+		env := environment{stdout: &out, stderr: io.Discard, now: b.config.Now, dockerRunner: b.env.dockerRunner}
+		score, err := labRun(ctx, env, base, false, now)
+		if err != nil {
+			return tui.Result{}, err
+		}
+		return tui.Result{Complete: len(score.Missed) == 0, SavedTo: base, Report: score.Markdown() + "\n## Run\n\n```\n" + out.String() + "```\n"}, nil
+	}), nil
 }

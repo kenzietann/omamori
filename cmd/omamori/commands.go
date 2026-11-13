@@ -12,6 +12,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/agent"
 	"github.com/kenzietann/omamori/internal/appconfig"
+	"github.com/kenzietann/omamori/internal/lab"
 	"github.com/kenzietann/omamori/internal/replay"
 	"github.com/kenzietann/omamori/internal/taskrun"
 	"github.com/kenzietann/omamori/internal/triage"
@@ -37,6 +38,9 @@ Commands:
   analyze <logs>...   detect, ask the AI to review alerts, and verify its claims against the evidence
   forensics <folder>  read the artifacts of a Linux system from a folder (read-only): hash them, run rules,
                       write a report with a timeline. "forensics verify <manifest> <folder>" checks the hashes again
+  lab                 check Omamori end to end: make a Debian server and an attacker in Docker on a network with
+                      no way out, run a fixed attack on that server only, then read its logs, files and traffic
+                      and score what was found. "lab clean" removes what a run left (--keep, --images)
   scenario <folder>   write synthetic logs of one day with attacks into a new folder, for demos and tests
                       (--host: a whole synthetic system for forensics; --campaign: one attack
                       through three hosts, with host logs and network sensor logs)
@@ -75,7 +79,7 @@ Flags for detect:
                       address are then known to be one machine, and rules and the AI review can join them
   --indicators file   addresses, domains and SHA-256 hashes that are known to be bad (YAML). Events that name
                       one are marked in every kind of log, and one alert is given for each indicator
-  --format name       syslog, web, json, suricata, zeek, wazuh or windows (default: look at the first lines of each file)
+  --format name       syslog, web, json, suricata, zeek, wazuh, windows or pcap (default: look at the first bytes and lines of each file)
   --year, --timezone  for syslog lines, which have no year and no time zone
   --output folder     where the report folder is made (default ~/omamori-output)
   --store             persist the sanitized run for search, cases and timelines
@@ -136,6 +140,8 @@ type environment struct {
 	settingsPath func() (string, error)
 	now          func() time.Time
 	newProvider  taskrun.ProviderFactory
+	// dockerRunner runs docker for the lab. Without it, the docker command of the machine is used.
+	dockerRunner lab.Runner
 }
 
 func mergeDefaults(chosen settings, saved appconfig.Settings) tui.Defaults {
@@ -194,6 +200,8 @@ func run(args []string, env environment) int {
 		return runStore(rest, env)
 	case "rule":
 		return runRule(rest, env)
+	case "lab":
+		return runLab(rest, env)
 	}
 
 	fmt.Fprintf(env.stderr, "omamori: %q is not a command. Run omamori help to see the commands.\n", command)
