@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -221,7 +222,9 @@ func TestRunFinishesTheSameWayEveryTime(t *testing.T) {
 }
 
 func TestStepLimit(t *testing.T) {
-	built := newStack(t, always(calls(tool("list_dir", nil))), true)
+	built := newStack(t, func(index int) reply {
+		return calls(tool("list_dir", map[string]string{"path": fmt.Sprintf("folder%d", index)}))
+	}, true)
 
 	outcome := built.agent(t, &fakeRecorder{}, Limits{MaxSteps: 3, MaxTokens: 100000}).Run(context.Background(), "go")
 
@@ -422,7 +425,7 @@ func TestBadToolCallsFromTheModelAreDropped(t *testing.T) {
 func TestTooManyToolCallsInOneStep(t *testing.T) {
 	var many []outbound.ToolCall
 	for count := 0; count < 12; count++ {
-		many = append(many, tool("list_dir", nil))
+		many = append(many, tool("list_dir", map[string]string{"path": fmt.Sprintf("folder%d", count)}))
 	}
 	built := newStack(t, inOrder(calls(many...), finalText("done")), true)
 
@@ -697,5 +700,75 @@ func TestALogFailureInTheSenderStopsTheRun(t *testing.T) {
 
 	if outcome.Status != Incomplete || outcome.Reason != "log failed" || len(built.provider.recorded) != 0 {
 		t.Errorf("outcome = %+v, provider calls = %d", outcome, len(built.provider.recorded))
+	}
+}
+
+func TestARepeatedCallIsNotRunAgainAndRepeatingEndsTheRun(t *testing.T) {
+	scan := tool("run_detectors", map[string]string{"path": "."})
+	built := newStack(t, always(calls(scan)), true)
+	recorder := &fakeRecorder{}
+
+	outcome := built.agent(t, recorder, Limits{MaxSteps: 15, MaxTokens: 100000}).Run(context.Background(), "go")
+
+	if outcome.ToolCalls != 1 || outcome.Reason != "the AI repeated the same calls" || outcome.Status != Incomplete || outcome.Steps != 3 {
+		t.Fatalf("outcome = %+v, want one real call and a stop after two repeated steps", outcome)
+	}
+	last := encodeForSearch(t, built.provider.recorded[len(built.provider.recorded)-1])
+	if !strings.Contains(last, "the same call was already made in this run") || strings.Count(last, "[SECRET:") > strings.Count(encodeForSearch(t, built.provider.recorded[1]), "[SECRET:") {
+		t.Fatal("the repeat was answered with the scan again")
+	}
+	if !slices.Contains(recorder.kinds, "tool_call") {
+		t.Fatal("the repeated call was not logged")
+	}
+}
+
+func TestOnlyTheSameCallCountsAsARepeat(t *testing.T) {
+	testCases := []struct {
+		name   string
+		second outbound.ToolCall
+		repeat bool
+	}{
+		{"the same path", tool("run_detectors", map[string]string{"path": "notes"}), true},
+		{"the same path written another way", tool("run_detectors", map[string]string{"path": "./notes/"}), true},
+		{"another path", tool("run_detectors", map[string]string{"path": "."}), false},
+		{"another tool on the same path", tool("list_dir", map[string]string{"path": "notes"}), false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			first := tool("run_detectors", map[string]string{"path": "notes"})
+			built := newStack(t, inOrder(calls(first), calls(testCase.second), finalText("done")), true)
+			outcome := built.agent(t, &fakeRecorder{}, generousLimits).Run(context.Background(), "go")
+			if outcome.Status != Complete || (outcome.ToolCalls == 1) != testCase.repeat {
+				t.Fatalf("outcome = %+v", outcome)
+			}
+		})
+	}
+}
+
+func TestOneRepeatedStepDoesNotEndTheRun(t *testing.T) {
+	scan := tool("run_detectors", map[string]string{"path": "."})
+	built := newStack(t, inOrder(calls(scan), calls(scan), calls(tool("list_dir", map[string]string{"path": "notes"})), finalText("done")), true)
+	outcome := built.agent(t, &fakeRecorder{}, generousLimits).Run(context.Background(), "go")
+	if outcome.Status != Complete || outcome.ToolCalls != 2 {
+		t.Fatalf("outcome = %+v", outcome)
+	}
+}
+
+func TestACutResultSaysHowToSeeTheRest(t *testing.T) {
+	text := formatToolResult("run_detectors", gateway.Result{Text: "a.txt:1: [SECRET:x:001]", Truncated: true}, nil)
+	for _, want := range []string{"cut at a limit", "same call gives the same cut result", "subfolders"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the cut note has no %q: %s", want, text)
+		}
+	}
+}
+
+func TestANewCallBetweenRepeatsKeepsTheRunGoing(t *testing.T) {
+	scan := tool("run_detectors", map[string]string{"path": "."})
+	script := inOrder(calls(scan), calls(scan), calls(tool("list_dir", map[string]string{"path": "notes"})), calls(scan), finalText("done"))
+	built := newStack(t, script, true)
+	outcome := built.agent(t, &fakeRecorder{}, generousLimits).Run(context.Background(), "go")
+	if outcome.Status != Complete || outcome.ToolCalls != 2 {
+		t.Fatalf("outcome = %+v, want the run to finish: two repeated steps that are not in a row do not end it", outcome)
 	}
 }

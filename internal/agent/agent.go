@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
+	"slices"
 	"strings"
 
 	"github.com/kenzietann/omamori/internal/gateway"
@@ -106,6 +108,8 @@ func (agent *Agent) Run(ctx context.Context, instruction string) Outcome {
 
 	firstAttempt := agent.sender.Attempts()
 	history := FirstRequest(instruction, nil).Messages
+	seen := map[string]bool{}
+	repeatedSteps := 0
 
 	for {
 		outcome.Steps = agent.sender.Attempts() - firstAttempt
@@ -143,9 +147,19 @@ func (agent *Agent) Run(ctx context.Context, instruction string) Outcome {
 		plan, assistantCalls := planCalls(response.ToolCalls)
 		history = append(history, outbound.Message{Role: "assistant", Text: response.Text, ToolCalls: assistantCalls})
 
-		toolMessages, stopReason := agent.runCalls(ctx, plan, &outcome)
+		before := outcome.ToolCalls
+		toolMessages, stopReason := agent.runCalls(ctx, plan, &outcome, seen)
 		if stopReason != "" {
 			return agent.finish(outcome, stopReason)
+		}
+		// A step that only repeats earlier calls learns nothing new. Two of them in a row end the run.
+		if outcome.ToolCalls == before && slices.ContainsFunc(plan, func(planned plannedCall) bool { return planned.valid }) {
+			repeatedSteps++
+		} else {
+			repeatedSteps = 0
+		}
+		if repeatedSteps >= 2 {
+			return agent.finish(outcome, "the AI repeated the same calls")
 		}
 		history = append(history, toolMessages...)
 	}
@@ -170,7 +184,32 @@ func planCalls(requested []outbound.ToolCall) ([]plannedCall, []outbound.ToolCal
 	return plan, accepted
 }
 
-func (agent *Agent) runCalls(ctx context.Context, plan []plannedCall, outcome *Outcome) ([]outbound.Message, string) {
+// callKey names a tool call by its tool and arguments. A path is cleaned, so that "./a" and "a" are one call.
+func callKey(call outbound.ToolCall) string {
+	names := make([]string, 0, len(call.Arguments))
+	for name := range call.Arguments {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	key := call.Name
+	for _, name := range names {
+		value := call.Arguments[name]
+		if name == "path" {
+			value = path.Clean(strings.TrimSpace(value))
+		}
+		key += "\x00" + name + "\x00" + value
+	}
+
+	return key
+}
+
+// The tools only read, so the same call gives the same answer. A model that asks again (for example because a
+// result was cut) gets this fixed answer instead of the same result with new placeholder numbers, which only
+// cost tokens and steps.
+const repeatedCall = "the same call was already made in this run, and its result has not changed. Use the result you have. " +
+	"To see more after a cut result, call the tool on a subfolder (list_dir shows them), or give your answer."
+
+func (agent *Agent) runCalls(ctx context.Context, plan []plannedCall, outcome *Outcome, seen map[string]bool) ([]outbound.Message, string) {
 	var messages []outbound.Message
 
 	for _, planned := range plan {
@@ -185,6 +224,15 @@ func (agent *Agent) runCalls(ctx context.Context, plan []plannedCall, outcome *O
 			if ctx.Err() != nil {
 				return nil, "cancelled"
 			}
+			key := callKey(planned.call)
+			if seen[key] {
+				if err := agent.recorder.Record("tool_call", planned.call.Name, false, "repeated call", ""); err != nil {
+					return nil, "log failed"
+				}
+				messages = append(messages, outbound.Message{Role: "tool", Text: "tool_result " + planned.call.Name + ": " + repeatedCall, ToolCallID: planned.call.ID})
+				continue
+			}
+			seen[key] = true
 
 			arguments := make(map[string]any, len(planned.call.Arguments))
 			for name, value := range planned.call.Arguments {
@@ -216,7 +264,8 @@ func formatToolResult(toolName string, result gateway.Result, err error) string 
 
 	text := "tool_result " + toolName + ": " + result.Text
 	if result.Truncated {
-		text += "\n[the result was cut because of a limit]"
+		text += "\n[the result was cut at a limit: not every file or match is shown. The same call gives the same cut result. " +
+			"To see the rest, call the tool on subfolders one at a time (list_dir shows them).]"
 	}
 
 	return text
