@@ -156,6 +156,9 @@ listening port of an odd process is listed and gives no alert by itself.
   `/etc/profile.d`), `at` jobs, units of installed packages under `/usr/lib/systemd`, changed
   system programs, `wtmp`/`btmp`/`lastlog` (binary), the journal of systemd (binary), browser data,
   and anything that was deleted.
+- A copy that keeps only whole seconds (a plain tar, FAT, some archive formats) can put two things of the
+  same second in the wrong order, for example a key written just after a login. Copy with the times to the
+  nanosecond (tar `--format=posix`, `cp -a` on the same kind of filesystem, a disk image).
 - A running system with a rootkit can show files that are not what is on the disk. Prefer an image.
 - Snapshot files are text that someone saved. Their content is taken as it is.
 - A rule hit on an artifact means "look at this". Administrators add keys and write cron jobs too.

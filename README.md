@@ -180,6 +180,29 @@ on a file's last change are marked as having weak times.
 See the [forensics guide](docs/forensics.md) for what is read, what the times
 mean and what is not covered.
 
+### Packet captures
+
+`detect`, `analyze` and `rule draft` read pcap and pcapng files (tcpdump, Wireshark). A capture is known by
+its first bytes, so it can lie among the logs. It becomes Zeek-like events (one per connection, HTTP request
+and DNS question, with the TLS server name), and the network and web rules read them. See the
+[packet capture guide](docs/pcap.md).
+
+```sh
+omamori detect capture.pcap /var/log/auth.log
+```
+
+### Attack lab
+
+`omamori lab` checks Omamori end to end: it builds a Debian server and an attacker in Docker, on a network
+with no way out, runs a fixed attack against that server only (port scan, web probes, password spraying
+and guessing, persistence, dropped tools, a web shell), copies out its logs, files and traffic, and scores
+what Omamori found. It is on the home screen too. It cannot be pointed at another machine. See the
+[lab guide](docs/lab.md).
+
+```sh
+omamori lab
+```
+
 ## Live test results
 
 `omamori eval` runs a fixed set of real-provider runs on the fake fixtures (Task A, and four
@@ -324,6 +347,8 @@ AI is limited by the guard and can only use read-only tools.
   toward, what exists for each and what is missing.
 - [Demo: one attack through three hosts](docs/demo.md): the synthetic campaign
   across host logs and network sensors, what is found and what is not.
+- [Packet captures](docs/pcap.md): pcap and pcapng into connection, HTTP and DNS events.
+- [Attack lab](docs/lab.md): a fixed attack on a Docker server of its own, scored end to end.
 - [File rules](docs/file-rules.md): YARA-like rules over the content of files, used by forensics.
 - [Forensic triage](docs/forensics.md): read-only collection of Linux artifacts,
   the hash manifest, the timeline and its limits.
@@ -371,6 +396,7 @@ can stay empty for the default of the command. What the forms take:
 | Forensics + AI review | the same, and a recording to replay |
 | Rule draft | goal, examples, clean logs, title, level, number of answers, log format, asset list, indicator list, a recording to replay |
 | Verify hashes | the manifest of an earlier forensic run; the folder is the evidence |
+| Attack lab | no form: needs Docker; builds its own server and attacker, runs the attack and shows the score |
 | Make demo data | one server and a system, the three-host campaign, or a day without attacks; a seed |
 
 A wrong value (a file that is not there, a log format that reads no event, an example

@@ -492,6 +492,32 @@ Measured live after the fixes (gpt-6-luna, 2026-11-13):
 A replay of a recording that was made with older built-in rules stops now, because the new rules give
 more alerts on the same logs. That is the fail-closed behaviour, not a fault of the replay.
 
+### Attack lab and packet captures (2026-11-13)
+
+`omamori lab` (also on the home screen): two images built from files inside Omamori, an `--internal` Docker
+network, a fixed attack in six stages against the lab server only (no target option; a test checks that
+the script has one fixed target), tcpdump on the server, a hostile-safe copy out (os.Root, no devices or
+hard links, limits, posix tar for nanosecond times), forensics and detect over the copy and the capture,
+and a score of 24 checks with an error code on a miss. `lab clean` removes what has the lab label.
+Guide: [lab.md](lab.md).
+
+`internal/pcap`: pcap and pcapng (byte orders, nanoseconds, every pcapng time resolution, several
+sections), Ethernet with VLANs, Linux SLL and SLL2, raw IP, BSD loopback, IPv4 and IPv6 with extension
+headers; connections with Zeek states, HTTP requests with their status, DNS questions with their answer
+code, the TLS server name. Intake finds a capture by its bytes. The connection rules now ask for
+`category: network, service: conn` (Zeek and captures), and a new pair of rules finds a port scan
+(`net_port_scan`, 20 ports of one host in five minutes). Guide: [pcap.md](pcap.md).
+
+Tests: table tests with a byte-level capture writer, fuzzing (11 million inputs, no crash), a fake docker
+that records every command (network internal, labels, cleanup after errors, `--keep`), a hostile tar
+(escapes through `..`, absolute names and links, devices, hard links, setuid). Mutations in a copy: 34,
+31 caught after three tests were added (pipelined HTTP answers, an overlong TLS name, 19 ports); the three
+left are checks of the extractor that `os.Root` makes a second time.
+
+Live: three runs in a row, 24 of 24 each, about 65 seconds; 1,470 packets and 0 malformed. The first runs
+found three faults (a broken pipe at the end of the copy, cron that had not run yet, and file times cut to
+whole seconds that put a key before the login it followed); all are fixed and in [lab.md](lab.md).
+
 ### File rules, YARA-like (2026-11-13)
 
 `internal/filerules`: a rule names text, hex (with `??`) and RE2 strings and a condition (`and`, `or`,

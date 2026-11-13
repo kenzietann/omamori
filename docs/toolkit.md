@@ -11,9 +11,14 @@ claims is checked by code, and collectors only read.
 
 | Stands in for | What exists | What is missing |
 |---|---|---|
-| Zeek | Reads Zeek JSON logs (conn, http, dns, notice). Rules for a sweep of internal addresses and a large upload | Its own protocol analysis. Zeek TSV logs |
+| Zeek | Reads Zeek JSON logs (conn, http, dns, notice). Rules for a sweep of internal addresses, a port scan and a large upload | Zeek TSV logs. Most of its protocol analysis |
 | Suricata / Snort | Reads Suricata EVE JSON (alert, http, dns, flow, tls). A rule for alerts of severity 1 | Its own packet inspection and signatures |
-| Wireshark / tshark, Arkime | nothing | Reading PCAP files into connection, DNS and HTTP events. **Next candidate** |
+| Wireshark / tshark, Arkime | Reads pcap and pcapng into Zeek-like connection, HTTP and DNS events (with the TLS server name), found by its bytes in any folder; the same rules read them ([pcap.md](pcap.md)) | Live capture, TCP reassembly, more protocols, a packet view, storing captures |
+
+Checking the tools themselves: `omamori lab` attacks a Debian server that it builds in Docker, on a network
+with no way out, and scores what Omamori finds in its logs, files and traffic ([lab.md](lab.md)). It stands
+in for detection-validation tools such as Atomic Red Team or Caldera, for one fixed attack and only against
+its own server.
 
 ## 2. Endpoint and host monitoring
 
