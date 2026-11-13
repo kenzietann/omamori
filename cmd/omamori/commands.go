@@ -47,7 +47,8 @@ Commands:
   store <command>    stored runs, event/alert search, cases and timelines (run "omamori store" for usage)
   ui <folder>         open the home screen, where you choose a task
   replay <recording> [folder or log file]
-                      play back the recorded answers of an earlier run. Nothing is sent
+                      play back the recorded answers of an earlier run. Nothing is sent. For an analyst run,
+                      give the --rules, --assets, --indicators and --format that it used
   peek <report> <project>
                       show what a report matched, on your screen only (add --reveal for full values)
   eval --yes          run the fixed live tests on the fake fixtures and score them (costs tokens)
@@ -379,8 +380,22 @@ func runReplay(args []string, env environment) int {
 		fmt.Fprintln(env.stderr, "omamori:", err)
 		return exitFailed
 	}
+	detection := chosen.rules != "" || chosen.assets != "" || chosen.indicators != "" || chosen.format != ""
+	if recording.Task == "ruledraft" {
+		fmt.Fprintln(env.stderr, "omamori: replay a rule draft with omamori rule draft --replay, with the same goal, examples and logs")
+		return exitUsage
+	}
+	if recording.Task != "analyst" && detection {
+		fmt.Fprintln(env.stderr, "omamori: --rules, --assets, --indicators and --format only fit the recording of an analyst run")
+		return exitUsage
+	}
 	if recording.Task == "analyst" {
 		arguments := []string{"--replay", chosen.recording, "--output", chosen.output}
+		for _, flag := range []struct{ name, value string }{{"--rules", chosen.rules}, {"--assets", chosen.assets}, {"--indicators", chosen.indicators}, {"--format", chosen.format}} {
+			if flag.value != "" {
+				arguments = append(arguments, flag.name, flag.value)
+			}
+		}
 		if chosen.year != 0 {
 			arguments = append(arguments, "--year", fmt.Sprint(chosen.year))
 		}

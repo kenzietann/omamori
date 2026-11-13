@@ -12,7 +12,15 @@ func TestForensicRulesLoadWithTheBuiltinRulesAndPassTheirOwnTests(t *testing.T) 
 		t.Fatal(err)
 	}
 	added := 0
+	// These join a log line with an artifact, so they name no kind of artifact. Every other forensic rule does.
+	joined := map[string]bool{"forensics_ssh_password_login": true, "forensics_key_after_password_login": true}
 	for _, rule := range set.Rules() {
+		if joined[rule.Name] {
+			if len(rule.tests) < 2 {
+				t.Errorf("rule %q needs a test with hits and a test without", rule.Title)
+			}
+			continue
+		}
 		if rule.LogSource["category"] != "forensics" {
 			continue
 		}
@@ -24,7 +32,7 @@ func TestForensicRulesLoadWithTheBuiltinRulesAndPassTheirOwnTests(t *testing.T) 
 			t.Errorf("rule %q must name its kind of artifact, an id and a description", rule.Title)
 		}
 	}
-	if added != 10 || len(set.Rules()) != len(builtin.Rules())+added {
+	if added != 11 || len(set.Rules()) != len(builtin.Rules())+added+len(joined) {
 		t.Fatalf("%d forensic rules and %d rules in all, with %d built-in rules", added, len(set.Rules()), len(builtin.Rules()))
 	}
 	// The detection of logs must stay as it is: none of the forensic rules is in the plain built-in set.

@@ -12,8 +12,8 @@ go run ./cmd/omamori analyze ./analyst-demo-logs --year 2026 --timezone Asia/Tok
   --replay ./testdata/fixtures/analyst/recording.json --output ./analyst-demo-reports
 ```
 
-Use new output folders if those names already exist. The demo makes 14 alerts and
-15 checked claims: one review per alert, plus a shared-source-address link between
+Use new output folders if those names already exist. The demo makes 15 alerts and
+16 checked claims: one review per alert, plus a shared-source-address link between
 the guessing burst and the successful-login sequence. No provider is created and
 no API key is needed. The report says `REPLAY (scripted answers)`.
 

@@ -450,15 +450,15 @@ func TestSyntheticScenarioCanBeReviewedWithoutRawLogsOrAIProse(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot := snapshotFor(t, outcome)
-	if len(snapshot.Alerts) != 14 {
-		t.Fatalf("expected 14 alerts, got %d", len(snapshot.Alerts))
+	if len(snapshot.Alerts) != 15 {
+		t.Fatalf("expected 15 alerts, got %d", len(snapshot.Alerts))
 	}
 	var claims []Claim
 	for _, alert := range snapshot.Alerts {
 		claims = append(claims, claimFor(alert))
 	}
 	result := Check(snapshot, responseFor(t, claims...))
-	if result.Status != StatusComplete || len(result.Verified) != 14 {
+	if result.Status != StatusComplete || len(result.Verified) != 15 {
 		t.Fatalf("scenario analysis: %+v", result)
 	}
 	if result.Verified[0].Count != 41 {

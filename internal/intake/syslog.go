@@ -19,7 +19,9 @@ var (
 	sshMaxTries  = regexp.MustCompile(`^(?:error: )?maximum authentication attempts exceeded for (invalid user )?(.*) from (\S+) port \d{1,5}(?: ssh2)?(?: \[preauth\])?$`)
 	sudoLine     = regexp.MustCompile(`^\s*(\S+) : (.*)$`)
 	userAdded    = regexp.MustCompile(`^new user: name=([^,\s]+)`)
-	groupAdded   = regexp.MustCompile(`^add '([^']+)' to (?:shadow )?group '([^']+)'$`)
+	groupAdded   = regexp.MustCompile(`^add '([^']+)' to (shadow )?group '([^']+)'$`)
+	gpasswdAdded = regexp.MustCompile(`^user (\S+) added by \S+ to group (\S+)$`)
+	sshPenalty   = regexp.MustCompile(`^drop connection #\d+ from \[([^\]]+)\]:\d{1,5} on \[[^\]]+\]:\d{1,5} penalty: (.+)$`)
 	cronLine     = regexp.MustCompile(`^\(([^)]+)\) (CMD|REPLACE|BEGIN EDIT|END EDIT|DELETE|LIST) \((.*)\)$`)
 	suFailed     = regexp.MustCompile(`^FAILED SU \(to (\S+)\) (\S+) on \S+$`)
 	suSucceeded  = regexp.MustCompile(`^\(to (\S+)\) (\S+) on \S+$`)
@@ -86,7 +88,14 @@ func newSyslogParser(options Options) lineParser {
 				fields[event.Action], fields[event.User] = "user_created", limit(parts[1], maxNameRunes)
 			}
 		case "usermod", "gpasswd":
+			// usermod writes one line for /etc/group and one for /etc/gshadow. The second one is marked, so that one
+			// change is counted once.
 			if parts := groupAdded.FindStringSubmatch(message); parts != nil {
+				fields[event.Action], fields[event.User], fields["group"] = "group_add", limit(parts[1], maxNameRunes), limit(parts[3], maxNameRunes)
+				if parts[2] != "" {
+					fields["group_file"] = "gshadow"
+				}
+			} else if parts := gpasswdAdded.FindStringSubmatch(message); parts != nil {
 				fields[event.Action], fields[event.User], fields["group"] = "group_add", limit(parts[1], maxNameRunes), limit(parts[2], maxNameRunes)
 			}
 		case "su":
@@ -154,6 +163,12 @@ func sshFields(message string, fields map[string]string) {
 		if ip, valid := address(parts[3]); valid {
 			fields[event.Action], fields[event.Outcome] = "max_auth_attempts", "failure"
 			fields[event.User], fields[event.SourceIP] = limit(parts[2], maxNameRunes), ip
+		}
+	} else if parts := sshPenalty.FindStringSubmatch(message); parts != nil {
+		// OpenSSH 9.8 and later refuse an address for a while after failures (PerSourcePenalties).
+		if ip, valid := address(parts[1]); valid {
+			fields[event.Action], fields[event.Outcome], fields[event.SourceIP] = "connection_dropped", "failure", ip
+			fields["reason"] = limit(parts[2], maxNameRunes)
 		}
 	} else if parts := sshInvalid.FindStringSubmatch(message); parts != nil {
 		if ip, valid := address(parts[2]); valid {

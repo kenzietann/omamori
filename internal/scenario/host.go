@@ -150,8 +150,9 @@ func GenerateHost(seed int64, day time.Time, attacks bool) Host {
 		} {
 			host.Expected = append(host.Expected, Expected{Rule: rule})
 		}
+		// The key in /root/.ssh/authorized_keys was written after the guessed root login: the file is joined with the log.
+		host.Expected = append(host.Expected, Expected{"forensics_key_after_password_login", "root"})
 		host.KnownMisses = append(host.KnownMisses,
-			"the key in /root/.ssh/authorized_keys is listed with its fingerprint and gives no alert by itself: only the command that added it does",
 			"the listening port 31337 of the process from /dev/shm is listed and gives no alert by itself")
 	}
 	put("snapshots/ps.txt", strings.Join(processes, "\n")+"\n", evening)

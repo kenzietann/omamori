@@ -108,7 +108,7 @@ func TestScenarioThenDetect(t *testing.T) {
 		Alerts []struct{ Rule, Who string } `json:"expected_alerts"`
 		Misses []string                     `json:"known_misses"`
 	}
-	if err := json.Unmarshal([]byte(before[filepath.Join(logs, "expected.json")]), &expected); err != nil || len(expected.Alerts) != 12 || len(expected.Misses) != 1 {
+	if err := json.Unmarshal([]byte(before[filepath.Join(logs, "expected.json")]), &expected); err != nil || len(expected.Alerts) != 13 || len(expected.Misses) != 1 {
 		t.Fatalf("expected.json: %v, %d alerts, %d misses", err, len(expected.Alerts), len(expected.Misses))
 	}
 
@@ -116,7 +116,7 @@ func TestScenarioThenDetect(t *testing.T) {
 	if found.code != exitOK {
 		t.Fatalf("detect: %d %s", found.code, found.stderr)
 	}
-	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 29 rules. 14 alerts, 1 critical, 5 high, 8 medium.") {
+	if !strings.Contains(found.stdout, "Read 2 files and 1254 events. 32 rules. 15 alerts, 1 critical, 6 high, 8 medium.") {
 		t.Errorf("the summary is %q", found.stdout)
 	}
 
@@ -191,7 +191,7 @@ func TestDetectRefusals(t *testing.T) {
 		{"unknown time zone", []string{"detect", "--timezone", "Mars/Olympus", logs, "--output", output}, exitFailed, "time zone"},
 		{"report folder inside the logs", []string{"detect", logs, "--output", filepath.Join(logs, "out")}, exitFailed, "must not be inside the logs"},
 		{"paths with .. in them are still usable", []string{"detect", filepath.Join(base, "detect-20261111-030405", "..", "logs"), "--output", base + "/logs/.."}, exitOK, ""},
-		{"folder without logs", []string{"detect", empty, "--output", output}, exitFailed, "no log file could be read"},
+		{"folder without logs", []string{"detect", empty, "--output", output}, exitFailed, "no log file was found here"},
 		{"rules folder with a bad rule", []string{"detect", "--rules", badRules, logs, "--output", output}, exitFailed, "modifier"},
 		{"rules folder without rules", []string{"detect", "--rules", empty, logs, "--output", output}, exitFailed, "no rule"},
 		{"rules folder that is missing", []string{"detect", "--rules", filepath.Join(base, "none"), logs, "--output", output}, exitFailed, "cannot be read"},
@@ -322,13 +322,13 @@ func TestCampaignScenarioThenDetect(t *testing.T) {
 		Alerts []struct{ Rule, Who string } `json:"expected_alerts"`
 		Misses []string                     `json:"known_misses"`
 	}
-	if err != nil || json.Unmarshal(text, &expected) != nil || len(expected.Alerts) != 17 || len(expected.Misses) != 3 || len(expected.Story) != 7 {
+	if err != nil || json.Unmarshal(text, &expected) != nil || len(expected.Alerts) != 18 || len(expected.Misses) != 3 || len(expected.Story) != 7 {
 		t.Fatalf("expected.json: %v, %d alerts, %d misses, %d steps", err, len(expected.Alerts), len(expected.Misses), len(expected.Story))
 	}
 	before := snapshot(t, campaign)
 
 	found := runAt(t, detectNow, "detect", filepath.Join(campaign, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", output)
-	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "29 rules. 19 alerts, 2 critical, 9 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "Read 6 files and ") || !strings.Contains(found.stdout, "32 rules. 20 alerts, 2 critical, 10 high, 8 medium.") {
 		t.Fatalf("detect: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(output, "detect-20261111-030405", "alerts.json"))
@@ -353,7 +353,7 @@ func TestCampaignScenarioThenDetect(t *testing.T) {
 		t.Fatal(made.stderr)
 	}
 	calm := runAt(t, detectNow, "detect", filepath.Join(quiet, "logs"), "--year", "2026", "--timezone", "Asia/Tokyo", "--output", filepath.Join(base, "out2"))
-	if calm.code != exitOK || !strings.Contains(calm.stdout, "29 rules. 0 alerts.") {
+	if calm.code != exitOK || !strings.Contains(calm.stdout, "32 rules. 0 alerts.") {
 		t.Fatalf("the quiet campaign: %d %s", calm.code, calm.stdout)
 	}
 }
@@ -371,7 +371,7 @@ func TestCampaignWithTheAssetList(t *testing.T) {
 	common := []string{logs, "--assets", list, "--year", "2026", "--timezone", "Asia/Tokyo"}
 
 	found := runAt(t, detectNow, append([]string{"detect", "--output", filepath.Join(base, "out")}, common...)...)
-	if found.code != exitOK || !strings.Contains(found.stdout, "29 rules. 20 alerts, 3 critical, 9 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "32 rules. 21 alerts, 3 critical, 10 high, 8 medium.") {
 		t.Fatalf("detect with assets: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(base, "out", "detect-20261111-030405", "alerts.json"))
@@ -438,7 +438,7 @@ func TestCampaignWithTheAssetList(t *testing.T) {
 	database := filepath.Join(base, "db", "omamori.db")
 	reviewed := analyzeCommand(t, func(_, _, _, _ string) (outbound.Provider, error) { return provider, nil },
 		append([]string{"analyze", "--yes", "--provider", "openai", "--model", "test", "--db", database, "--output", filepath.Join(base, "review")}, common...)...)
-	if reviewed.code != exitOK || !strings.Contains(reviewed.stdout, "21 verified findings, 0 rejected claims, 0 unreviewed alerts") || !strings.Contains(reviewed.stdout, "Stored run:") {
+	if reviewed.code != exitOK || !strings.Contains(reviewed.stdout, "22 verified findings, 0 rejected claims, 0 unreviewed alerts") || !strings.Contains(reviewed.stdout, "Stored run:") {
 		t.Fatalf("analyze with assets: %d %s %s", reviewed.code, reviewed.stdout, reviewed.stderr)
 	}
 	report, _ := os.ReadFile(analysisFiles(t, filepath.Join(base, "review"))["report.md"])
@@ -467,7 +467,7 @@ func TestIndicatorListThroughTheCommandLine(t *testing.T) {
 	common := []string{logs, "--indicators", known, "--assets", machines, "--year", "2026", "--timezone", "Asia/Tokyo"}
 
 	found := runAt(t, detectNow, append([]string{"detect", "--output", filepath.Join(base, "out")}, common...)...)
-	if found.code != exitOK || !strings.Contains(found.stdout, "29 rules. 21 alerts, 3 critical, 10 high, 8 medium.") {
+	if found.code != exitOK || !strings.Contains(found.stdout, "32 rules. 22 alerts, 3 critical, 11 high, 8 medium.") {
 		t.Fatalf("detect with both lists: %d %s %s", found.code, found.stdout, found.stderr)
 	}
 	report, _ := os.ReadFile(filepath.Join(base, "out", "detect-20261111-030405", "report.md"))
@@ -490,7 +490,7 @@ func TestIndicatorListThroughTheCommandLine(t *testing.T) {
 	// The forensic triage marks the artifacts too: the cron job and the shell history name the same address.
 	host := hostFixture(t, false)
 	triage := runAt(t, detectNow, forensicsArgs(host, filepath.Join(base, "forensics"), "--indicators", known)...)
-	if triage.code != exitOK || !strings.Contains(triage.stdout, "39 rules. 27 alerts") {
+	if triage.code != exitOK || !strings.Contains(triage.stdout, "45 rules. 29 alerts") {
 		t.Fatalf("forensics with indicators: %d %s %s", triage.code, triage.stdout, triage.stderr)
 	}
 	alerts, _ := os.ReadFile(filepath.Join(base, "forensics", "forensics-20261111-030405", "alerts.json"))
@@ -549,7 +549,7 @@ func TestIndicatorListThroughTheCommandLine(t *testing.T) {
 	provider := &analystProvider{answer: string(encoded)}
 	reviewed := analyzeCommand(t, func(_, _, _, _ string) (outbound.Provider, error) { return provider, nil },
 		append([]string{"analyze", "--yes", "--provider", "openai", "--model", "test", "--db", filepath.Join(base, "db", "o.db"), "--output", filepath.Join(base, "review")}, common...)...)
-	if reviewed.code != exitOK || !strings.Contains(reviewed.stdout, "22 verified findings, 0 rejected claims") || !strings.Contains(reviewed.stdout, "Stored run:") {
+	if reviewed.code != exitOK || !strings.Contains(reviewed.stdout, "23 verified findings, 0 rejected claims") || !strings.Contains(reviewed.stdout, "Stored run:") {
 		t.Fatalf("analyze with indicators: %d %s %s", reviewed.code, reviewed.stdout, reviewed.stderr)
 	}
 	text, _ := os.ReadFile(analysisFiles(t, filepath.Join(base, "review"))["report.md"])

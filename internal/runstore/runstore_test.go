@@ -215,7 +215,7 @@ func TestScenarioStoresAllEventsBeyondRetainedEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	input, err := Build(outcome, checked(t, outcome))
-	if err != nil || len(input.Events) != 1254 || len(input.Alerts) != 14 {
+	if err != nil || len(input.Events) != 1254 || len(input.Alerts) != 15 {
 		t.Fatalf("scenario build: %d events, %d alerts, %v", len(input.Events), len(input.Alerts), err)
 	}
 	linked := map[string]bool{}
@@ -260,7 +260,7 @@ func TestScenarioStoresAllEventsBeyondRetainedEvidence(t *testing.T) {
 	}
 	defer db.Close()
 	saved, err := db.SaveRun(ctx, input)
-	if err != nil || saved.EventCount != 1254 || saved.AlertCount != 14 {
+	if err != nil || saved.EventCount != 1254 || saved.AlertCount != 15 {
 		t.Fatalf("store scenario: %+v %v", saved, err)
 	}
 	events, err := db.SearchEvents(ctx, store.Query{RunID: saved.ID, Field: "url", Value: "/healthz", Limit: 1000})

@@ -63,3 +63,32 @@ tests:
       - {service: cron, product: linux, action: cron_run, user: backup, command: "curl -fsS https://hc.example.test/ping/abc > /dev/null"}
       - {service: cron, product: linux, action: cron_run, user: aiko, command: "/usr/local/bin/backup.sh | logger -t backup"}
     expect: {alerts: 0}
+---
+title: An account was added to an admin group
+name: linux_admin_group_add
+id: 6f3a2c10-0104-4a6e-9d7b-0a1b2c3d4e04
+description: usermod or gpasswd put an account into sudo, wheel or admin. That account can then run anything as root. Attackers do this to keep their rights; check that the change was planned.
+level: high
+tags: [attack.persistence, attack.privilege_escalation, attack.t1098]
+logsource: {product: linux}
+detection:
+  selection:
+    action: group_add
+    group: [sudo, wheel, admin]
+  shadow:
+    group_file: gshadow
+  condition: selection and not shadow
+tests:
+  - name: a user put into sudo is one alert, with the shadow line not counted again
+    events:
+      - {service: usermod, product: linux, action: group_add, user: support2, group: sudo}
+      - {service: usermod, product: linux, action: group_add, user: support2, group: sudo, group_file: gshadow}
+    expect: {alerts: 1}
+  - name: gpasswd into wheel matches
+    events: [{service: gpasswd, product: linux, action: group_add, user: deploy, group: wheel}]
+    expect: {alerts: 1}
+  - name: other groups do not match
+    events:
+      - {service: usermod, product: linux, action: group_add, user: aiko, group: docker}
+      - {service: usermod, product: linux, action: group_add, user: aiko, group: sudoers-readonly}
+    expect: {alerts: 0}

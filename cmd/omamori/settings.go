@@ -18,7 +18,7 @@ const (
 	defaultMaxTokens = 300000
 	usageText        = "usage: omamori check|ui [--provider id] [--model name] [--output folder] [--max-steps n] [--max-tokens n] <project folder>"
 	usageTriage      = "usage: omamori triage [--year n] [--timezone name] [--triage-config file] [--provider id] [--model name] [--output folder] <log file>"
-	usageReplay      = "usage: omamori replay [--output folder] [--max-steps n] [--max-tokens n] <recording file> [<project folder or log file>]"
+	usageReplay      = "usage: omamori replay [--output folder] [--max-steps n] [--max-tokens n] [--rules folder] [--assets file] [--indicators file] [--format name] <recording file> [<project folder or log file>]"
 )
 
 type settings struct {
@@ -34,6 +34,8 @@ type settings struct {
 	triageFile string
 	// recording is the file that a replay plays back.
 	recording string
+	// The detection inputs of an analyst run. A replay needs the same ones, or the evidence does not match.
+	rules, assets, indicators, format string
 }
 
 var (
@@ -48,11 +50,14 @@ func isUsage(err error) bool {
 
 // parseFlags reads the flags that all commands share, and gives back the other arguments in order.
 // A flag may come before or after the arguments, like in most tools. It never reads a key.
-func parseFlags(name string, args []string, lookupEnv func(string) string, usage error) (settings, []string, error) {
+func parseFlags(name string, args []string, lookupEnv func(string) string, usage error, extra ...func(*flag.FlagSet, *settings)) (settings, []string, error) {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 
 	var parsed settings
+	for _, add := range extra {
+		add(flags, &parsed)
+	}
 	flags.StringVar(&parsed.output, "output", "", "folder for the reports")
 	flags.StringVar(&parsed.provider, "provider", lookupEnv("OMAMORI_PROVIDER"), "provider id")
 	flags.StringVar(&parsed.model, "model", lookupEnv("OMAMORI_MODEL"), "model name")
@@ -163,7 +168,12 @@ func parseTriage(args []string, lookupEnv func(string) string, homeDirectory fun
 
 // parseReplay reads the command line of replay: a recording, and the project folder or the log file that it was made for.
 func parseReplay(args []string, lookupEnv func(string) string, homeDirectory func() (string, error)) (settings, error) {
-	parsed, positional, err := parseFlags("omamori replay", args, lookupEnv, errUsageReplay)
+	parsed, positional, err := parseFlags("omamori replay", args, lookupEnv, errUsageReplay, func(flags *flag.FlagSet, parsed *settings) {
+		flags.StringVar(&parsed.rules, "rules", "", "rules folder of the analyst run")
+		flags.StringVar(&parsed.assets, "assets", "", "asset list of the analyst run")
+		flags.StringVar(&parsed.indicators, "indicators", "", "indicator list of the analyst run")
+		flags.StringVar(&parsed.format, "format", "", "log format of the analyst run")
+	})
 	if err != nil {
 		return settings{}, err
 	}

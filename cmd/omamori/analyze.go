@@ -112,7 +112,7 @@ func runAnalyze(args []string, env environment) int {
 		return fail(err)
 	}
 	if len(outcome.Intake.Files) == 0 {
-		return fail(errors.New("no log file could be read. Give the format with --format syslog, web, json, suricata, zeek, wazuh or windows"))
+		return fail(noLogs(outcome.Intake))
 	}
 
 	target := sources[0]

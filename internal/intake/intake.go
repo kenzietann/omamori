@@ -45,9 +45,12 @@ const (
 )
 
 var (
-	ErrTooBig   = errors.New("the logs hold more events than one run can take")
-	ErrBadInput = errors.New("the log cannot be read")
-	ErrFormat   = errors.New("the format is not known. Use syslog, web, json, suricata, zeek, wazuh or windows")
+	ErrTooBig = errors.New("the logs hold more events than one run can take")
+	// ErrTooManyFiles is for a folder with more files than one run reads. It is most often a project folder,
+	// not a folder of logs.
+	ErrTooManyFiles = errors.New("the folder holds more than 2000 files to read. Give the folder of the logs, not a whole project")
+	ErrBadInput     = errors.New("the log cannot be read")
+	ErrFormat       = errors.New("the format is not known. Use syslog, web, json, suricata, zeek, wazuh or windows")
 )
 
 // Options say how to read lines that do not say everything themselves.
@@ -114,7 +117,7 @@ func ReadContext(ctx context.Context, paths []string, options Options) (Result, 
 			return nil
 		}
 		if len(targets) >= maxFiles {
-			return ErrTooBig
+			return ErrTooManyFiles
 		}
 		seen[absolute] = true
 		targets = append(targets, target{absolute, name})
@@ -152,6 +155,10 @@ func ReadContext(ctx context.Context, paths []string, options Options) (Result, 
 				if found != path && strings.HasPrefix(entry.Name(), ".") {
 					return filepath.SkipDir
 				}
+				if found != path && skippedFolder(found, entry.Name()) {
+					result.Skipped = append(result.Skipped, name+": a folder of dependencies or a cache, not read")
+					return filepath.SkipDir
+				}
 			case !entry.Type().IsRegular():
 				result.Skipped = append(result.Skipped, name+": not a normal file")
 			case strings.HasPrefix(entry.Name(), "."):
@@ -168,7 +175,7 @@ func ReadContext(ctx context.Context, paths []string, options Options) (Result, 
 			if ctx.Err() != nil {
 				return Result{}, ctx.Err()
 			}
-			if errors.Is(err, ErrTooBig) {
+			if errors.Is(err, ErrTooBig) || errors.Is(err, ErrTooManyFiles) {
 				return Result{}, err
 			}
 			return Result{}, fmt.Errorf("%w: %s", ErrBadInput, filepath.Base(path))
@@ -404,4 +411,22 @@ func limit(text string, runes int) string {
 	}
 
 	return string([]rune(text)[:runes])
+}
+
+// These folders hold the code of other people or files that a tool made, not logs. They are skipped like the
+// exposure check skips them, so that a project folder can be read for its logs.
+var dependencyFolders = map[string]bool{
+	"node_modules": true, "vendor": true, "__pycache__": true, "venv": true, "site-packages": true, "Pods": true,
+	"SourcePackages": true, "DerivedData": true, "Carthage": true, "bower_components": true, "jspm_packages": true,
+}
+
+// skippedFolder is a dependency folder, or a folder that marks itself as a cache with the standard CACHEDIR.TAG
+// file (the target folder of Rust does).
+func skippedFolder(path, name string) bool {
+	if dependencyFolders[name] {
+		return true
+	}
+	info, err := os.Lstat(filepath.Join(path, "CACHEDIR.TAG"))
+
+	return err == nil && info.Mode().IsRegular()
 }

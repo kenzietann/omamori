@@ -167,7 +167,7 @@ func runDetect(args []string, env environment) int {
 		return fail(err)
 	}
 	if len(outcome.Intake.Files) == 0 {
-		return fail(errors.New("no log file could be read. Give the format with --format syslog, web, json, suricata, zeek, wazuh or windows"))
+		return fail(noLogs(outcome.Intake))
 	}
 
 	report := detect.Markdown(outcome)
@@ -341,4 +341,19 @@ func writeCampaignScenario(env environment, directory string, seed int64, day ti
 		day.Year(), shellArgument(location.String()), shellArgument(filepath.Join(directory, "assets.yml")), shellArgument(filepath.Join(directory, "indicators.yml")), shellArgument(filepath.Join(directory, "logs")))
 
 	return exitOK
+}
+
+// noLogs says why nothing was read: how many files were looked at, and what the format flag can and cannot change.
+func noLogs(read intake.Result) error {
+	unknown := 0
+	for _, skipped := range read.Skipped {
+		if strings.HasSuffix(skipped, ": the format was not recognized") {
+			unknown++
+		}
+	}
+	if unknown == 0 {
+		return errors.New("no log file was found here")
+	}
+
+	return fmt.Errorf("none of the %d files here looks like a log that Omamori reads. If some of them are logs, give the format with --format syslog, web, json, suricata, zeek, wazuh or windows", unknown)
 }

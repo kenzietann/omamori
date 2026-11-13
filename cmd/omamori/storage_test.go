@@ -41,7 +41,7 @@ func TestStoredRunsSearchCasesAndTimelineThroughCLI(t *testing.T) {
 		t.Fatalf("stored detection: %d %s %s", detected.code, detected.stdout, detected.stderr)
 	}
 	runs := decodeStored[[]store.Run](t, storedCommand(t, database, "runs"))
-	if len(runs) != 1 || runs[0].EventCount != 1254 || runs[0].AlertCount != 14 {
+	if len(runs) != 1 || runs[0].EventCount != 1254 || runs[0].AlertCount != 15 {
 		t.Fatalf("run counts: %#v", runs)
 	}
 	first := runs[0]
@@ -142,7 +142,7 @@ func TestAnalysisPersistenceAndPreview(t *testing.T) {
 		t.Fatalf("analysis store: %d %s %s", live.code, live.stdout, live.stderr)
 	}
 	runs := decodeStored[[]store.Run](t, storedCommand(t, database, "runs"))
-	if len(runs) != 1 || runs[0].EventCount != 1254 || runs[0].AlertCount != 14 || len(runs[0].Analysis) == 0 {
+	if len(runs) != 1 || runs[0].EventCount != 1254 || runs[0].AlertCount != 15 || len(runs[0].Analysis) == 0 {
 		t.Fatalf("analysis persistence: %#v", runs)
 	}
 	var result analysisrun.Result

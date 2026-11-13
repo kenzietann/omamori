@@ -24,7 +24,7 @@ func TestReportOfTheScenario(t *testing.T) {
 	report := Markdown(outcome)
 
 	for _, want := range []string{
-		"# Omamori detection report", "- Alerts: 14", "No AI was used",
+		"# Omamori detection report", "- Alerts: 15", "No AI was used",
 		"| 1 | critical | 2026-11-10 02:1", "SSH login succeeded after password guessing | src_ip=203.0.113.9 | 41 |",
 		"- Step 1: SSH password guessing from one address (events: 40,", "- Step 2: SSH login succeeded (events: 1,",
 		"service=sshd action=login outcome=success user=root src_ip=203.0.113.9",

@@ -48,7 +48,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 	if got.code != exitOK {
 		t.Fatalf("forensics: %d %s", got.code, got.stderr)
 	}
-	if !strings.Contains(got.stdout, "Read and hashed 22 files: 1254 log events and 77 artifacts. 39 rules. 26 alerts, 3 critical, 14 high, 9 medium.") ||
+	if !strings.Contains(got.stdout, "Read and hashed 22 files: 1254 log events and 77 artifacts. 45 rules. 28 alerts, 3 critical, 16 high, 9 medium.") ||
 		!strings.Contains(got.stdout, "Stored run:") {
 		t.Errorf("the summary is %q", got.stdout)
 	}
@@ -74,7 +74,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 	var expected struct {
 		Alerts []struct{ Rule string } `json:"expected_alerts"`
 	}
-	if err := json.Unmarshal([]byte(before[filepath.Join(host, "expected.json")]), &expected); err != nil || len(expected.Alerts) != 22 {
+	if err := json.Unmarshal([]byte(before[filepath.Join(host, "expected.json")]), &expected); err != nil || len(expected.Alerts) != 24 {
 		t.Fatalf("expected.json: %v, %d alerts", err, len(expected.Alerts))
 	}
 	for _, wanted := range expected.Alerts {
@@ -94,7 +94,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 	}
 
 	runs := decodeStored[[]store.Run](t, storedCommand(t, database, "runs"))
-	if len(runs) != 1 || runs[0].EventCount != 1331 || runs[0].AlertCount != 26 {
+	if len(runs) != 1 || runs[0].EventCount != 1331 || runs[0].AlertCount != 28 {
 		t.Fatalf("stored run: %#v", runs)
 	}
 	keys := decodeStored[[]store.Event](t, storedCommand(t, database, "search", "--run", runs[0].ID, "--field", "service", "--value", "authorized_keys"))
@@ -124,7 +124,7 @@ func TestForensicsThroughTheCommandLine(t *testing.T) {
 func TestForensicsOnTheSystemWithoutAnAttack(t *testing.T) {
 	host := hostFixture(t, true)
 	got := runAt(t, detectNow, forensicsArgs(host, filepath.Join(t.TempDir(), "out"))...)
-	if got.code != exitOK || !strings.Contains(got.stdout, "39 rules. 0 alerts.") {
+	if got.code != exitOK || !strings.Contains(got.stdout, "45 rules. 0 alerts.") {
 		t.Fatalf("code %d, stdout %q, stderr %q", got.code, got.stdout, got.stderr)
 	}
 }
@@ -252,7 +252,7 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	if live.code != exitOK || len(provider.sent) != 1 {
 		t.Fatalf("live: %d %s %s, calls %d", live.code, live.stdout, live.stderr, len(provider.sent))
 	}
-	if !strings.Contains(live.stdout, "26 verified findings, 0 rejected claims, 0 unreviewed alerts") || !strings.Contains(live.stdout, "Stored run:") {
+	if !strings.Contains(live.stdout, "28 verified findings, 0 rejected claims, 0 unreviewed alerts") || !strings.Contains(live.stdout, "Stored run:") {
 		t.Errorf("the summary is %q", live.stdout)
 	}
 	// What left the machine: the bounded snapshot with placeholders. Not the secret, not a private file, no tools.
@@ -279,7 +279,7 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 		return string(data)
 	}
 	report, manifest := read("report.md"), read("manifest.json")
-	for _, want := range []string{"# Omamori forensic triage report", "## Attack timeline", "## Evidence manifest", "## AI analyst", "- Verified claims: 26",
+	for _, want := range []string{"# Omamori forensic triage report", "## Attack timeline", "## Evidence manifest", "## AI analyst", "- Verified claims: 28",
 		"The checked AI review is shown separately below.", "do not say when or in which order things happened"} {
 		if !strings.Contains(report, want) {
 			t.Errorf("the report does not have %q", want)
@@ -299,7 +299,7 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	}
 
 	var result analysisrun.Result
-	if err := json.Unmarshal([]byte(read("analysis.json")), &result); err != nil || !result.Complete || len(result.Analysis.Verified) != 26 {
+	if err := json.Unmarshal([]byte(read("analysis.json")), &result); err != nil || !result.Complete || len(result.Analysis.Verified) != 28 {
 		t.Fatalf("analysis.json: %v", err)
 	}
 	weak := 0
@@ -308,12 +308,12 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 			weak++
 		}
 	}
-	if weak != 7 {
-		t.Errorf("%d findings are marked as having weak times, want 7", weak)
+	if weak != 8 {
+		t.Errorf("%d findings are marked as having weak times, want 8", weak)
 	}
 
 	runs := decodeStored[[]store.Run](t, storedCommand(t, database, "runs"))
-	if len(runs) != 1 || runs[0].AlertCount != 26 || runs[0].EventCount != 1331 {
+	if len(runs) != 1 || runs[0].AlertCount != 28 || runs[0].EventCount != 1331 {
 		t.Fatalf("stored runs: %#v", runs)
 	}
 	shown := storedCommand(t, database, "run", runs[0].ID)
@@ -327,7 +327,7 @@ func TestForensicsWithTheAnalystThroughTheCommandLine(t *testing.T) {
 	}
 	replayOutput := filepath.Join(t.TempDir(), "replay")
 	replayed := analyzeCommand(t, noProvider, forensicsArgs(host, replayOutput, "--analyze", "--replay", filepath.Join(folder, "recording.json"))...)
-	if replayed.code != exitOK || !strings.Contains(replayed.stdout, "REPLAY") || !strings.Contains(replayed.stdout, "26 verified findings") {
+	if replayed.code != exitOK || !strings.Contains(replayed.stdout, "REPLAY") || !strings.Contains(replayed.stdout, "28 verified findings") {
 		t.Fatalf("replay: %d %s %s", replayed.code, replayed.stdout, replayed.stderr)
 	}
 	passwd := filepath.Join(host, "root", "etc", "passwd")

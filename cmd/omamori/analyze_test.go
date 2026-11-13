@@ -142,7 +142,7 @@ func TestAnalyzeLiveAndReplayThroughTheCLI(t *testing.T) {
 	}
 	data, err := os.ReadFile(files["analysis.json"])
 	var result analysisrun.Result
-	if err != nil || json.Unmarshal(data, &result) != nil || !result.Complete || len(result.Analysis.Verified) != 14 {
+	if err != nil || json.Unmarshal(data, &result) != nil || !result.Complete || len(result.Analysis.Verified) != 15 {
 		t.Fatalf("analysis JSON: %v, %s", err, data)
 	}
 	noProvider := func(_, _, _, _ string) (outbound.Provider, error) {
@@ -220,12 +220,12 @@ func TestBundledAnalystReplay(t *testing.T) {
 		return nil, nil
 	}, "analyze", logs, "--year", "2026", "--timezone", "Asia/Tokyo", "--output", output,
 		"--replay", filepath.Join("..", "..", "testdata", "fixtures", "analyst", "recording.json"))
-	if got.code != exitOK || !strings.Contains(got.stdout, "15 verified findings") || !strings.Contains(got.stdout, "REPLAY (scripted answers)") {
+	if got.code != exitOK || !strings.Contains(got.stdout, "16 verified findings") || !strings.Contains(got.stdout, "REPLAY (scripted answers)") {
 		t.Fatalf("bundled demo: %d %s %s", got.code, got.stdout, got.stderr)
 	}
 	data, err := os.ReadFile(analysisFiles(t, output)["analysis.json"])
 	var result analysisrun.Result
-	if err != nil || json.Unmarshal(data, &result) != nil || len(result.Analysis.Verified) != 15 || result.Analysis.Verified[14].Kind != "related" {
+	if err != nil || json.Unmarshal(data, &result) != nil || len(result.Analysis.Verified) != 16 || result.Analysis.Verified[15].Kind != "related" {
 		t.Fatalf("the demo did not verify its related-alert claim: %v", err)
 	}
 }

@@ -305,7 +305,7 @@ func (c *collector) read(reader io.Reader, info fs.FileInfo, name string, found 
 	if found.kind == KindLog {
 		events, stats, err := intake.Parse(tee, name, intake.Options{Year: c.options.Year, Location: c.options.Location, Format: found.format})
 		switch {
-		case errors.Is(err, intake.ErrTooBig):
+		case errors.Is(err, intake.ErrTooBig), errors.Is(err, intake.ErrTooManyFiles):
 			return ErrTooBig
 		case err != nil:
 			entry.Note = "could not be read as a log"
