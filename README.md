@@ -18,7 +18,7 @@ you see it.
 It runs on your own computer, as a CLI with a terminal home screen and a local web dashboard. Most features
 need no AI at all.
 
-**Status: v0.1.0, a public preview.** All features below run and have tests, and the main paths have been
+**Status: v0.2.0, a public preview.** All features below run and have tests, and the main paths have been
 tested live (see [Live test results](#live-test-results)). It is not a finished product: read the limits of
 each feature. What changed in each version is in the [changelog](CHANGELOG.md).
 
@@ -92,8 +92,8 @@ the [latest release](https://github.com/kenzietann/omamori/releases/latest), the
 
 ```sh
 shasum -a 256 -c checksums.txt --ignore-missing       # check the download
-tar xzf omamori_0.1.0_darwin_arm64.tar.gz
-sudo mv omamori_0.1.0_darwin_arm64/omamori /usr/local/bin/
+tar xzf omamori_0.2.0_darwin_arm64.tar.gz
+sudo mv omamori_0.2.0_darwin_arm64/omamori /usr/local/bin/
 omamori version
 ```
 
@@ -103,7 +103,7 @@ The binaries are not signed. If macOS refuses to open a file that a browser down
 **Or build it from source** with Go 1.26.5 or newer:
 
 ```sh
-go install github.com/kenzietann/omamori/cmd/omamori@v0.1.0
+go install github.com/kenzietann/omamori/cmd/omamori@v0.2.0
 # or, in a clone: go install ./cmd/omamori
 ```
 

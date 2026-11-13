@@ -6,6 +6,11 @@ flags and file formats.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
+Omamori reads the logs of web applications: fifteen framework setups, Docker and the systemd journal, with
+rules for attacks on applications and APIs.
+
 ### Added
 
 - **Logs of web frameworks.** Express, NestJS, Django, Flask, FastAPI, Spring Boot, ASP.NET Core, Laravel,
@@ -70,5 +75,6 @@ nobody outside the project has used it yet. Read the limits before you rely on a
 - Live AI quality was measured on a small sample (14 of 15 runs of the fixed tests, one model).
 - Binaries for macOS and Linux only. They are not signed.
 
-[Unreleased]: https://github.com/kenzietann/omamori/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kenzietann/omamori/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kenzietann/omamori/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kenzietann/omamori/releases/tag/v0.1.0
