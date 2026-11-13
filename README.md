@@ -9,207 +9,433 @@
 
 [日本語](README.jp.md)
 
-An AI blue-team tool for exposure checks, log detection and evidence-based alert
-review. It uses read-only tools, and a guard sits between the AI and your data.
-The CLI and a dashboard running locally on `127.0.0.1` use the same detection,
-analyst and investigation services.
+Omamori is a blue-team tool for the terminal. It checks projects for leaked secrets, reads logs, packet
+captures and whole Linux systems, finds attacks with rules, and lets an AI review what it found. A **guard**
+sits between the AI and your data: secrets and personal data are removed before anything leaves your
+computer, the AI can only use read-only tools, and every claim the AI makes is checked by plain code before
+you see it.
 
-**Status: work in progress, detection, AI analysis and persistent investigation data run.** Task A
-(exposure check), Task B (AI log triage), the guard, a terminal screen and replay
-mode work. `detect` checks local logs with rules and `scenario` makes synthetic
-demo logs. `analyze` reviews detected alerts with the AI and verifies its claims.
-SQLite, PostgreSQL and MariaDB can store runs for search, cases and timelines.
-`forensics` reads the artifacts of a Linux system read-only, hashes them and
-builds a timeline. `rule draft` (Task C) lets the AI write the matching part of a detection rule,
-and code accepts it only if it passes fixed checks. No live model has been measured on it yet.
-The remaining Should items are not done. I am learning Go while I build it.
+It runs on your own computer, as a CLI with a terminal home screen and a local web dashboard. Most features
+need no AI at all.
+
+**Status:** work in progress, built for my 就職作品 presentation in February 2027 and for my startup. All
+features below run and have tests, and the main paths have been tested live (see
+[Live test results](#live-test-results)). It is not a finished product: read the limits of each feature.
+
+## Contents
+
+- [Why I am building this](#why-i-am-building-this)
+- [How the guard keeps your data safe](#how-the-guard-keeps-your-data-safe)
+- [Install](#install)
+- [A five-minute tour, no API key needed](#a-five-minute-tour-no-api-key-needed)
+- [Two ways to use it: home screen or commands](#two-ways-to-use-it-home-screen-or-commands)
+- [Features](#features)
+  1. [Exposure check (Task A)](#1-exposure-check-task-a)
+  2. [Log triage (Task B)](#2-log-triage-task-b)
+  3. [Detection with rules](#3-detection-with-rules)
+  4. [AI analyst](#4-ai-analyst)
+  5. [Forensic triage of a Linux system](#5-forensic-triage-of-a-linux-system)
+  6. [File rules (YARA-like)](#6-file-rules-yara-like)
+  7. [Packet captures](#7-packet-captures)
+  8. [AI rule writing (Task C)](#8-ai-rule-writing-task-c)
+  9. [Store, search, cases and timelines](#9-store-search-cases-and-timelines)
+  10. [Local web dashboard](#10-local-web-dashboard)
+  11. [Attack lab](#11-attack-lab)
+  12. [Synthetic demo data](#12-synthetic-demo-data)
+  13. [Replay and live evaluation](#13-replay-and-live-evaluation)
+- [AI providers and API keys](#ai-providers-and-api-keys)
+- [Where the output goes](#where-the-output-goes)
+- [What it cannot do](#what-it-cannot-do)
+- [Live test results](#live-test-results)
+- [Docs](#docs)
+- [About the project](#about-the-project)
 
 ## Why I am building this
 
-Security teams want to use AI for blue team work, like detection, log checks,
-and leak checks. But logs and code are full of secrets and personal data.
-Sending them to an AI company as they are is a risk. In a big company it may
-also break company rules.
+Security teams want to use AI for blue-team work: checking logs, finding leaks, writing detection rules. But
+logs and code are full of secrets and personal data. Sending them to an AI company as they are is a risk,
+and in a big company it can break company rules. And an AI that sounds sure can still be wrong.
 
-Omamori tries to fix that. You use your own API key. Before anything leaves
-your computer, the guard removes the sensitive data it can detect.
+Omamori tries to fix both. You use your own API key. Before anything leaves your computer, the guard removes
+the sensitive data it can detect. After the AI answers, code checks each claim against the evidence and
+throws away what it cannot prove.
 
-## Who it is for
+It is for security engineers and developers, in teams of any size: a security team for first-pass work, or a
+small team with no security person. It is not a SIEM and not a hosted service.
 
-Security engineers and developers, in companies of any size. A security team in
-a big company can use it for first-pass blue team work, like checking logs and
-writing detection rules. A small team with no security person can use it too.
+## How the guard keeps your data safe
 
-v1 runs on one computer. It reads local files and logs. It is not a
-SIEM and not a hosted service.
+These rules hold for every feature:
 
-## Quick start
+- **One way out.** A single function sends data to the AI provider, and it cleans the whole request first.
+  Secrets and personal data become placeholders like `[SECRET:aws_key:001]`, which are never turned back.
+- **Read-only.** The AI can only use read-only tools: no shell, no network, no writing. It cannot change its
+  own permissions. Collectors (logs, forensics, captures) only read, and never follow links out of the
+  folder you give.
+- **Data is data.** Text from files, logs and packets is treated as data, never as instructions. There are
+  prompt-injection tests with booby-trapped files.
+- **Checked claims.** For the analyst features, every citation, count, time and link the AI gives is checked
+  by code. Claims that fail are rejected and shown as rejected; the rule alerts never get replaced.
+- **You see it first.** Before a live AI run, you see the request that would be sent. Nothing is sent without
+  `--yes` (or your confirmation on the screen).
+- **Safe reports.** Reports show the place, the type and a placeholder, never the secret itself. Reports go
+  into a new folder that is never inside the evidence.
+- **Your key stays yours.** The API key is never printed, logged or written to a file. On macOS a key that
+  works is kept in your Keychain.
 
-```
-go install ./cmd/omamori
-omamori providers                       # which AI providers have a key
-omamori check ./some-project            # Task A
-omamori triage ./auth.log --year 2026   # Task B
-omamori replay ~/omamori-output/run-.../recording.json ./some-project
-omamori eval --yes --runs 3             # live test on the fake fixtures, with a token cap
-```
+The [platform plan](docs/platform-plan.md) has the details and the tests behind each rule.
 
-You can type the key in the screen. On macOS a key that works is saved in your
-Keychain (you can remove it in Settings). It is never printed or written to a
-file. Every live run saves a report (`report.md` and a static `report.html` with no script),
-an event log and a `recording.json` in `~/omamori-output/`. Use `--help` for all flags.
+## Install
 
-### Local detection, without an AI provider
-
-`detect` reads sshd/Linux syslog, Apache/Nginx access logs, or JSON lines with a
-timestamp. It normalizes supported Suricata EVE, Zeek, Wazuh and Windows/Sysmon
-JSON exports into the shared event fields. It applies 33 built-in rules, including counts, distinct counts and
-ordered sequences such as password guessing followed by a successful login.
-Rule evaluation uses no API key. The command stays local unless you enable
-storage on a configured database server.
-
-Try it with made-up logs in a new folder:
+You need **Go 1.26.5 or newer**.
 
 ```sh
+git clone https://github.com/kenzietann/omamori.git
+cd omamori
+go install ./cmd/omamori      # puts the omamori command in $(go env GOPATH)/bin
+omamori help
+```
+
+Optional:
+
+- an **API key** of an AI provider, for the AI features (see [AI providers](#ai-providers-and-api-keys))
+- **Docker** (Docker Desktop, colima or Docker Engine), for the [attack lab](#11-attack-lab)
+- **PostgreSQL or MariaDB**, if you want the store on a server instead of the built-in SQLite
+
+## A five-minute tour, no API key needed
+
+Everything here uses made-up data and runs offline.
+
+```sh
+# 1. Make a day of synthetic logs with planted attacks, and find them with the rules.
 omamori scenario --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-logs
-omamori detect ./demo-logs --year 2026 --timezone Asia/Tokyo --output ./demo-reports
-```
+omamori detect ./demo-logs --year 2026 --timezone Asia/Tokyo
+#    -> Read 2 files and 1254 events. 35 rules. 15 alerts, 1 critical, 6 high, 8 medium.
 
-This example produces 14 alerts, including one critical alert for a login after
-password guessing. Reports are saved in a new `detect-...` folder as `report.md`,
-`report.html` and `alerts.json`. Existing run folders are refused. The logs stay
-unchanged. `expected.json` describes the synthetic scenario; the report lists it
-as skipped because it is not a log.
+# 2. Watch the AI analyst work, with recorded answers instead of a live AI.
+omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo \
+  --replay ./testdata/fixtures/analyst/recording.json
+#    -> REPLAY (scripted answers) ... Analyst: complete. 16 verified findings, 0 rejected claims.
 
-Use `scenario --benign` for a day without planted attacks, `detect --rules ./rules`
-to load your own YAML rules, or `--format syslog|web|json|suricata|zeek|wazuh|windows`
-to choose a parser. Auto mode can read mixed JSON sources; an explicit source
-format counts other shapes as unread. See the [intake guide](docs/intake.md)
-for field mappings, supported exporters and limits. The built-in rules cover
-SSH, Linux host events, web servers, and movement inside a network as Zeek and
-Suricata see it; additional sources can use custom rules.
-Custom rules replace the built-in set. The rule format is a documented subset of
-Sigma: unsupported conditions and modifiers are refused. Rules can include test
-events, and a rule set with failing tests is refused too.
-
-The tests cover 25 synthetic seeds, including ordinary logins, typos, web visits
-and scans. These checks measure the generated fixtures, not production accuracy.
-Slow password guessing below the configured thresholds is a known miss. Classic
-syslog has no year or time zone, so set `--year` and `--timezone` for the logs.
-
-### AI analyst over the alerts
-
-Use the same logs with `analyze`. It sends a bounded, sanitized evidence snapshot
-through the existing guard. The AI can review alerts, identify shared entities
-and suggest investigation steps. Code checks its citations, counts, times and
-relationships before constructing the displayed findings. It has no tools, and
-its suggestions are not executed.
-
-```sh
-omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo --dry-run
-omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo --yes
-```
-
-Select the provider and model using `--provider` and `--model`, the environment,
-or existing saved settings. Without `--yes`, the command shows a request preview
-and sends nothing. Runs save the detection report, checked analysis, coverage
-gaps and a replay recording when an answer can be recorded. Invalid AI claims
-never replace the rule alerts. The versioned `analysis.json` result and shared
-run service are also intended for the local dashboard.
-
-For a demo with no provider or key, use the [bundled scripted analyst replay](testdata/fixtures/analyst/README.md).
-It checks 14 alert reviews plus one shared-entity link, and is explicitly labeled
-as scripted. See the [analyst guide](docs/analyst.md) for the schema boundaries,
-replay behavior and integration APIs. Local fake-provider and replay tests verify
-the pipeline; live model quality has not been measured for this slice.
-
-The [multi-source fixture](testdata/fixtures/intake/README.md) exercises all four
-new source families with eight synthetic records and six expected observation
-alerts. It runs through the same detection and analyst services as the CLI and
-local dashboard.
-
-### Store, search and investigate
-
-Add `--store` to `detect` or `analyze` to keep the sanitized run, including all
-parsed events, its alerts and checked analysis. SQLite is the default local
-backend at `~/omamori-data/omamori.db`; `--db file` chooses another SQLite file.
-PostgreSQL and MariaDB use `OMAMORI_DB_DRIVER` and `OMAMORI_DB_DSN` from the
-environment. Request previews never open the database.
-
-```sh
-omamori detect ./demo-logs --year 2026 --timezone Asia/Tokyo --store
-omamori store runs
-omamori store search --field src_ip --value 203.0.113.9
-omamori store search --kind alerts --level critical
-omamori store cases create --title 'Authentication review'
-omamori store timeline --from 2026-11-10T00:00:00Z --to 2026-11-11T00:00:00Z
-```
-
-Cases link chosen alerts across runs and use versions to prevent stale updates.
-Timelines retain event/alert provenance, and AI citations resolve to full stored
-events. These APIs are shared with the local dashboard. See the
-[storage guide](docs/storage.md) for backend setup, case commands, query semantics
-and limits. PostgreSQL and MariaDB have been tested with disposable real servers,
-including the CLI detection and analyst replay paths.
-
-### Forensic triage of a Linux system
-
-`forensics` reads logs, crontabs, systemd units, `authorized_keys`, shell
-histories and `/etc/passwd` from a folder (a mounted image, a copy, or `/`), and
-saved output of `ps` and `ss` when you give it. It only reads. Every file it
-opens is hashed into a manifest that can be checked again later. The same rules
-and the same store are used, and alerts from logs and artifacts stand in one
-timeline that says where each time comes from.
-
-```sh
-omamori scenario --host --date 2026-11-10 --timezone Asia/Tokyo ./demo-host
+# 3. Make a whole synthetic Linux system that was broken into, and triage it.
+omamori scenario --host --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-host
 omamori forensics --year 2026 --timezone Asia/Tokyo \
   --processes ./demo-host/snapshots/ps.txt --sockets ./demo-host/snapshots/ss.txt ./demo-host/root
-omamori forensics verify ~/omamori-output/forensics-<time>/manifest.json ./demo-host/root
+#    -> Read and hashed 31 files ... 55 rules. 34 alerts, 3 critical, 20 high, 11 medium.
+
+# 4. Open the home screen and try the other tasks.
+omamori ui ./demo-logs
 ```
 
-File rules (a subset of YARA: text, hex and regex strings with a condition)
-look at the content of files in `/tmp`, `/dev/shm`, home folders, web folders
-and other places where an attacker leaves tools: droppers, reverse shells,
-miners, programs in temporary folders, web shells. Each hit is an alert with the
-SHA-256 of the file from the manifest. See the [file rules guide](docs/file-rules.md).
+Each command prints where its report is. Open `report.html` in a browser. If Docker runs, try
+`omamori lab` too: it attacks a real Debian server in a container and scores what Omamori finds.
 
-Password hashes, private keys and credential files are never read, and links are not followed.
-Add `--analyze` for the checked AI review of the alerts; findings that rest only
-on a file's last change are marked as having weak times.
-See the [forensics guide](docs/forensics.md) for what is read, what the times
-mean and what is not covered.
+## Two ways to use it: home screen or commands
 
-### Packet captures
+**Home screen.** `omamori ui <folder>` opens a terminal home menu for the folder: exposure check, log triage,
+detect, analyze, forensics (with or without the AI review), rule draft, the dashboard, stored runs, verify
+hashes, the attack lab and demo data. Each task with options opens a short form first. Text fields take
+paths (`~/` works), choices change with left and right, and every field can stay empty for the default. A
+wrong value brings you back to the form with the reason. AI tasks show the guarded request before you
+confirm; a recording on the form replays instead, and nothing is sent. When the run starts, the screen
+gives way to the normal terminal, so you can scroll and select the report.
 
-`detect`, `analyze` and `rule draft` read pcap and pcapng files (tcpdump, Wireshark). A capture is known by
-its first bytes, so it can lie among the logs. It becomes Zeek-like events (one per connection, HTTP request
-and DNS question, with the TLS server name), and the network and web rules read them. See the
-[packet capture guide](docs/pcap.md).
+| Task on the home screen | What the form takes |
+|---|---|
+| Detect | rules folder, asset list, indicator list, log format, store the run |
+| Analyze | the same, and a recording to replay instead of asking a provider |
+| Forensics | saved `ps` and `ss` output, rules folder, file rules folder (or `none`), asset list, indicator list, store the run |
+| Forensics + AI review | the same, and a recording to replay |
+| Rule draft | goal, examples, clean logs, title, level, number of answers, log format, asset list, indicator list, a recording |
+| Verify hashes | the manifest of an earlier forensic run; the folder is the evidence |
+| Attack lab | no form: needs Docker |
+| Make demo data | logs and a system, the three-host campaign, or a day without attacks; a seed |
+
+**Commands.** Every feature is also a command, for scripts and for options the forms do not have (the year
+and time zone of syslog, `--db`, `--dry-run`, `--timeout`). `omamori help` lists them all.
+
+## Features
+
+### 1. Exposure check (Task A)
+
+**What it does.** Looks through a project folder for leaked secrets and personal data, and gives fix advice
+like "rotate this key". An AI agent explores the project with read-only tools (list folders, read files,
+search text, run the detectors) through the guard.
+
+**How to use it.**
 
 ```sh
+omamori check ./my-project           # opens the screen: choose a provider, see the request, confirm
+omamori peek ~/omamori-output/run-<time> ./my-project            # see what matched (middle of values hidden)
+omamori peek --reveal ~/omamori-output/run-<time> ./my-project   # full values, on your screen only
+```
+
+**What it finds.** AWS access key IDs, GitHub tokens, AI provider keys (`sk-`, `sk-ant-`, `sk-proj-`), Google
+API keys, Slack tokens, Stripe live keys, JWTs, private key blocks, passwords inside addresses
+(`scheme://user:password@host`), マイナンバー (a valid check digit means "possible identifier" only) and
+Japanese phone numbers.
+
+**What it does not count.** Every match is hidden from the AI, but these are listed apart and not counted as
+findings: a key in a `.env` file that `.gitignore` keeps out of git and that was never committed (it is a
+finding if it is in the history), matches in libraries and caches (`deps`, `site-packages`, `.angular`),
+phone-like numbers in build output, numbers inside decimals, UUIDs and hex dumps, test values like
+`0123456789`, and example passwords like `user:pass@`. Binary files are not scanned.
+
+**What you get.** `report.md` and `report.html` with each finding's place, type and placeholder, a "limits"
+section, an event log and `recording.json`. `peek` finds each match again and shows it on your screen;
+nothing is saved and nothing is sent. A private key block is never shown, only its first line.
+
+### 2. Log triage (Task B)
+
+**What it does.** The AI reads an sshd `auth.log` (classic or ISO time stamps, `sshd` or the `sshd-session`
+of OpenSSH 9.8 and later) and looks for two attacks: many failed logins followed by a success (password
+guessing), and one address trying many usernames (password spraying). A normal program checks every line,
+time and count the AI cites, so it cannot make things up. Findings that code sees and the AI did not claim
+are listed too.
+
+```sh
+omamori triage /var/log/auth.log --year 2026 --timezone Asia/Tokyo
+```
+
+Classic syslog lines have no year and no time zone, so give `--year` and `--timezone`. `--triage-config`
+changes the window and thresholds. A log in which no password event was read gets a warning, so an empty
+result is never read as "clean".
+
+### 3. Detection with rules
+
+**What it does.** `detect` reads logs, runs detection rules over them, and writes a report of alerts. No AI
+and no API key are used.
+
+**What it reads.** sshd and Linux syslog, nginx and Apache access logs, JSON lines, Suricata EVE, Zeek JSON,
+Wazuh alerts, Windows and Sysmon events (Winlogbeat or NXLog JSON), and packet captures (see
+[7](#7-packet-captures)). Give files or folders; the format of each file is found from its first bytes and
+lines, or set it with `--format`. Dependency folders like `node_modules` are skipped and listed.
+
+**The rules.** 35 built-in rules for SSH (guessing, spraying, a login after guessing, sshd penalties), Linux
+hosts (sudo refused, new users, admin groups, cron jobs that download a script), web servers (scans for
+sensitive files, path enumeration, injection, scanner tools, commands sent to a web shell), and networks
+(internal sweeps, port scans, large uploads, IDS alerts). The format is a documented subset of
+[Sigma](https://sigmahq.io), with counts, distinct counts and ordered sequences. Every rule carries tests, and
+a rule set whose tests fail is refused.
+
+```sh
+omamori detect ./logs --year 2026 --timezone Asia/Tokyo
+omamori detect ./logs --rules ./my-rules                     # your own rules in place of the built-in ones
+omamori detect ./logs --assets assets.yml --indicators bad.yml
+```
+
+- **Asset list** (`--assets`): names and addresses of your own machines. Then a host name in one log and its
+  address in another are known to be one machine, and rules and the AI can join them.
+- **Indicator list** (`--indicators`): addresses, domains and SHA-256 hashes known to be bad. Every event
+  that names one is marked, in every kind of log, and one alert is given per indicator.
+
+**What you get.** A new `detect-<time>` folder with `report.md`, `report.html` and `alerts.json`. The logs are
+not changed. Guides: [rules](docs/rules.md), [log intake](docs/intake.md).
+
+### 4. AI analyst
+
+**What it does.** `analyze` runs detection, then sends a bounded, sanitized snapshot of the alerts and a few
+sample events to the AI. The AI reviews each alert, links alerts that share an address, user or host, and
+suggests next steps. Code then checks every citation, count, time and link. Only checked claims are shown;
+the AI has no tools, and its suggestions are never run.
+
+```sh
+omamori analyze ./logs --year 2026 --timezone Asia/Tokyo            # preview only: shows the request
+omamori analyze ./logs --year 2026 --timezone Asia/Tokyo --yes      # send, then check the answer
+omamori analyze ./logs --year 2026 --timezone Asia/Tokyo --replay recording.json   # offline
+```
+
+It takes every `detect` flag, plus `--provider`, `--model`, `--reasoning`, `--dry-run` and `--timeout`. The
+report holds the rule alerts, the checked review, the rejected claims and what was not reviewed, and
+`analysis.json`. Guide: [analyst](docs/analyst.md).
+
+### 5. Forensic triage of a Linux system
+
+**What it does.** `forensics` reads a Linux system from a folder (a mounted image, an unpacked copy, or `/` of
+a running system): login, system and web logs, crontabs, systemd units, `authorized_keys`, shell histories,
+`/etc/passwd`, and saved `ps` and `ss` output if you give it. The same rules run over the logs and the
+artifacts, and everything stands in one attack timeline. The [file rules](#6-file-rules-yara-like) look at
+the content of the files where attackers leave tools.
+
+```sh
+omamori forensics --year 2026 --timezone Asia/Tokyo --processes ps.txt --sockets ss.txt /mnt/server
+omamori forensics verify ~/omamori-output/forensics-<time>/manifest.json /mnt/server
+omamori forensics --analyze --yes /mnt/server          # add the checked AI review
+```
+
+- **Evidence you can prove.** Every file that is read is hashed into `manifest.json`, and the hash of the
+  manifest is printed. `forensics verify` hashes the files again later and names each one that changed.
+- **Nothing is changed or run.** Links are never followed. Password hashes, private keys and credential
+  files (`.aws`, `.netrc`, `.env` and the like) are never opened.
+- **Honest times.** The timeline says where each time comes from: a log line, a time written in the history,
+  or only the last change of a file. An AI finding that rests on file times is marked as having weak times.
+
+Guide: [forensics](docs/forensics.md).
+
+### 6. File rules (YARA-like)
+
+**What it does.** File rules look at the content of files, in the way of YARA: text, hex (with `??`
+wildcards) and regular expression strings, and a condition like `any of them` or `2 of (a, b, c)`. During
+`forensics` they scan `/tmp`, `/var/tmp`, `/dev/shm`, web folders, `/usr/local`, `/opt`, `/etc` and the home
+folders (in that order). Each hit is an alert with the SHA-256 of the file from the manifest.
+
+Seven built-in rules find droppers that download and run a program, reverse shells, coin miners, programs in
+temporary folders, PHP web shells, scripts that add SSH keys, and scripts that wipe logs or the history.
+
+```sh
+omamori forensics --file-rules ./my-file-rules /mnt/server     # your own file rules
+omamori forensics --no-file-rules /mnt/server                  # turn the scan off
+```
+
+Every file rule carries tests (a text or bytes, and whether it must match); a rule with a failing test is
+refused. Regular expressions are those of Go, so no rule can make a scan hang. Guide:
+[file rules](docs/file-rules.md).
+
+### 7. Packet captures
+
+**What it does.** `detect`, `analyze` and `rule draft` read packet captures: pcap (tcpdump) and pcapng
+(Wireshark). A capture becomes events in the shape of Zeek logs: one per TCP or UDP connection (with its
+state, bytes and packets), one per HTTP request (with its status) and one per DNS question (with its answer
+code), plus the TLS server name. The network and web rules read them, so a port scan, web probes or a web
+shell show up from the traffic alone.
+
+```sh
+sudo tcpdump -i eth0 -w capture.pcap        # on a server you own
 omamori detect capture.pcap /var/log/auth.log
 ```
 
-### Attack lab
+A capture is found by its first bytes, so it can lie in a folder of logs. Every length in a packet is
+checked, and the reader was fuzzed with 11 million inputs. Guide: [packet captures](docs/pcap.md).
 
-`omamori lab` checks Omamori end to end: it builds a Debian server and an attacker in Docker, on a network
-with no way out, runs a fixed attack against that server only (port scan, web probes, password spraying
-and guessing, persistence, dropped tools, a web shell), copies out its logs, files and traffic, and scores
-what Omamori found. It is on the home screen too. It cannot be pointed at another machine. See the
-[lab guide](docs/lab.md).
+### 8. AI rule writing (Task C)
+
+**What it does.** You point at log lines and say what you want a rule to find. The AI writes the matching
+part of one detection rule. Omamori accepts it only if it loads, passes its own tests, matches every example
+you gave, matches nothing on built-in days without an attack and in clean logs you give, and is not too broad
+on your logs. If it is refused, the AI is told the fixed reasons and may try again.
 
 ```sh
-omamori lab
+omamori rule draft --goal "cron jobs that download a script and pipe it to a shell" \
+  --example web01/auth.log:68 --benign ./clean-logs --year 2026 --timezone UTC ./logs
 ```
+
+Without `--yes` it only shows the request. `rule.yml` is written only for an accepted rule; put it in a folder
+and use it with `omamori detect --rules`. Guide: [rule writing](docs/rule-writing.md).
+
+### 9. Store, search, cases and timelines
+
+**What it does.** Add `--store` to `detect`, `analyze` or `forensics` to keep the sanitized run: its events,
+alerts and checked analysis. Then search across runs, group alerts into cases, and build timelines. SQLite is
+built in (`~/omamori-data/omamori.db`, or `--db file`); PostgreSQL and MariaDB are set with
+`OMAMORI_DB_DRIVER` and `OMAMORI_DB_DSN`. Database passwords are never command-line flags.
+
+```sh
+omamori detect ./logs --year 2026 --timezone Asia/Tokyo --store
+omamori store runs
+omamori store search --field src_ip --value 203.0.113.9
+omamori store search --kind alerts --level critical
+omamori store cases create --title "Authentication review"
+omamori store timeline --from 2026-11-10T00:00:00Z --to 2026-11-11T00:00:00Z
+```
+
+Cases keep versions so that two people cannot overwrite each other. Guide: [storage](docs/storage.md).
+
+### 10. Local web dashboard
+
+**What it does.** `omamori dashboard <workspace>` starts a web interface on `127.0.0.1` (port 8765) and prints
+a private session link. It shows stored runs, alerts beside their evidence, checked AI citations, search,
+cases, timelines and charts, and it can start detection and forensic runs on folders inside the workspace.
+Provider keys stay on the server side; AI runs need a preview and a confirmation. Guide:
+[dashboard](docs/dashboard.md).
+
+### 11. Attack lab
+
+**What it does.** `omamori lab` checks Omamori end to end against a real attack on a real Linux server. It
+builds a Debian server (`web01`, with sshd, nginx, cron and rsyslog) and an attacker in Docker, on a network
+with no way out, and runs a fixed attack on that server only: a port scan, web probes, password spraying and
+guessing, persistence (a key, a cron job, a history), dropped tools and a web shell. It records the traffic,
+copies out the logs and files, reads them with `forensics` and `detect`, and scores 24 expected detections.
+
+```sh
+omamori lab                 # about a minute; about ten the first time, while Docker downloads Debian
+omamori lab --keep          # leave the containers running to look at them
+omamori lab clean           # remove what a run left (--images: the images too)
+```
+
+It ends with an error code when a detection is missed, so it can guard changes. It has **no target option**:
+the attack is fixed to its own container, and a test checks that. To check your own servers, use
+`forensics` and `detect` on their logs, files and captures. Guide: [attack lab](docs/lab.md).
+
+### 12. Synthetic demo data
+
+**What it does.** `scenario` writes made-up data with planted attacks and a list of what must be found
+(`expected.json`). All data is fake: addresses come from the ranges kept for documentation.
+
+```sh
+omamori scenario --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-logs       # logs of one server
+omamori scenario --benign --seed 3 --date 2026-11-10 ./quiet-day                     # the same day, no attack
+omamori scenario --host --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-host # a whole system
+omamori scenario --campaign --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-campaign
+```
+
+The campaign is one attack through three hosts, with host logs, Zeek and Suricata sensor logs, an asset list
+and an indicator list. The story, and what is found and what is not, is in [the demo guide](docs/demo.md).
+
+### 13. Replay and live evaluation
+
+- **Replay.** Every live AI run saves `recording.json`. `omamori replay <recording>` plays the answers back
+  through the same guard, tools, checker and report, with no network call. It is always labeled REPLAY. A
+  recording only fits the same evidence; if a file changed, the replay stops instead of showing old findings.
+- **Eval.** `omamori eval --yes --runs 3` runs fixed live tests on the fake fixtures and scores them on
+  correct findings and locations, with a token cap. It costs tokens.
+
+## AI providers and API keys
+
+Providers: Anthropic and any OpenAI-compatible API (OpenAI, Gemini, Mistral, Groq, Together, DeepSeek, xAI,
+OpenRouter, Ollama, LM Studio). With Ollama or LM Studio, nothing leaves your computer at all.
+
+```sh
+omamori providers                 # which providers have a key set
+omamori models anthropic          # the models your key can use
+export ANTHROPIC_API_KEY=...      # or type the key in the screen
+```
+
+Choose with `--provider` and `--model`, the variables `OMAMORI_PROVIDER` and `OMAMORI_MODEL`, or the home
+screen (your choice is remembered). Keys are never read from the command line. On macOS a key that works is
+kept in your Keychain; remove it in Settings. Runs have limits on requests and tokens (`--max-steps`,
+`--max-tokens`).
+
+## Where the output goes
+
+Reports go to `~/omamori-output/` (or `--output folder`), always into a new folder per run, such as
+`detect-<time>`, `forensics-<time>` or `lab-<time>`. A folder that exists is never written into, and a report
+folder may not be inside the evidence. Typical files:
+
+| File | What it is |
+|---|---|
+| `report.md`, `report.html` | the report (the HTML has no script and loads nothing) |
+| `alerts.json` | the alerts with their evidence |
+| `analysis.json` | the checked AI review |
+| `recording.json` | the AI answers, for replay |
+| `manifest.json`, `manifest.sha256` | forensics: the hash of every file that was read |
+
+## What it cannot do
+
+- It only removes the data types it can detect. A password in a line like `password = hunter2` is not found.
+  IP addresses, names and street addresses are not removed (log triage needs the addresses).
+- A valid マイナンバー check digit only means "possible identifier": about 1 in 10 random 12-digit numbers
+  pass by luck.
+- It reduces what the AI company sees. It cannot control what the company does with it.
+- Detection is batch: it reads files, it does not watch live traffic or logs. There is no agent on hosts, no
+  blocking and no active response.
+- The rules and the synthetic tests were written by me together. Numbers from them show that the code works
+  as designed, not how many real attacks would be found. The attack lab is the check against a real server.
+- It is for defense only. The attack lab attacks only its own container.
 
 ## Live test results
 
-`omamori eval` runs a fixed set of real-provider runs on the fake fixtures (Task A, and four
-logs for Task B) and scores them on correct findings and correct locations, not on wording.
-It stops at a token cap. The table is saved as `live-results-*.md`; paste the latest one here.
-
-Latest run (2026-11-11, `gpt-6-luna`, 3 runs per case, 43,220 tokens in all): **14 of 15 runs passed.**
+`omamori eval` runs fixed real-provider tests on the fake fixtures and scores findings and locations, not
+wording. Latest run (2026-11-11, `gpt-6-luna`, 3 runs per case, 43,220 tokens): **14 of 15 runs passed.**
 
 | Case | Passed | Avg requests | Avg tokens |
 |---|---|---|---|
@@ -219,208 +445,43 @@ Latest run (2026-11-11, `gpt-6-luna`, 3 runs per case, 43,220 tokens in all): **
 | Task B: benign.log | 3 of 3 | 3 | 2992 |
 | Task B: malformed.log | 2 of 3 | 3 | 3246 |
 
-The one failure: the AI did not claim a finding that was in the log, so the checker listed it
-as "found by Omamori, not claimed by the AI". Nothing false was accepted. Three runs per case is a
-small sample, so the rates are rough. The first live run was 12 of 15: the AI read "invalid user
-admin" as a different user. The instruction was made clearer for that, which is why the
-numbers changed between runs.
+The one failure: the AI did not claim a finding that was in the log, so the checker listed it as "found by
+Omamori, not claimed by the AI". Nothing false was accepted. Three runs per case is a small sample.
 
-## What it will do (v1)
-
-- **Task A: exposure check.** Look through a local project folder for leaked
-  secrets and personal data. Give fix advice, like "rotate this key".
-- **Task B: log triage.** Read an sshd `auth.log` (classic or ISO time stamps, `sshd` or
-  the `sshd-session` of OpenSSH 9.8 and later). Find two cases: many failed
-  logins followed by a success, and one IP trying many usernames. A normal
-  program checks the AI's answer, so the AI cannot just make things up.
-- **Task C: detection rules.** You point at log lines and say what you want. The AI writes
-  the matching part of a rule. Omamori accepts it only if it loads, passes its tests,
-  matches every example, and matches nothing on days without an attack
-  ([rule-writing.md](docs/rule-writing.md)).
-- A terminal screen: setup pages, then the run prints a live progress bar and the
-  report into the normal terminal, so you can select and scroll it.
-- **Replay mode.** Recorded AI answers play back through the real pipeline, so
-  the demo works offline. It is always labeled REPLAY.
-
-## How the guard works
-
-- One function sends data to the AI provider. It cleans the whole request first.
-- The AI can only use read-only tools. No shell. No network tools.
-- Text from scanned files is treated as data, never as instructions.
-- The AI cannot change its own permissions.
-- Reports show the place, the type, and a placeholder. They never show the
-  secret itself.
-- Your API key is never printed, logged, or written to a file. On macOS it can be
-  kept in the Keychain.
-
-## What it detects
-
-- AWS access key IDs (`AKIA`, `ASIA`) and GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`)
-- AI provider keys (`sk-`, including `sk-ant-` and `sk-proj-`), Google API keys (`AIza`),
-  Slack tokens (`xox`), Stripe live keys (`sk_live_`, `rk_live_`)
-- JWTs (three parts, starting with `eyJ`)
-- Private key blocks (the whole block, from BEGIN to END)
-- Passwords written inside web or database addresses (`scheme://user:password@host`)
-- マイナンバー (a valid check digit gives "possible identifier" only) and Japanese phone numbers
-
-A phone-like number in a generated file (build output, a cache, a test report, `.map` and
-`.min.js` files) gets severity `low`, because it is nearly always code and not a person.
-A secret in the same file stays `high`.
-
-A key in an env file (`.env`) that a `.gitignore` file keeps out of git is the normal setup.
-It is listed in its own section, "Kept out of git", and is not counted as a finding. If the
-file is not ignored, the key is `high`.
-
-Matches in libraries (`deps`, `.angular`, `site-packages`, ...) and phone-like numbers in build
-output (`dist`, `.map`, `.min.js`, test reports) are listed in their own section, one line per
-file line, and are not counted as findings. A secret in your own build output still counts.
-
-### What is not counted as a finding
-
-Every match is still hidden from the AI. These are only left out of the count, and each one is
-listed in its own section of the report:
-
-- digits inside a long decimal (`-0.0643290124`), a UUID, a table or hex dump, next to letters
-  (`abc0312345678`), or between colons (an AWS account number in an ARN)
-- test values: digits that count up or repeat (`0123456789`, `0000000000`)
-- example passwords in an address (`user:pass@`, `${PASSWORD}`, `<password>`)
-- library, cache and plugin folders (`deps`, `.angular`, `.agents/skills`, `.claude/plugins`, ...)
-- phone numbers and My Numbers in build output
-- a key in an env file that `.gitignore` keeps out of git, and that git says was never committed.
-  If the file is in the history (committed once, ignored later), the key is a finding: it is still
-  readable by anyone who can read the repository
-- binary files (images, archives) are not scanned
-
-A real password in an address, a key in your own code, and a phone number in your own data are
-still counted.
-
-### Looking at the matches
-
-A report holds places and placeholders only. To tell a false alarm from a real leak, look at
-the matches on your own screen:
-
-```
-omamori peek ~/omamori-output/run-... ./your-project           # the middle of each value is hidden
-omamori peek --reveal ~/omamori-output/run-... ./your-project  # full values
-```
-
-It finds each match again in the file and prints the value and the text around it. Nothing is
-saved and nothing is sent to the AI. A private key block is never shown, only its first line.
-
-Every detector has a test table with fake values, a list of look-alikes that must not match,
-and a fuzz test.
-
-## What it cannot do
-
-I want to be clear about the limits.
-
-- It only removes the data types it can detect (see above). A password in a
-  config line like `password = hunter2` is not found.
-- It does **not** remove IP addresses, names, or street addresses in v1.
-  IP addresses stay because log triage needs them.
-- A valid マイナンバー check digit only means "possible identifier". About 1 in
-  10 random 12-digit numbers pass by luck.
-- It reduces what the AI company sees. It cannot control what the company does
-  with the data after it gets it.
-- It is for defense only. There is no attack code, and there never will be.
-
-## How I use AI
-
-I built the first parts by hand to learn. Later parts, the tests and the docs were
-written with an AI coding tool, and I review, run and commit them. The product's own
-AI is limited by the guard and can only use read-only tools.
+Other live checks (2026-11-13): the attack lab found 24 of 24 detections in four runs in a row; a forensic
+run with the AI review on an attacked lab server had 24 claims verified and 0 rejected; the exposure check
+completed on two real projects of mine. The details and the faults these runs found are in the
+[platform plan](docs/platform-plan.md), [file rules](docs/file-rules.md) and [lab](docs/lab.md) guides.
 
 ## Docs
 
-- [Platform plan and decisions](docs/platform-plan.md): the detection pipeline,
-  supported rule subset, verification results and next slices.
-- [AI analyst](docs/analyst.md): checked alert reviews, replay and the shared
-  service for the local dashboard.
-- [Local rules](docs/rules.md): supported detection and correlation YAML.
-- [AI rule writing](docs/rule-writing.md): `rule draft`, what is sent, the checks
-  that decide whether a rule is accepted, and their limits.
-- [Log intake](docs/intake.md): supported source formats, field maps and a
-  mixed-source demo.
-- [Storage and investigations](docs/storage.md): SQLite/PostgreSQL/MariaDB,
-  persistent runs, search, cases, timelines and dashboard APIs.
-- [Toolkit map](docs/toolkit.md): the blue-team tool families Omamori is growing
-  toward, what exists for each and what is missing.
-- [Demo: one attack through three hosts](docs/demo.md): the synthetic campaign
-  across host logs and network sensors, what is found and what is not.
-- [Packet captures](docs/pcap.md): pcap and pcapng into connection, HTTP and DNS events.
-- [Attack lab](docs/lab.md): a fixed attack on a Docker server of its own, scored end to end.
-- [File rules](docs/file-rules.md): YARA-like rules over the content of files, used by forensics.
-- [Forensic triage](docs/forensics.md): read-only collection of Linux artifacts,
-  the hash manifest, the timeline and its limits.
-- [My Number test table](docs/mynumber-test-table.md): my test cases for the
-  first detector. All numbers are dummy numbers.
-
-## Plan
-
-I am building this for my 就職作品 presentation in February 2027. There are two
-check points: end of December (Task A works through the guard) and end of
-January (all must-have parts are done).
-
-## Tech
-
-Go. Tests with `go test`, including fuzz tests. Terminal screen with Bubble Tea.
-Providers: Anthropic and any OpenAI-compatible API (OpenAI, Gemini, Mistral, Groq,
-Together, DeepSeek, xAI, OpenRouter, Ollama, LM Studio). Design choices are in
-[DECISIONS.md](DECISIONS.md).
-
-Code style: I use clear, full-word names (like `expectedCheckDigit`, not `x`). Commit
-messages follow Conventional Commits.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
-
-### Home menu
-
-`omamori ui <folder>` opens the terminal home menu. It connects exposure checks,
-log triage, local detection, checked AI analysis, forensic collection (with an
-optional AI review), stored-run listing and synthetic demo generation to their
-real services. Local tasks skip provider setup; AI tasks preview the sanitized
-request before confirmation. Stored-run listing uses the configured database and
-does not create a missing local store during preparation.
-
-Each task with options opens a form first. Text fields take paths (`~/` is your
-home folder); choices change with left and right; enter goes on, and every field
-can stay empty for the default of the command. What the forms take:
-
-| Task | Form |
+| Guide | About |
 |---|---|
-| Detect | rules folder, asset list, indicator list, log format, store the run |
-| Analyze | the same, and a recording to replay instead of asking a provider |
-| Forensics | saved `ps` and `ss` output, rules folder, asset list, indicator list, store the run |
-| Forensics + AI review | the same, and a recording to replay |
-| Rule draft | goal, examples, clean logs, title, level, number of answers, log format, asset list, indicator list, a recording to replay |
-| Verify hashes | the manifest of an earlier forensic run; the folder is the evidence |
-| Attack lab | no form: needs Docker; builds its own server and attacker, runs the attack and shows the score |
-| Make demo data | one server and a system, the three-host campaign, or a day without attacks; a seed |
+| [Platform plan](docs/platform-plan.md) | design, decisions, verification results, what was fixed and why |
+| [Toolkit map](docs/toolkit.md) | which blue-team tools Omamori stands in for, and what is missing |
+| [Log intake](docs/intake.md) | formats, field maps and limits |
+| [Rules](docs/rules.md) | the detection and correlation rule format |
+| [AI analyst](docs/analyst.md) | checked reviews, schema, replay |
+| [Forensics](docs/forensics.md) | what is read, the manifest, times, limits |
+| [File rules](docs/file-rules.md) | the YARA-like format and the scan |
+| [Packet captures](docs/pcap.md) | pcap and pcapng into events |
+| [Rule writing](docs/rule-writing.md) | `rule draft`, its checks and limits |
+| [Storage](docs/storage.md) | databases, search, cases, timelines |
+| [Dashboard](docs/dashboard.md) | the local web interface |
+| [Attack lab](docs/lab.md) | the lab, its safety and its results |
+| [Demo campaign](docs/demo.md) | one attack through three hosts |
+| [PRD](docs/omamori-prd-v1.0.md) and [roadmap](ROADMAP.md) | the plan for v1 |
 
-A wrong value (a file that is not there, a log format that reads no event, an example
-that is not in the logs) brings you back to the form with the reason and your text
-kept. With storage, the database is opened only when the run starts. A recording on
-the form skips the provider pages: nothing is sent.
+## About the project
 
-Use the direct commands for the year and time zone of syslog lines (give them to
-`omamori ui`), `--db`, the dashboard port, store search and cases (or use the
-dashboard), `--dry-run`, `--timeout`, and `eval`, `peek` and `models`.
+**Plan.** I am building this for my 就職作品 presentation in February 2027, and as the start of a product for
+my startup, Millelith.
 
-### Local web dashboard
+**How I use AI.** I built the first parts by hand to learn Go. Later parts, the tests and the docs were
+written with an AI coding tool; I review, run and commit them. The product's own AI is limited by the guard.
 
-Run `omamori dashboard <evidence-workspace>` and open the private session link
-printed in the terminal. The dashboard includes saved runs, alert/event details,
-checked AI citations, search, cases, timelines and confirmed detection/forensic
-runs. It uses the configured SQLite, PostgreSQL or MariaDB store.
+**Tech.** Go, one binary. Tests with `go test`, including fuzz tests and mutation checks; the dashboard has
+browser tests (`npm test --prefix tests`). Terminal screen with Bubble Tea. Commit messages follow
+Conventional Commits.
 
-The UI is embedded in the Go binary, listens only on `127.0.0.1` (port 8765 by
-default), and accepts new evidence paths only inside the chosen workspace.
-Prepare a preview before confirming an AI request; provider keys stay server-side.
-See [dashboard.md](docs/dashboard.md) for setup, capabilities and limits.
-
-The dashboard’s Reference workspace puts the alert queue beside its evidence, with scoped activity
-and severity charts and a persistent light/dark theme switch. On small screens, chart detail can be
-expanded while the alert queue remains immediately accessible. See [DESIGN.md](DESIGN.md) for the
-shared visual system and [the validation notes](docs/dashboard-design-validation.md) for test scope.
+**License.** MIT. See [LICENSE](LICENSE).
