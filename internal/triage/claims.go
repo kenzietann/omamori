@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/kenzietann/omamori/internal/authlog"
@@ -97,6 +98,27 @@ func normalize(stamp string) string {
 	return strings.Join(strings.Fields(stamp), " ")
 }
 
+// sameStamp says that a claimed time names the time of the line. A classic line must be cited as written. A line
+// with an ISO header has its own zone, and a model may write it in the classic way: the same second in the zone
+// of the line is accepted then, as written ISO or classic, never a time that is only close.
+func sameStamp(claimed string, line authlog.Event) bool {
+	text := normalize(claimed)
+	if text == line.Stamp {
+		return true
+	}
+	if !strings.Contains(line.Stamp, "T") {
+		return false
+	}
+	second := line.Time.Truncate(time.Second)
+	for _, layout := range []string{"Jan _2 15:04:05", "2006-01-02T15:04:05Z07:00", "2006-01-02 15:04:05"} {
+		if text == normalize(second.Format(layout)) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (checker *Checker) Check(claim Claim) Verdict {
 	var reasons []string
 	reject := func(reason string) { reasons = append(reasons, reason) }
@@ -141,7 +163,7 @@ func (checker *Checker) Check(claim Claim) Verdict {
 	if claim.Count != len(cited) {
 		reject("the count is not the number of cited lines")
 	}
-	if normalize(claim.First) != first.Stamp || normalize(claim.Last) != last.Stamp {
+	if !sameStamp(claim.First, first) || !sameStamp(claim.Last, last) {
 		reject("the first or the last time is not the one of the cited lines")
 	}
 	if last.Time.Sub(first.Time) > checker.config.Window {

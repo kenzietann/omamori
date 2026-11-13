@@ -60,9 +60,14 @@ type Parsed struct {
 	Ignored int
 	// Malformed are lines that cannot be read as a log line, or look like a password event but have wrong fields.
 	Malformed int
+	// Zoned are the lines with a full time and zone of their own (the ISO header of current rsyslog). The year and
+	// the time zone of the settings are not used for them.
+	Zoned int
 }
 
 var (
+	// isoPattern is the header that current rsyslog writes by default: a full time with a zone, then host and program.
+	isoPattern  = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?)(Z|[+-]\d{2}:?\d{2}) (\S+) ([A-Za-z0-9_.-]+)(?:\[\d+\])?: (.*)$`)
 	linePattern = regexp.MustCompile(`^([A-Z][a-z]{2}) +(\d{1,2}) (\d{2}):(\d{2}):(\d{2}) (\S+) ([A-Za-z0-9_.-]+)(?:\[\d+\])?: (.*)$`)
 	failedText  = regexp.MustCompile(`^Failed password for (?:invalid user )?(\S+) from (\S+) port \d{1,5}(?: ssh2)?$`)
 	acceptText  = regexp.MustCompile(`^Accepted password for (\S+) from (\S+) port \d{1,5}(?: ssh2)?$`)
@@ -95,7 +100,11 @@ func Parse(reader io.Reader, year int, location *time.Location) (Parsed, error) 
 		if parsed.Lines > maxLines {
 			return Parsed{}, ErrTooBig
 		}
-		switch event, outcome := parseLine(line, tooLong, parsed.Lines, year, location); outcome {
+		event, outcome, zoned := parseLine(line, tooLong, parsed.Lines, year, location)
+		if zoned {
+			parsed.Zoned++
+		}
+		switch outcome {
 		case readEvent:
 			parsed.Events = append(parsed.Events, event)
 			if len(parsed.Events) > maxEvents {
@@ -143,7 +152,13 @@ const (
 	readMalformed
 )
 
-func parseLine(line string, tooLong bool, number, year int, location *time.Location) (Event, outcome) {
+func parseLine(line string, tooLong bool, number, year int, location *time.Location) (Event, outcome, bool) {
+	event, read := parseHeader(line, tooLong, number, year, location)
+
+	return event, read, read != readMalformed && isoPattern.MatchString(line)
+}
+
+func parseHeader(line string, tooLong bool, number, year int, location *time.Location) (Event, outcome) {
 	if tooLong || !utf8.ValidString(line) || strings.ContainsRune(line, 0) {
 		return Event{}, readMalformed
 	}
@@ -151,22 +166,39 @@ func parseLine(line string, tooLong bool, number, year int, location *time.Locat
 		return Event{}, readIgnored
 	}
 
-	parts := linePattern.FindStringSubmatch(line)
-	if parts == nil {
-		return Event{}, readMalformed
-	}
-	month, known := months[parts[1]]
-	day, hour, minute, second := atoi(parts[2]), atoi(parts[3]), atoi(parts[4]), atoi(parts[5])
-	moment := time.Date(year, month, day, hour, minute, second, 0, location)
-	if !known || hour > 23 || minute > 59 || second > 59 || moment.Day() != day || moment.Month() != month {
-		return Event{}, readMalformed
+	var moment time.Time
+	var stamp, program, message string
+	if iso := isoPattern.FindStringSubmatch(line); iso != nil {
+		zone := iso[2]
+		if len(zone) == 5 {
+			zone = zone[:3] + ":" + zone[3:]
+		}
+		parsed, err := time.Parse(time.RFC3339Nano, iso[1]+zone)
+		if err != nil {
+			return Event{}, readMalformed
+		}
+		moment, stamp, program, message = parsed, iso[1]+iso[2], iso[4], iso[5]
+	} else {
+		parts := linePattern.FindStringSubmatch(line)
+		if parts == nil {
+			return Event{}, readMalformed
+		}
+		month, known := months[parts[1]]
+		day, hour, minute, second := atoi(parts[2]), atoi(parts[3]), atoi(parts[4]), atoi(parts[5])
+		moment = time.Date(year, month, day, hour, minute, second, 0, location)
+		if !known || hour > 23 || minute > 59 || second > 59 || moment.Day() != day || moment.Month() != month {
+			return Event{}, readMalformed
+		}
+		stamp = parts[1] + " " + strings.TrimLeft(parts[2], " ") + " " + parts[3] + ":" + parts[4] + ":" + parts[5]
+		program, message = parts[7], parts[8]
 	}
 
-	if parts[7] != "sshd" {
+	// OpenSSH 9.8 and later log the work of a connection as sshd-session (and sshd-auth), not as sshd.
+	if program != "sshd" && program != "sshd-session" && program != "sshd-auth" {
 		return Event{}, readIgnored
 	}
 
-	message := strings.TrimRight(parts[8], " ")
+	message = strings.TrimRight(message, " ")
 	var kind Kind
 	var fields []string
 	switch {
@@ -180,8 +212,6 @@ func parseLine(line string, tooLong bool, number, year int, location *time.Locat
 	if fields == nil || utf8.RuneCountInString(fields[1]) > maxNameRunes || len(fields[2]) > maxIPRunes || !ipPattern.MatchString(fields[2]) {
 		return Event{}, readMalformed
 	}
-
-	stamp := parts[1] + " " + strings.TrimLeft(parts[2], " ") + " " + parts[3] + ":" + parts[4] + ":" + parts[5]
 
 	return Event{Line: number, Kind: kind, Time: moment, Stamp: stamp, User: fields[1], IP: fields[2]}, readEvent
 }

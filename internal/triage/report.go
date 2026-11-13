@@ -188,6 +188,11 @@ func Render(input Input) (string, error) {
 	fmt.Fprintf(&report, "Log: %s\n", plainText(input.LogName))
 	fmt.Fprintf(&report, "Lines read: %d (events: %d, with %d failed passwords and %d accepted passwords; other lines ignored: %d)\n", input.Parsed.Lines, len(input.Parsed.Events), failed, accepted, input.Parsed.Ignored)
 	fmt.Fprintf(&report, "Malformed lines: %d\n", input.Parsed.Malformed)
+	if len(input.Parsed.Events) == 0 && input.Parsed.Lines > 0 {
+		report.WriteString("\nWARNING: no failed or accepted password was read from this log, so nothing could be checked. " +
+			"Omamori reads sshd lines with a classic header (Nov 12 14:00:10 host sshd[1]: ...) or an ISO header " +
+			"(2026-11-12T14:00:10+00:00 host sshd-session[1]: ...). Do not read this report as clean.\n")
+	}
 	fmt.Fprintf(&report, "Settings: window %d minutes, failure threshold %d, spray threshold %d, year %d, time zone %s\n\n",
 		int(input.Config.Window.Minutes()), input.Config.FailureThreshold, input.Config.SprayThreshold, input.Config.Year, plainText(input.Config.ZoneName))
 
@@ -230,7 +235,12 @@ func Render(input Input) (string, error) {
 
 	report.WriteString("\n## Limits\n\n")
 	report.WriteString("- One log format: sshd lines of a Linux auth.log (text). Other lines are counted and not used.\n")
-	report.WriteString("- The log has no year and no time zone. They come from the settings above, and the times are only as right as the settings.\n")
+	if input.Parsed.Zoned < input.Parsed.Lines {
+		report.WriteString("- Classic syslog lines have no year and no time zone. They come from the settings above, and the times are only as right as the settings.\n")
+	}
+	if input.Parsed.Zoned > 0 {
+		report.WriteString("- Lines with a full time and zone (ISO header) are read as written; the year and time zone settings are not used for them.\n")
+	}
 	report.WriteString("- The window and the thresholds are settings. Real attacks vary, so the numbers are not facts.\n")
 	report.WriteString("- Only two patterns are checked: guessing, then success, and password spraying.\n")
 	report.WriteString("- Source addresses are shown as they are. Omamori does not hide IP addresses, because the triage needs them.\n")
