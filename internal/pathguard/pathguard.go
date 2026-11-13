@@ -107,8 +107,13 @@ func resolveLoosely(path string) (string, error) {
 			return filepath.Join(resolved, remainder), nil
 		}
 
-		// Something is there but can not be followed, like a symlink that points nowhere.
+		// Something is there. It can have been made just now, between the two looks (another run that
+		// makes the same folder), so it is followed once more. If it still cannot be followed, it is
+		// something like a symlink that points nowhere.
 		if _, lstatErr := os.Lstat(current); lstatErr == nil {
+			if resolved, err := filepath.EvalSymlinks(current); err == nil {
+				return filepath.Join(resolved, remainder), nil
+			}
 			return "", ErrInvalidPath
 		}
 

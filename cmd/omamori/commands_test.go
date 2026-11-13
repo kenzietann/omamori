@@ -384,3 +384,15 @@ func TestTheProgramStartsFullScreenAndNeverTakesTheMouse(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveVersion(t *testing.T) {
+	cases := []struct{ stamped, module, want string }{
+		{"0.1.0", "", "0.1.0"}, {"v0.1.0", "(devel)", "0.1.0"}, {"dev", "v0.1.0", "0.1.0"},
+		{"dev", "(devel)", "dev"}, {"dev", "", "dev"}, {"", "v0.2.0-rc.1", "0.2.0-rc.1"},
+	}
+	for _, current := range cases {
+		if got := resolveVersion(current.stamped, current.module); got != current.want {
+			t.Errorf("resolveVersion(%q, %q) = %q, want %q", current.stamped, current.module, got, current.want)
+		}
+	}
+}

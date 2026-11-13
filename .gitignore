@@ -31,3 +31,6 @@ tests/node_modules/
 
 # Local design skill workspace
 .impeccable/
+
+# Release archives made by scripts/release.sh
+dist/

@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -19,7 +21,30 @@ import (
 	"github.com/kenzietann/omamori/internal/tui"
 )
 
-var version = "dev"
+// version is set at build time for a release: go build -ldflags "-X main.version=0.1.0". Without it, the
+// version of the module is used when Go knows it (go install ...@v0.1.0), and "dev" otherwise.
+var version = resolveVersion(stampedVersion, moduleVersion())
+
+var stampedVersion = "dev"
+
+func moduleVersion() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		return info.Main.Version
+	}
+
+	return ""
+}
+
+func resolveVersion(stamped, module string) string {
+	if stamped != "" && stamped != "dev" {
+		return strings.TrimPrefix(stamped, "v")
+	}
+	if module != "" && module != "(devel)" {
+		return strings.TrimPrefix(module, "v")
+	}
+
+	return "dev"
+}
 
 const (
 	exitOK      = 0

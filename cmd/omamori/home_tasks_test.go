@@ -13,6 +13,7 @@ import (
 	"github.com/kenzietann/omamori/internal/outbound"
 	"github.com/kenzietann/omamori/internal/scenario"
 	"github.com/kenzietann/omamori/internal/taskrun"
+	"github.com/kenzietann/omamori/internal/triage"
 	"github.com/kenzietann/omamori/internal/tui"
 )
 
@@ -67,7 +68,10 @@ func TestHomeStoredRunsDoesNotCreateMissingDatabase(t *testing.T) {
 func TestHomeAnalysisPreviewsWithoutSending(t *testing.T) {
 	logs, packet := analystFixture(t, true)
 	provider := &analystProvider{answer: analystAnswers(t, packet)}
-	b := backend{config: taskrun.Config{Target: logs, OutputBase: filepath.Join(t.TempDir(), "reports"), Now: func() time.Time { return detectNow }, NewProvider: func(_, _, _, _ string) (outbound.Provider, error) { return provider, nil }}}
+	// The fixture is written in Tokyo time. The home screen reads syslog in the time of the computer unless it is
+	// told, so the test tells it: on a computer in another zone the hours, and so the counts, would differ.
+	tokyo := &triage.Config{Year: 2026, Location: time.FixedZone("JST", 9*3600)}
+	b := backend{config: taskrun.Config{Target: logs, OutputBase: filepath.Join(t.TempDir(), "reports"), Now: func() time.Time { return detectNow }, Triage: tokyo, NewProvider: func(_, _, _, _ string) (outbound.Provider, error) { return provider, nil }}}
 	plan, err := b.Prepare(tui.Setup{Task: tui.TaskAnalyze, ProviderID: "openai", Model: "test", Key: "fake-key"})
 	if err != nil {
 		t.Fatal(err)
