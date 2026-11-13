@@ -18,9 +18,9 @@ you see it.
 It runs on your own computer, as a CLI with a terminal home screen and a local web dashboard. Most features
 need no AI at all.
 
-**Status:** work in progress, built for my 就職作品 presentation in February 2027 and for my startup. All
-features below run and have tests, and the main paths have been tested live (see
-[Live test results](#live-test-results)). It is not a finished product: read the limits of each feature.
+**Status: v0.1.0, a public preview.** All features below run and have tests, and the main paths have been
+tested live (see [Live test results](#live-test-results)). It is not a finished product: read the limits of
+each feature. What changed in each version is in the [changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -87,13 +87,24 @@ The [platform plan](docs/platform-plan.md) has the details and the tests behind 
 
 ## Install
 
-You need **Go 1.26.5 or newer**.
+**Download a release** (macOS and Linux, Apple silicon and Intel/AMD). Pick the archive of your system from
+the [latest release](https://github.com/kenzietann/omamori/releases/latest), then:
 
 ```sh
-git clone https://github.com/kenzietann/omamori.git
-cd omamori
-go install ./cmd/omamori      # puts the omamori command in $(go env GOPATH)/bin
-omamori help
+shasum -a 256 -c checksums.txt --ignore-missing       # check the download
+tar xzf omamori_0.1.0_darwin_arm64.tar.gz
+sudo mv omamori_0.1.0_darwin_arm64/omamori /usr/local/bin/
+omamori version
+```
+
+The binaries are not signed. If macOS refuses to open a file that a browser downloaded, run
+`xattr -d com.apple.quarantine /usr/local/bin/omamori` once.
+
+**Or build it from source** with Go 1.26.5 or newer:
+
+```sh
+go install github.com/kenzietann/omamori/cmd/omamori@v0.1.0
+# or, in a clone: go install ./cmd/omamori
 ```
 
 Optional:
@@ -470,7 +481,7 @@ completed on two real projects of mine. The details and the faults these runs fo
 | [Dashboard](docs/dashboard.md) | the local web interface |
 | [Attack lab](docs/lab.md) | the lab, its safety and its results |
 | [Demo campaign](docs/demo.md) | one attack through three hosts |
-| [PRD](docs/omamori-prd-v1.0.md) and [roadmap](ROADMAP.md) | the plan for v1 |
+| [Roadmap](ROADMAP.md) | the plan for v1 |
 
 ## About the project
 
@@ -479,6 +490,9 @@ my startup, Millelith.
 
 **How I use AI.** I built the first parts by hand to learn Go. Later parts, the tests and the docs were
 written with an AI coding tool; I review, run and commit them. The product's own AI is limited by the guard.
+
+**Releases.** Pushing a tag like `v0.1.0` runs the tests and builds the archives with
+[`scripts/release.sh`](scripts/release.sh); every push to `main` runs the test gate in GitHub Actions.
 
 **Tech.** Go, one binary. Tests with `go test`, including fuzz tests and mutation checks; the dashboard has
 browser tests (`npm test --prefix tests`). Terminal screen with Bubble Tea. Commit messages follow
