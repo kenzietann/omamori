@@ -264,3 +264,26 @@ func FuzzDiagnostic(f *testing.F) {
 		}
 	})
 }
+
+func TestAUnifiedLogThatIsTooBigNamesTheFile(t *testing.T) {
+	root := writeMac(t)
+	before := maxEvents
+	maxEvents = 50
+	defer func() { maxEvents = before }()
+	var log strings.Builder
+	for line := 0; line < 60; line++ {
+		log.WriteString(`{"processImagePath":"\/usr\/sbin\/bluetoothd","timestamp":"2026-11-16 09:16:00.5+0900","eventMessage":"a line","processID":381}` + "\n")
+	}
+	file := filepath.Join(t.TempDir(), "unified.ndjson")
+	if err := os.WriteFile(file, []byte(log.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Collect(root, Options{Year: 2026, Location: tokyo, UnifiedLog: file})
+	if err != ErrUnifiedTooBig || !strings.Contains(err.Error(), "--predicate 'process == \"sshd\"") {
+		t.Fatalf("error = %v", err)
+	}
+	// The Mac alone is within the limit.
+	if _, err := Collect(root, Options{Year: 2026, Location: tokyo}); err != nil {
+		t.Fatalf("without the file: %v", err)
+	}
+}

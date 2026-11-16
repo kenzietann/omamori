@@ -56,7 +56,6 @@ const (
 	maxArtifactBytes = 8 << 20
 	maxEntries       = 50_000
 	maxLinesPerFile  = 50_000
-	maxEvents        = 500_000
 	maxValueRunes    = 2048
 	maxNameRunes     = 64
 	maxMatches       = 2000
@@ -65,10 +64,19 @@ const (
 	MaxManifestBytes = 64 << 20
 )
 
+// maxEvents is the most events of one run. A test makes it small.
+var maxEvents = 500_000
+
 var (
 	ErrRoot   = errors.New("the evidence folder cannot be read")
 	ErrTooBig = errors.New("the evidence folder holds more than one run can take")
-	ErrInput  = errors.New("the settings of the collection are not valid")
+	// ErrUnifiedTooBig is for a saved unified log of everything: a few days of a Mac are millions of lines.
+	ErrUnifiedTooBig = errors.New("the file of --unified-log has more lines than one run reads. Save only what the rules read:\n" +
+		"  sudo /usr/bin/log show --last 3d --style ndjson --predicate " + UnifiedLogPredicate + " > unified.ndjson")
+	// UnifiedLogPredicate keeps the lines of the unified log that the rules read: logins, sudo and su, and the
+	// lines of the kernel about the last shutdown and panics. It is quoted for a shell.
+	UnifiedLogPredicate = `'process == "sshd" OR process == "sshd-session" OR process == "sudo" OR process == "su" OR (process == "kernel" AND (eventMessage CONTAINS[c] "shutdown cause" OR eventMessage CONTAINS "panic("))'`
+	ErrInput            = errors.New("the settings of the collection are not valid")
 )
 
 type Options struct {
@@ -202,7 +210,12 @@ func Collect(folder string, options Options) (Collection, error) {
 		if snapshot.file == "" {
 			continue
 		}
-		if err := c.snapshot(snapshot.file, snapshot.kind); err != nil {
+		err := c.snapshot(snapshot.file, snapshot.kind)
+		if errors.Is(err, ErrTooBig) && snapshot.kind.kind == KindLog {
+			// A whole unified log of a few days has millions of lines. The folder is not the problem; the file is.
+			return Collection{}, ErrUnifiedTooBig
+		}
+		if err != nil {
 			return Collection{}, err
 		}
 	}

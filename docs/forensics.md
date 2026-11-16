@@ -69,9 +69,15 @@ The unified log (`/var/db/diagnostics`) is binary and only `log` reads it, so it
 output of `ps`:
 
 ```sh
-sudo log show --last 3d --style ndjson > ~/Desktop/unified.ndjson
+sudo /usr/bin/log show --last 3d --style ndjson --predicate 'process == "sshd" OR process == "sshd-session" OR process == "sudo" OR process == "su" OR (process == "kernel" AND (eventMessage CONTAINS[c] "shutdown cause" OR eventMessage CONTAINS "panic("))' > ~/Desktop/unified.ndjson
 sudo omamori forensics --output "/Library/Application Support/omamori" --unified-log ~/Desktop/unified.ndjson /
 ```
+
+Keep the predicate. A Mac writes about a million lines a day to the unified log (3.3 million lines and
+3.9 GB in three days on the test Mac), and one run reads at most 500,000 events; a file with more is refused
+with a message that repeats this command. The predicate keeps what the rules read: sshd, sudo and su, and the
+lines of the kernel about the last shutdown and about panics. Use `/usr/bin/log`: in zsh, `log` is a command
+of the shell.
 
 `--output` must be outside `/Users` and `/private` on a running Mac. Without `sudo` the run still works, but
 files of other users and some of root are named as skipped. macOS can also refuse folders that need Full

@@ -19,7 +19,8 @@ unified log.
   The file rules look at `/private/tmp`, `/Users/Shared`, the launchd folders and the homes.
 - **The unified log of macOS** (`--format macos`): the output of `log show` in the styles default, syslog,
   compact and ndjson, found by itself. sshd and sudo of a Mac give the same events as on Linux, and the kernel
-  line with the cause of the last shutdown is read. `forensics --unified-log file` adds a saved `log show`.
+  line with the cause of the last shutdown is read. `forensics --unified-log file` adds a saved `log show`;
+  a file with more lines than a run reads is refused with the filtered `log show` command to use instead.
 - **Rules for a Mac:** a kernel panic, a reset with the power button, a reset by the watchdog or another fault,
   a shutdown that was not normal, and a LaunchAgent or LaunchDaemon that starts a program from `/tmp`,
   `/Users/Shared` or a hidden folder, downloads a script, or runs encoded or inline code.
@@ -36,6 +37,13 @@ unified log.
   places that the run reads (`/etc`, `/var/log`, `/tmp`, `/home`, and on a Mac `/Users` and `/private`), and
   the run needs `--output`. Tested on a real Linux system in Docker and on a real Mac.
 - On a Mac, `forensics` found nothing: it only knew the paths of Linux.
+
+### Known issues
+
+- On a developer's Mac, your own tools give alerts: installers run with `curl … | sh` in the shell history,
+  and LaunchAgents of tools you installed (on the test Mac, 13 of 15 alerts). The alerts are correct ("look
+  at this"), but there is no way yet to mark an item you reviewed. A known-good list is planned for 0.3.1:
+  exact entries that you confirm, which lower an alert to "known good" and never remove it.
 
 ## [0.2.0] - 2026-11-14
 

@@ -327,10 +327,11 @@ the crash reporter (kernel panics, resets, crashes), LaunchDaemons and LaunchAge
 lists), `system.log` and `install.log`, crontabs, shell histories (with `~/.zsh_sessions`) and
 `authorized_keys` in `/Users`. The unified log is binary, so save it with `log show` and give the file. A
 panic, a reset by the power button and a reset by the watchdog each give their own alert, which answers
-"why did my Mac restart?".
+"why did my Mac restart?". On a developer's Mac, expect alerts for your own `curl … | sh` installers and the
+LaunchAgents of tools you installed: they are correct, and a list to mark reviewed items is planned for 0.3.1.
 
 ```sh
-sudo log show --last 3d --style ndjson > ~/Desktop/unified.ndjson
+sudo /usr/bin/log show --last 3d --style ndjson --predicate 'process == "sshd" OR process == "sshd-session" OR process == "sudo" OR process == "su" OR (process == "kernel" AND (eventMessage CONTAINS[c] "shutdown cause" OR eventMessage CONTAINS "panic("))' > ~/Desktop/unified.ndjson
 sudo omamori forensics --output "/Library/Application Support/omamori" --unified-log ~/Desktop/unified.ndjson /
 ```
 
