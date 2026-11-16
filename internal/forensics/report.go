@@ -25,6 +25,8 @@ type Result struct {
 	ManifestSHA256 string
 	// Label is the name of the evidence folder, without the folders above it.
 	Label string
+	// Product is the system that the folder holds: linux or macos.
+	Product string
 }
 
 // manifestLimit is MaxManifestBytes. A test makes it small, because a real manifest of that size needs
@@ -57,7 +59,7 @@ func Run(folder string, set rules.Set, rulesFrom string, options Options, now ti
 			Intake: intake.Result{Events: collected.Events, Files: collected.Files, Skipped: collected.Manifest.Skipped},
 			Result: set.Evaluate(collected.Events), Rules: len(set.Rules()), RulesFrom: rulesFrom, Made: now, Location: options.Location,
 		},
-		Manifest: collected.Manifest, ManifestText: text, ManifestSHA256: digest, Label: filepath.Base(filepath.Clean(folder)),
+		Manifest: collected.Manifest, ManifestText: text, ManifestSHA256: digest, Label: filepath.Base(filepath.Clean(folder)), Product: collected.Product,
 	}, nil
 }
 
@@ -69,6 +71,9 @@ func timeNote(alert *rules.Alert) string {
 	if first.Source != Source {
 		return "log line"
 	}
+	if first.Fields[TimeField] == TimeRecorded && first.Fields[event.Service] == KindDiagnostic {
+		return "written in the report"
+	}
 	if first.Fields[TimeField] == TimeRecorded {
 		return "written in the history"
 	}
@@ -77,6 +82,17 @@ func timeNote(alert *rules.Alert) string {
 }
 
 func Markdown(result Result) string {
+	limits := []string{
+		"Only a fixed list of places was read as artifacts: login and web logs, crontabs, systemd units in /etc and in home folders, authorized_keys, shell histories, /etc/passwd, and the snapshot files that were given. Other places to hide (kernel modules, shell start files, changed programs, at jobs) were not read as artifacts.",
+		"The file rules (when they were on) looked at the content of the files in tmp, var/tmp, dev/shm, root, home, etc, var/spool/cron, usr/local, opt, srv and var/www, without following links. Programs of the system in /usr/bin and /usr/lib were not looked at. A packed or encrypted program shows none of its strings.",
+	}
+	if result.Product == ProductMacOS {
+		limits = []string{
+			"Only a fixed list of places of the Mac was read as artifacts: the reports in /Library/Logs/DiagnosticReports, LaunchDaemons and LaunchAgents (not the ones of Apple in /System), system.log and install.log, crontabs, authorized_keys, shell histories, and the files that were given. Login items of System Settings, kernel and system extensions, TCC and the quarantine database were not read.",
+			"The unified log is read only from the output of log show that was given (--unified-log). Without it, the log of the system was not looked at.",
+			"The file rules (when they were on) looked at the content of the files in /private/tmp, /private/var/tmp, /Users/Shared, the launchd folders, /usr/local/bin, /opt, /private/etc and the homes, without following links. Folders that macOS keeps from the terminal (Full Disk Access) were skipped.",
+		}
+	}
 	return detect.MarkdownWith(result.Outcome, detect.Extra{
 		Title: "Omamori forensic triage report",
 		Intro: []string{
@@ -85,15 +101,13 @@ func Markdown(result Result) string {
 		},
 		OwnTimeline: true,
 		Sections:    func(format *detect.Formatter) string { return sections(result, format) },
-		Limits: []string{
-			"Only a fixed list of places was read as artifacts: login and web logs, crontabs, systemd units in /etc and in home folders, authorized_keys, shell histories, /etc/passwd, and the snapshot files that were given. Other places to hide (kernel modules, shell start files, changed programs, at jobs) were not read as artifacts.",
-			"The file rules (when they were on) looked at the content of the files in tmp, var/tmp, dev/shm, root, home, etc, var/spool/cron, usr/local, opt, srv and var/www, without following links. Programs of the system in /usr/bin and /usr/lib were not looked at. A packed or encrypted program shows none of its strings.",
+		Limits: append(limits,
 			"Password hashes (/etc/shadow), private keys and files of credentials are never read.",
 			"Most artifacts do not say when they were made. Their time in the timeline is the last change of the file. A copy of a file can have a new time, and an attacker can set the time of a file.",
 			"Deleted files are not seen. A system that is still running and has a rootkit can show files that are not what is on the disk.",
 			"A hit of a rule on an artifact says that it needs a look. An administrator can have made it.",
 			"Snapshot files of processes and sockets are text that someone saved. Their content is taken as it is.",
-		},
+		),
 	})
 }
 

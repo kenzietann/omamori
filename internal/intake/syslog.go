@@ -75,38 +75,44 @@ func newSyslogParser(options Options) lineParser {
 			event.Product: "linux", event.Service: service, event.Host: limit(host, 255),
 			event.Process: limit(program, maxNameRunes), event.Message: limit(message, maxValueRunes),
 		}
-		message = strings.TrimRight(message, " ")
-		switch service {
-		case "sshd":
-			sshFields(message, fields)
-		case "sudo":
-			sudoFields(message, fields)
-		case "cron", "crontab":
-			cronFields(message, fields)
-		case "useradd":
-			if parts := userAdded.FindStringSubmatch(message); parts != nil {
-				fields[event.Action], fields[event.User] = "user_created", limit(parts[1], maxNameRunes)
-			}
-		case "usermod", "gpasswd":
-			// usermod writes one line for /etc/group and one for /etc/gshadow. The second one is marked, so that one
-			// change is counted once.
-			if parts := groupAdded.FindStringSubmatch(message); parts != nil {
-				fields[event.Action], fields[event.User], fields["group"] = "group_add", limit(parts[1], maxNameRunes), limit(parts[3], maxNameRunes)
-				if parts[2] != "" {
-					fields["group_file"] = "gshadow"
-				}
-			} else if parts := gpasswdAdded.FindStringSubmatch(message); parts != nil {
-				fields[event.Action], fields[event.User], fields["group"] = "group_add", limit(parts[1], maxNameRunes), limit(parts[2], maxNameRunes)
-			}
-		case "su":
-			if parts := suFailed.FindStringSubmatch(message); parts != nil {
-				fields[event.Action], fields[event.Outcome], fields["target_user"], fields[event.User] = "su", "failure", limit(parts[1], maxNameRunes), limit(parts[2], maxNameRunes)
-			} else if parts := suSucceeded.FindStringSubmatch(message); parts != nil {
-				fields[event.Action], fields[event.Outcome], fields["target_user"], fields[event.User] = "su", "success", limit(parts[1], maxNameRunes), limit(parts[2], maxNameRunes)
-			}
-		}
+		programFields(service, strings.TrimRight(message, " "), fields)
 
 		return fields, moment, true
+	}
+}
+
+// programFields reads the message of a program that Omamori knows (sshd, sudo, cron, su and the tools that
+// add users and groups) into fields. It is shared by syslog and the unified log of macOS, where the same
+// programs write the same messages.
+func programFields(service, message string, fields map[string]string) {
+	switch service {
+	case "sshd":
+		sshFields(message, fields)
+	case "sudo":
+		sudoFields(message, fields)
+	case "cron", "crontab":
+		cronFields(message, fields)
+	case "useradd":
+		if parts := userAdded.FindStringSubmatch(message); parts != nil {
+			fields[event.Action], fields[event.User] = "user_created", limit(parts[1], maxNameRunes)
+		}
+	case "usermod", "gpasswd":
+		// usermod writes one line for /etc/group and one for /etc/gshadow. The second one is marked, so that one
+		// change is counted once.
+		if parts := groupAdded.FindStringSubmatch(message); parts != nil {
+			fields[event.Action], fields[event.User], fields["group"] = "group_add", limit(parts[1], maxNameRunes), limit(parts[3], maxNameRunes)
+			if parts[2] != "" {
+				fields["group_file"] = "gshadow"
+			}
+		} else if parts := gpasswdAdded.FindStringSubmatch(message); parts != nil {
+			fields[event.Action], fields[event.User], fields["group"] = "group_add", limit(parts[1], maxNameRunes), limit(parts[2], maxNameRunes)
+		}
+	case "su":
+		if parts := suFailed.FindStringSubmatch(message); parts != nil {
+			fields[event.Action], fields[event.Outcome], fields["target_user"], fields[event.User] = "su", "failure", limit(parts[1], maxNameRunes), limit(parts[2], maxNameRunes)
+		} else if parts := suSucceeded.FindStringSubmatch(message); parts != nil {
+			fields[event.Action], fields[event.Outcome], fields["target_user"], fields[event.User] = "su", "success", limit(parts[1], maxNameRunes), limit(parts[2], maxNameRunes)
+		}
 	}
 }
 
@@ -193,7 +199,7 @@ func sudoFields(message string, fields map[string]string) {
 			fields["target_user"] = limit(strings.TrimPrefix(part, "USER="), maxNameRunes)
 		case strings.HasPrefix(part, "PWD="):
 			fields["directory"] = limit(strings.TrimPrefix(part, "PWD="), maxValueRunes)
-		case part == "user NOT in sudoers", part == "command not allowed", strings.HasSuffix(part, "incorrect password attempts"), strings.HasSuffix(part, "incorrect password attempt"):
+		case part == "user NOT in sudoers", part == "command not allowed", part == "a password is required", strings.HasSuffix(part, "incorrect password attempts"), strings.HasSuffix(part, "incorrect password attempt"):
 			fields[event.Outcome], fields["reason"] = "failure", part
 		}
 	}

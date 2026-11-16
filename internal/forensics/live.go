@@ -3,6 +3,7 @@ package forensics
 import (
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -11,13 +12,14 @@ import (
 // folders of the artifact patterns and the folders that the file rules look at. On a running system, the top
 // of the system is "/", and everything is inside it, so "the report must be outside the evidence" cannot be
 // asked of the whole tree. It is asked of these places instead: a report in one of them would change the
-// evidence, and the next run would read the report as if it were part of the system.
+// evidence, and the next run would read the report as if it were part of the system. The places of Linux and
+// of macOS are both given; the ones that a system does not have do no harm.
 func ReadPlaces() []string {
 	seen := map[string]bool{}
-	for _, folder := range scanFolders {
+	for _, folder := range append(slices.Clone(scanFolders), macScanFolders...) {
 		seen[folder] = true
 	}
-	for _, current := range patterns {
+	for _, current := range append(slices.Clone(patterns), macPatterns...) {
 		var kept []string
 		for _, part := range strings.Split(current.glob, "/") {
 			if strings.Contains(part, "*") {

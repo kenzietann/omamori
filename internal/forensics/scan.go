@@ -89,6 +89,7 @@ func secretFile(name string) bool {
 // rules pass over them, so that one line does not give two alerts.
 var parsedKinds = map[string]bool{
 	KindLog: true, KindCron: true, KindHistory: true, KindUnit: true, KindKeys: true, KindAccounts: true,
+	KindLaunchd: true, KindDiagnostic: true,
 }
 
 type scanner struct {
@@ -108,7 +109,7 @@ func (c *collector) scan() error {
 	for index, entry := range c.result.Manifest.Entries {
 		state.entries[entry.Path] = index
 	}
-	for _, folder := range scanFolders {
+	for _, folder := range c.scanFolders {
 		if err := c.walk(folder, state); err != nil {
 			return err
 		}

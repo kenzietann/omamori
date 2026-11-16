@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--rules folder] [--file-rules folder | --no-file-rules] [--assets file] [--indicators file] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
+	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--unified-log file] [--rules folder] [--file-rules folder | --no-file-rules] [--assets file] [--indicators file] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
 		"       omamori forensics --analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] ... <evidence folder>\n" +
 		"       omamori forensics verify <manifest.json> <evidence folder>"
 	maxManifestBytes = forensics.MaxManifestBytes
@@ -40,7 +40,7 @@ func runForensics(args []string, env environment) int {
 	var chosen settings
 	var database storageFlags
 	database.bind(flags, true)
-	var rulesFolder, processes, sockets string
+	var rulesFolder, processes, sockets, unifiedLog string
 	flags.StringVar(&rulesFolder, "rules", "", "folder with rules, in place of the built-in rules")
 	var fileRulesFolder string
 	var noFileRules bool
@@ -48,6 +48,7 @@ func runForensics(args []string, env environment) int {
 	flags.BoolVar(&noFileRules, "no-file-rules", false, "do not look at the content of files with file rules")
 	flags.StringVar(&processes, "processes", "", "file with the output of ps aux or ps -ef")
 	flags.StringVar(&sockets, "sockets", "", "file with the output of ss -tulpn or netstat -tulpn")
+	flags.StringVar(&unifiedLog, "unified-log", "", "file with the output of log show (macOS)")
 	flags.IntVar(&chosen.year, "year", 0, "year of syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of syslog lines")
 	flags.StringVar(&chosen.output, "output", "", "folder for the reports")
@@ -134,10 +135,10 @@ func runForensics(args []string, env environment) int {
 	outputRefused := errors.New("the report folder must be new, and it must not be inside the evidence folder or around it")
 	if live {
 		sources = forensics.LivePlaces(evidence)
-		outputRefused = errors.New("on a running system the report folder must be outside the places that are read (/etc, /var/log, /tmp, /home, /root, /opt, /srv and others). " +
-			"Use --output with a folder like /var/lib/omamori or a mounted disk")
+		outputRefused = errors.New("on a running system the report folder must be outside the places that are read (/etc, /var/log, /tmp, /home, /root, /opt, /srv, and on a Mac /Users and /private). " +
+			"Use --output with a folder like /var/lib/omamori (Linux), /Library/Application Support/omamori (macOS) or a mounted disk")
 	}
-	for _, snapshot := range []string{processes, sockets} {
+	for _, snapshot := range []string{processes, sockets, unifiedLog} {
 		if snapshot != "" {
 			absolute, err := filepath.Abs(snapshot)
 			if err != nil {
@@ -157,12 +158,12 @@ func runForensics(args []string, env environment) int {
 		fmt.Fprintln(env.stderr, "Looking at a running system. Files are only read, but a system that was broken into can show files that are not what is on the disk; prefer a mounted image when you can.")
 	}
 
-	result, err := forensics.Run(evidence, loaded, rulesFrom, forensics.Options{Year: chosen.year, Location: location, Processes: processes, Sockets: sockets, Assets: machines, Indicators: known, FileRules: fileRules}, now)
+	result, err := forensics.Run(evidence, loaded, rulesFrom, forensics.Options{Year: chosen.year, Location: location, Processes: processes, Sockets: sockets, UnifiedLog: unifiedLog, Assets: machines, Indicators: known, FileRules: fileRules}, now)
 	if err != nil {
 		return fail(err)
 	}
 	if len(result.Manifest.Entries) == 0 {
-		return fail(errors.New("no artifact was found. The folder must be the top of a Linux system, with folders like etc, var and home in it"))
+		return fail(errors.New("no artifact was found. The folder must be the top of a Linux system, with folders like etc, var and home in it, or of a Mac, with Library, Users and private in it"))
 	}
 
 	report := forensics.Markdown(result)

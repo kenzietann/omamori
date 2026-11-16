@@ -23,7 +23,7 @@ import (
 	"github.com/kenzietann/omamori/internal/taskrun"
 )
 
-const usageAnalyze = "usage: omamori analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] [--rules folder] [--assets file] [--indicators file] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
+const usageAnalyze = "usage: omamori analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] [--rules folder] [--assets file] [--indicators file] [--format syslog|web|json|app|macos|suricata|zeek|wazuh|windows|pcap] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
 
 // runAnalyze is the terminal adapter for the shared analysis service. The future local dashboard
 // can use the same Prepare/Preview/Confirm/Run lifecycle without invoking this command or a TUI.
@@ -43,7 +43,7 @@ func runAnalyze(args []string, env environment) int {
 	flags.StringVar(&chosen.model, "model", lookup("OMAMORI_MODEL"), "model name")
 	flags.StringVar(&reasoning, "reasoning", "", "reasoning level")
 	flags.StringVar(&rulesFolder, "rules", "", "custom rules, replacing the built-in set")
-	flags.StringVar(&format, "format", "", "syslog, web, json, app, suricata, zeek, wazuh, windows or pcap")
+	flags.StringVar(&format, "format", "", "syslog, web, json, app, macos, suricata, zeek, wazuh, windows or pcap")
 	flags.IntVar(&chosen.year, "year", 0, "year of classic syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of classic syslog lines")
 	var assetsPath string

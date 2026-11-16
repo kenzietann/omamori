@@ -1,0 +1,41 @@
+# Rules for the unified log of macOS, read from the output of `log show` (--format macos).
+# sshd and sudo of a Mac write the same messages as on Linux; their rules are in ssh.yml and linux.yml.
+title: The Mac did not shut down normally the last time
+name: macos_abnormal_shutdown
+id: 7b2d4e60-0101-4c1a-8e5f-1a2b3c4d5e01
+description: When a Mac starts, the kernel can write the cause of the last shutdown. 5 is a normal shutdown and 3 a shutdown with the power button. Any other cause (a loss of power, a reset, a problem of temperature or of the hardware) stopped the Mac without the system, and the log before it ends without a shutdown.
+level: medium
+logsource: {product: macos, service: kernel}
+detection:
+  selection: {action: shutdown_cause}
+  normal:
+    cause: ['5', '3']
+  condition: selection and not normal
+tests:
+  - name: causes that are not normal
+    events:
+      - {product: macos, service: kernel, action: shutdown_cause, cause: '-128'}
+      - {product: macos, service: kernel, action: shutdown_cause, cause: '0'}
+    expect: {alerts: 2}
+  - name: a normal shutdown and one with the power button
+    events:
+      - {product: macos, service: kernel, action: shutdown_cause, cause: '5'}
+      - {product: macos, service: kernel, action: shutdown_cause, cause: '3'}
+    expect: {alerts: 0}
+---
+title: The kernel of the Mac stopped (kernel panic)
+name: macos_kernel_panic
+id: 7b2d4e60-0102-4c1a-8e5f-1a2b3c4d5e02
+description: The unified log has a kernel panic. The Mac stopped and started again. Most panics come from a driver, a kernel extension or the hardware, not from an attack; the panic text names the part that failed.
+level: medium
+logsource: {product: macos, service: kernel}
+detection:
+  selection: {action: kernel_panic}
+  condition: selection
+tests:
+  - name: a panic matches
+    events: [{product: macos, service: kernel, action: kernel_panic, message: "panic(cpu 2 caller 0xfffffe0012345678): watchdog timeout"}]
+    expect: {alerts: 1}
+  - name: another kernel line does not
+    events: [{product: macos, service: kernel, message: "AppleSMC: a message"}]
+    expect: {alerts: 0}

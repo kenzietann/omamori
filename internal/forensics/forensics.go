@@ -1,4 +1,4 @@
-// Package forensics reads the artifacts of a Linux system from a folder: a mounted disk image, an unpacked
+// Package forensics reads the artifacts of a Linux or macOS system from a folder: a mounted disk image, an unpacked
 // collection, or a live system. It only reads. Every file it opens is hashed, and the hashes go into a
 // manifest, so that someone else can later check that the evidence is the same.
 //
@@ -76,6 +76,9 @@ type Options struct {
 	Location  *time.Location
 	Processes string
 	Sockets   string
+	// UnifiedLog is a file with the output of `log show` (macOS). The unified log is binary, and only the
+	// `log` program of macOS reads it, so it is given like the snapshots of processes and sockets.
+	UnifiedLog string
 	// Assets and Indicators are optional, as for the detection in logs.
 	Assets     *assets.List
 	Indicators *indicators.List
@@ -103,6 +106,8 @@ type Manifest struct {
 }
 
 type Collection struct {
+	// Product is linux or macos, as the folder shows.
+	Product  string
 	Events   []event.Event
 	Files    []intake.Stats
 	Manifest Manifest
@@ -150,6 +155,10 @@ type collector struct {
 	options Options
 	result  Collection
 	seen    map[string]bool
+	// product is linux or macos, as the folder shows. It picks the artifacts that are looked for.
+	product     string
+	patterns    []pattern
+	scanFolders []string
 }
 
 func Collect(folder string, options Options) (Collection, error) {
@@ -166,13 +175,16 @@ func Collect(folder string, options Options) (Collection, error) {
 	}
 	defer root.Close()
 
-	c := &collector{root: root, options: options, seen: map[string]bool{}}
+	c := &collector{root: root, options: options, seen: map[string]bool{}, product: ProductLinux, patterns: patterns, scanFolders: scanFolders}
+	if isMac(root) {
+		c.product, c.patterns, c.scanFolders = ProductMacOS, macPatterns, macScanFolders
+	}
 	c.result.Manifest = Manifest{
 		Version: ManifestVersion,
 		Note:    "Files read by omamori forensics. Paths are relative to the evidence folder. Each hash is the SHA-256 of the whole file.",
 		Entries: []Entry{}, Skipped: []string{},
 	}
-	for _, current := range patterns {
+	for _, current := range c.patterns {
 		for _, name := range c.expand(current.glob) {
 			if c.seen[name] {
 				continue
@@ -183,7 +195,10 @@ func Collect(folder string, options Options) (Collection, error) {
 			}
 		}
 	}
-	for _, snapshot := range []struct{ file, kind string }{{options.Processes, KindProcesses}, {options.Sockets, KindSockets}} {
+	for _, snapshot := range []struct {
+		file string
+		kind pattern
+	}{{options.Processes, pattern{kind: KindProcesses}}, {options.Sockets, pattern{kind: KindSockets}}, {options.UnifiedLog, pattern{kind: KindLog, format: intake.FormatMacOS}}} {
 		if snapshot.file == "" {
 			continue
 		}
@@ -200,6 +215,7 @@ func Collect(folder string, options Options) (Collection, error) {
 	options.Indicators.Enrich(c.result.Events)
 	event.Sort(c.result.Events)
 	sort.Strings(c.result.Manifest.Skipped)
+	c.result.Product = c.product
 
 	return c.result, nil
 }
@@ -320,6 +336,10 @@ func (c *collector) read(reader io.Reader, info fs.FileInfo, name string, found 
 		case err != nil:
 			entry.Note = "could not be read as a log"
 		default:
+			// The system.log of a Mac is read as syslog; its lines are of macOS all the same.
+			for index := range events {
+				events[index].Fields[event.Product] = c.product
+			}
 			c.result.Events = append(c.result.Events, events...)
 			c.result.Files = append(c.result.Files, stats)
 		}
@@ -352,7 +372,7 @@ func (c *collector) read(reader io.Reader, info fs.FileInfo, name string, found 
 	return nil
 }
 
-func (c *collector) snapshot(file, kind string) error {
+func (c *collector) snapshot(file string, kind pattern) error {
 	name := "snapshot:" + filepath.Base(file)
 	info, err := os.Lstat(file)
 	if err != nil || !info.Mode().IsRegular() {
@@ -364,12 +384,12 @@ func (c *collector) snapshot(file, kind string) error {
 	}
 	defer opened.Close()
 
-	return c.read(opened, info, name, pattern{kind: kind})
+	return c.read(opened, info, name, kind)
 }
 
 func (c *collector) add(kind, name string, line int, when time.Time, timeSource string, fields map[string]string) {
 	made := map[string]string{
-		event.Product: "linux", event.Category: "forensics", event.Service: kind, event.Collector: Source, TimeField: timeSource,
+		event.Product: c.product, event.Category: "forensics", event.Service: kind, event.Collector: Source, TimeField: timeSource,
 	}
 	for field, value := range fields {
 		if value = tidy(value, maxValueRunes); value != "" {
@@ -408,7 +428,9 @@ func owner(name string) string {
 	switch {
 	case parts[0] == "root":
 		return "root"
-	case parts[0] == "home" && len(parts) > 2:
+	case parts[0] == "private" && len(parts) > 3 && parts[1] == "var" && parts[2] == "root":
+		return "root"
+	case (parts[0] == "home" || parts[0] == "Users") && len(parts) > 2:
 		return tidy(parts[1], maxNameRunes)
 	case len(parts) > 0:
 		return tidy(parts[len(parts)-1], maxNameRunes)

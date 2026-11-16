@@ -4,20 +4,38 @@ All notable changes to Omamori. The format follows [Keep a Changelog](https://ke
 versions follow [Semantic Versioning](https://semver.org). Before 1.0, a minor version can change commands,
 flags and file formats.
 
-## [Unreleased]
+## [0.3.0] - 2026-11-16
+
+Omamori reads a Mac: `forensics` on a mounted Mac disk or on `/` of a running Mac, and `detect` on the
+unified log.
+
+### Added
+
+- **Forensic triage of macOS.** A folder with `System/Library/CoreServices/SystemVersion.plist` is read as a
+  Mac, at the real places under `/private` (no link is followed). It reads the reports of the crash reporter
+  in `/Library/Logs/DiagnosticReports` (kernel panics, ResetCounter reports, crashes, Jetsam events),
+  LaunchDaemons and LaunchAgents (XML and binary property lists), `system.log`, `install.log`, crontabs in
+  `/private/var/at/tabs`, and the shell histories (with `~/.zsh_sessions`) and `authorized_keys` of `/Users`.
+  The file rules look at `/private/tmp`, `/Users/Shared`, the launchd folders and the homes.
+- **The unified log of macOS** (`--format macos`): the output of `log show` in the styles default, syslog,
+  compact and ndjson, found by itself. sshd and sudo of a Mac give the same events as on Linux, and the kernel
+  line with the cause of the last shutdown is read. `forensics --unified-log file` adds a saved `log show`.
+- **Rules for a Mac:** a kernel panic, a reset with the power button, a reset by the watchdog or another fault,
+  a shutdown that was not normal, and a LaunchAgent or LaunchDaemon that starts a program from `/tmp`,
+  `/Users/Shared` or a hidden folder, downloads a script, or runs encoded or inline code.
+- A rule's `logsource` can list choices, as in `{product: [linux, macos]}`. The rules for SSH, sudo, crontabs,
+  shell histories, `authorized_keys`, accounts and processes now fit both systems.
+- **Easier installation.** `install.sh` (finds the latest release, checks its sha256, installs to
+  `/usr/local/bin` or `~/.local/bin`) and a Homebrew formula that the release workflow writes to the tap
+  `kenzietann/homebrew-tap` (`brew install kenzietann/tap/omamori`). CI tests the script on every push.
 
 ### Fixed
 
 - `omamori forensics /` was refused on every system, although the README said it works. The check that keeps
   the report out of the evidence took the whole tree for the evidence. It now keeps the report out of the
-  places that the run reads (`/etc`, `/var/log`, `/tmp`, `/home` and the others), and the run needs `--output`.
-  Tested on a real Linux system in Docker.
-
-### Added
-
-- **Easier installation.** `install.sh` (finds the latest release, checks its sha256, installs to
-  `/usr/local/bin` or `~/.local/bin`) and a Homebrew formula that the release workflow writes to the tap
-  `kenzietann/homebrew-tap` (`brew install kenzietann/tap/omamori`). CI tests the script on every push.
+  places that the run reads (`/etc`, `/var/log`, `/tmp`, `/home`, and on a Mac `/Users` and `/private`), and
+  the run needs `--output`. Tested on a real Linux system in Docker and on a real Mac.
+- On a Mac, `forensics` found nothing: it only knew the paths of Linux.
 
 ## [0.2.0] - 2026-11-14
 

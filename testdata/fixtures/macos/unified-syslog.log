@@ -1,0 +1,13 @@
+Filtering the log data using "process == "sshd-session" OR process == "sudo" OR process == "kernel""
+Timestamp                       (process)[PID]    
+2026-11-16 09:12:01.104512+0900  mac-mini sshd-session[2201]: Failed password for invalid user admin from 203.0.113.50 port 50122 ssh2
+2026-11-16 09:12:03.881233+0900  mac-mini sshd-session[2201]: Failed password for invalid user admin from 203.0.113.50 port 50122 ssh2
+2026-11-16 09:12:07.009100+0900  mac-mini sshd-session[2205]: Accepted keyboard-interactive/pam for aiko from 198.51.100.7 port 61001 ssh2
+2026-11-16 09:15:44.551020+0900  mac-mini sudo[2290]:     aiko : TTY=ttys001 ; PWD=/Users/aiko ; USER=root ; COMMAND=/bin/launchctl load /Library/LaunchDaemons/com.example.helper.plist
+2026-11-16 09:15:50.000001+0900  mac-mini kernel[0]: (AppleSMC) [com.apple.kernel:smc] Previous shutdown cause: -128
+2026-11-16 09:16:02.120000+0900  mac-mini ContinuityCaptureAgent[989]: (CMContinuityCaptureHost) [com.apple.CMContinuityCapture:default] RapportDevices : (
+    "RPRemoteDisplayDevice, Nm 'x'"
+)
+--------------------------------------------------------------------------------------------------------------------
+Log      - Default:          7, Info:                0, Debug:             0, Error:          0, Fault:          0
+Activity - Create:           0, Transition:          0, Actions:           0

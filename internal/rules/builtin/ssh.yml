@@ -4,7 +4,7 @@ name: ssh_login_failure
 id: 6f3a2c10-0001-4a6e-9d7b-0a1b2c3d4e01
 description: One failed SSH login. It is counted by other rules and gives no alert alone.
 level: low
-logsource: {product: linux, service: sshd}
+logsource: {product: [linux, macos], service: sshd}
 detection:
   selection: {action: login, outcome: failure}
   condition: selection
@@ -23,7 +23,7 @@ name: ssh_login_success
 id: 6f3a2c10-0002-4a6e-9d7b-0a1b2c3d4e02
 description: One successful SSH login. It is used by other rules and gives no alert alone.
 level: informational
-logsource: {product: linux, service: sshd}
+logsource: {product: [linux, macos], service: sshd}
 detection:
   selection: {action: login, outcome: success}
   condition: selection
@@ -240,7 +240,7 @@ name: ssh_penalty_drop
 id: 6f3a2c10-0007-4a6e-9d7b-0a1b2c3d4e07
 description: One connection that sshd refused because the address had failed before (PerSourcePenalties of OpenSSH 9.8 and later). It is counted by another rule and gives no alert alone.
 level: low
-logsource: {product: linux, service: sshd}
+logsource: {product: [linux, macos], service: sshd}
 detection:
   selection: {action: connection_dropped}
   condition: selection

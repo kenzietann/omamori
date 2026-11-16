@@ -23,7 +23,7 @@ import (
 var changed = time.Date(2026, 11, 10, 2, 16, 0, 0, tokyo)
 
 func parseArtifact(kind, name, text string) ([]event.Event, intake.Stats) {
-	c := &collector{}
+	c := &collector{product: ProductLinux}
 	stats := intake.Stats{File: name}
 	c.parse(kind, name, []byte(text), changed, &stats)
 

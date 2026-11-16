@@ -1,0 +1,3 @@
+Timestamp               Ty Process[PID:TID]
+2026-11-16 09:12:01.104 Df sshd-session[2201:13b0] Failed password for aiko from 203.0.113.50 port 50122 ssh2
+2026-11-16 09:12:02.000 E  mDNSResponder[475:13b0] [com.apple.mDNSResponder:mDNS] lost a device

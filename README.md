@@ -10,7 +10,7 @@
 [日本語](README.jp.md)
 
 Omamori is a blue-team tool for the terminal. It checks projects for leaked secrets, reads logs, packet
-captures and whole Linux systems, finds attacks with rules, and lets an AI review what it found. A **guard**
+captures and whole Linux and macOS systems, finds attacks with rules, and lets an AI review what it found. A **guard**
 sits between the AI and your data: secrets and personal data are removed before anything leaves your
 computer, the AI can only use read-only tools, and every claim the AI makes is checked by plain code before
 you see it.
@@ -18,7 +18,7 @@ you see it.
 It runs on your own computer, as a CLI with a terminal home screen and a local web dashboard. Most features
 need no AI at all.
 
-**Status: v0.2.0, a public preview.** All features below run and have tests, and the main paths have been
+**Status: v0.3.0, a public preview.** All features below run and have tests, and the main paths have been
 tested live (see [Live test results](#live-test-results)). It is not a finished product: read the limits of
 each feature. What changed in each version is in the [changelog](CHANGELOG.md).
 
@@ -34,7 +34,7 @@ each feature. What changed in each version is in the [changelog](CHANGELOG.md).
   2. [Log triage (Task B)](#2-log-triage-task-b)
   3. [Detection with rules](#3-detection-with-rules)
   4. [AI analyst](#4-ai-analyst)
-  5. [Forensic triage of a Linux system](#5-forensic-triage-of-a-linux-system)
+  5. [Forensic triage of a Linux system or a Mac](#5-forensic-triage-of-a-linux-system-or-a-mac)
   6. [File rules (YARA-like)](#6-file-rules-yara-like)
   7. [Packet captures](#7-packet-captures)
   8. [AI rule writing (Task C)](#8-ai-rule-writing-task-c)
@@ -102,7 +102,7 @@ sha256 against `checksums.txt`, and installs nothing if they differ:
 curl -fsSL https://raw.githubusercontent.com/kenzietann/omamori/main/install.sh | sh
 ```
 
-It puts the binary in `/usr/local/bin` (or `~/.local/bin` if that cannot be written). `OMAMORI_VERSION=v0.2.0`
+It puts the binary in `/usr/local/bin` (or `~/.local/bin` if that cannot be written). `OMAMORI_VERSION=v0.3.0`
 installs a fixed version and `OMAMORI_INSTALL_DIR=/some/folder` chooses the folder. Read the script first if you
 like; it is short.
 
@@ -117,8 +117,8 @@ go install github.com/kenzietann/omamori/cmd/omamori@latest
 
 ```sh
 shasum -a 256 -c checksums.txt --ignore-missing       # check the download
-tar xzf omamori_0.2.0_darwin_arm64.tar.gz
-sudo mv omamori_0.2.0_darwin_arm64/omamori /usr/local/bin/
+tar xzf omamori_0.3.0_darwin_arm64.tar.gz
+sudo mv omamori_0.3.0_darwin_arm64/omamori /usr/local/bin/
 omamori version
 ```
 
@@ -146,7 +146,7 @@ Everything here uses made-up data and runs offline.
 # 1. Make a day of synthetic logs with planted attacks, and find them with the rules.
 omamori scenario --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-logs
 omamori detect ./demo-logs --year 2026 --timezone Asia/Tokyo
-#    -> Read 2 files and 1254 events. 47 rules. 15 alerts, 1 critical, 6 high, 8 medium.
+#    -> Read 2 files and 1254 events. 49 rules. 15 alerts, 1 critical, 6 high, 8 medium.
 
 # 2. Watch the AI analyst work, with recorded answers instead of a live AI.
 omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo \
@@ -157,7 +157,7 @@ omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo \
 omamori scenario --host --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-host
 omamori forensics --year 2026 --timezone Asia/Tokyo \
   --processes ./demo-host/snapshots/ps.txt --sockets ./demo-host/snapshots/ss.txt ./demo-host/root
-#    -> Read and hashed 31 files ... 67 rules. 34 alerts, 3 critical, 20 high, 11 medium.
+#    -> Read and hashed 31 files ... 73 rules. 34 alerts, 3 critical, 20 high, 11 medium.
 
 # 4. Open the home screen and try the other tasks.
 omamori ui ./demo-logs
@@ -243,12 +243,13 @@ result is never read as "clean".
 and no API key are used.
 
 **What it reads.** sshd and Linux syslog, the systemd journal (`journalctl -o json`), nginx and Apache access
-logs, the logs of web frameworks (see below), Docker container logs, JSON lines, Suricata EVE, Zeek JSON,
+logs, the logs of web frameworks (see below), Docker container logs, the macOS unified log (the output of
+`log show`, in any of its styles), JSON lines, Suricata EVE, Zeek JSON,
 Wazuh alerts, Windows and Sysmon events (Winlogbeat or NXLog JSON), and packet captures (see
 [7](#7-packet-captures)). Give files or folders; the format of each file is found from its first bytes and
 lines, or set it with `--format`. Dependency folders like `node_modules` are skipped and listed.
 
-**The rules.** 47 built-in rules for SSH (guessing, spraying, a login after guessing, sshd penalties), Linux
+**The rules.** 49 built-in rules for SSH (guessing, spraying, a login after guessing, sshd penalties), Linux
 hosts (sudo refused, new users, admin groups, cron jobs that download a script), web servers (scans for
 sensitive files, path enumeration, injection, scanner tools, commands sent to a web shell), web applications
 and APIs (login guessing, many accounts tried, a login after guessing, bursts of refused requests and server
@@ -300,9 +301,9 @@ It takes every `detect` flag, plus `--provider`, `--model`, `--reasoning`, `--dr
 report holds the rule alerts, the checked review, the rejected claims and what was not reviewed, and
 `analysis.json`. Guide: [analyst](docs/analyst.md).
 
-### 5. Forensic triage of a Linux system
+### 5. Forensic triage of a Linux system or a Mac
 
-**What it does.** `forensics` reads a Linux system from a folder (a mounted image, an unpacked copy, or `/` of
+**What it does.** `forensics` reads a Linux system or a Mac from a folder (a mounted image, an unpacked copy, or `/` of
 a running system, with `--output` outside the places it reads): login, system and web logs, crontabs, systemd units, `authorized_keys`, shell histories,
 `/etc/passwd`, and saved `ps` and `ss` output if you give it. The same rules run over the logs and the
 artifacts, and everything stands in one attack timeline. The [file rules](#6-file-rules-yara-like) look at
@@ -320,6 +321,18 @@ omamori forensics --analyze --yes /mnt/server          # add the checked AI revi
   files (`.aws`, `.netrc`, `.env` and the like) are never opened.
 - **Honest times.** The timeline says where each time comes from: a log line, a time written in the history,
   or only the last change of a file. An AI finding that rests on file times is marked as having weak times.
+
+**On a Mac.** A folder with `System/Library/CoreServices/SystemVersion.plist` is read as a Mac: the reports of
+the crash reporter (kernel panics, resets, crashes), LaunchDaemons and LaunchAgents (XML and binary property
+lists), `system.log` and `install.log`, crontabs, shell histories (with `~/.zsh_sessions`) and
+`authorized_keys` in `/Users`. The unified log is binary, so save it with `log show` and give the file. A
+panic, a reset by the power button and a reset by the watchdog each give their own alert, which answers
+"why did my Mac restart?".
+
+```sh
+sudo log show --last 3d --style ndjson > ~/Desktop/unified.ndjson
+sudo omamori forensics --output "/Library/Application Support/omamori" --unified-log ~/Desktop/unified.ndjson /
+```
 
 Guide: [forensics](docs/forensics.md).
 

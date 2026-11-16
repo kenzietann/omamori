@@ -5,7 +5,7 @@ id: 6f3a2c10-0101-4a6e-9d7b-0a1b2c3d4e01
 description: A user who is not allowed to use sudo tried it, or gave wrong passwords.
 level: medium
 tags: [attack.privilege_escalation, attack.t1548.003]
-logsource: {product: linux, service: sudo}
+logsource: {product: [linux, macos], service: sudo}
 detection:
   selection: {action: sudo, outcome: failure}
   condition: selection

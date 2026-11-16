@@ -47,6 +47,7 @@ type Rule struct {
 	Level       string
 	Tags        []string
 	// LogSource holds the product, service and category that an event must have. Empty fits every event.
+	// A value with "|" holds choices: "linux|macos" fits both products.
 	LogSource map[string]string
 
 	detection   *detection
@@ -148,6 +149,20 @@ func build(doc document, file string) (*Rule, error) {
 
 	rule := &Rule{Name: doc.Name, ID: doc.ID, Title: doc.Title, Description: doc.Description, Level: level, Tags: doc.Tags, file: file}
 	for key, value := range doc.LogSource {
+		// A value can be a list of choices, as in {product: [linux, macos]}. The choices are kept joined by "|",
+		// and an event fits when its field is one of them.
+		if choices, isList := value.([]any); isList {
+			var names []string
+			for _, choice := range choices {
+				if name, isName := choice.(string); isName && name != "" && !strings.Contains(name, "|") {
+					names = append(names, name)
+				} else {
+					names = nil
+					break
+				}
+			}
+			value = strings.Join(names, "|")
+		}
 		text, isText := value.(string)
 		switch {
 		case key == "definition":

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -134,7 +135,8 @@ func (rule *Rule) detect(sorted []event.Event) []*Alert {
 
 func (rule *Rule) fitsSource(candidate event.Event) bool {
 	for key, wanted := range rule.LogSource {
-		if value, found := candidate.Fields[key]; !found || !strings.EqualFold(value, wanted) {
+		value, found := candidate.Fields[key]
+		if !found || !slices.ContainsFunc(strings.Split(wanted, "|"), func(choice string) bool { return strings.EqualFold(value, choice) }) {
 			return false
 		}
 	}

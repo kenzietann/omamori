@@ -52,7 +52,7 @@ var (
 	// not a folder of logs.
 	ErrTooManyFiles = errors.New("the folder holds more than 2000 files to read. Give the folder of the logs, not a whole project")
 	ErrBadInput     = errors.New("the log cannot be read")
-	ErrFormat       = errors.New("the format is not known. Use syslog, web, json, app, suricata, zeek, wazuh, windows or pcap")
+	ErrFormat       = errors.New("the format is not known. Use syslog, web, json, app, macos, suricata, zeek, wazuh, windows or pcap")
 )
 
 // Options say how to read lines that do not say everything themselves.
@@ -87,7 +87,7 @@ func (options Options) valid() error {
 		return ErrBadInput
 	}
 	switch options.Format {
-	case FormatAuto, FormatSyslog, FormatWeb, FormatJSON, FormatApp, FormatSuricata, FormatZeek, FormatWazuh, FormatWindows, FormatPCAP:
+	case FormatAuto, FormatSyslog, FormatWeb, FormatJSON, FormatApp, FormatSuricata, FormatZeek, FormatWazuh, FormatWindows, FormatPCAP, FormatMacOS:
 		return nil
 	}
 
@@ -317,6 +317,8 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 		parse = parseWebLine
 	case FormatApp:
 		parse = newAppParser(options)
+	case FormatMacOS:
+		parse = newMacOSParser(options)
 	default:
 		parseJSON = jsonSourceParser(options)
 	}
@@ -339,7 +341,7 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 		switch {
 		case tooLong || !clean(line):
 			stats.Malformed++
-		case strings.TrimSpace(line) == "" || wrappedBlank(line):
+		case strings.TrimSpace(line) == "" || wrappedBlank(line) || format == FormatMacOS && macOSNoise(line):
 			stats.Blank++
 		default:
 			var fields map[string]string
@@ -382,13 +384,17 @@ func sniff(head string, options Options) string {
 	syslog := newSyslogParser(options)
 	jsonLine := jsonParser(options)
 	app := newAppParser(options)
+	mac := newMacOSParser(options)
 	counts := map[string]int{}
 	for _, line := range lines {
 		line = stripANSI(strings.TrimRight(line, "\r"))
 		if strings.TrimSpace(line) == "" || !clean(line) {
 			continue
 		}
-		if _, _, ok := jsonLine(line); ok {
+		if _, _, ok := mac(line); ok {
+			// Before JSON and syslog: an ndjson line of `log show` is JSON too, and is read better as macOS.
+			counts[FormatMacOS]++
+		} else if _, _, ok := jsonLine(line); ok {
 			counts[FormatJSON]++
 		} else if _, _, ok := app(line); ok {
 			// Before syslog: a line of docker logs --timestamps can look like a syslog line by chance.
@@ -401,7 +407,7 @@ func sniff(head string, options Options) string {
 	}
 
 	best, most := FormatAuto, 0
-	for _, format := range []string{FormatSyslog, FormatWeb, FormatJSON, FormatApp} {
+	for _, format := range []string{FormatSyslog, FormatWeb, FormatJSON, FormatApp, FormatMacOS} {
 		if counts[format] > most {
 			best, most = format, counts[format]
 		}

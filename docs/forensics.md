@@ -1,6 +1,6 @@
 # Forensic triage
 
-`omamori forensics` reads the artifacts of a Linux system from a folder, hashes every file it reads,
+`omamori forensics` reads the artifacts of a Linux system or a Mac from a folder, hashes every file it reads,
 runs the rules over the artifacts and the logs, and writes a report with one timeline.
 It uses no AI and no network. It never changes the folder it reads.
 
@@ -49,6 +49,45 @@ manifest as skipped. `forensics verify manifest.json /` checks the files later.
 
 The same limits hold as for an image, and one more: a system with a rootkit can show files that are not what
 is on the disk. Prefer an image when you think the system is not honest.
+
+### A Mac
+
+A folder with `System/Library/CoreServices/SystemVersion.plist` is read as a Mac. `/etc`, `/var` and `/tmp` of
+a Mac are links into `/private`, so the real places are read and no link is followed. Events have
+`product: macos`; the rules for SSH, sudo, crontabs, histories, keys and processes fit both systems.
+
+| Kind (`service`) | Read from | One event for each |
+|---|---|---|
+| logs | `private/var/log/system.log`, `install.log`, `apache2/access_log`, and the file of `--unified-log` | log line |
+| `diagnostic_report` | `Library/Logs/DiagnosticReports`: `*.panic`, `ResetCounter-*.diag`, `*.ips` (and those of each user) | report: `kernel_panic` (with the panic text), `reset` (with `boot_faults` and `reset_kind`), `crash`, `jetsam` |
+| `launchd_plist` | `Library/LaunchDaemons`, `Library/LaunchAgents`, `~/Library/LaunchAgents` (XML and binary plists) | item: label, program and arguments, user, `RunAtLoad`, `KeepAlive` |
+| `cron_file` | `private/etc/crontab`, `private/var/at/tabs/*` | job |
+| `shell_history` | `.zsh_history`, `.bash_history` and `.zsh_sessions/*.history` in `/Users/*` and `/private/var/root` | command |
+| `authorized_keys` | `~/.ssh/authorized_keys` in `/Users/*` and `/private/var/root` | key |
+
+The unified log (`/var/db/diagnostics`) is binary and only `log` reads it, so it is given as a file, like the
+output of `ps`:
+
+```sh
+sudo log show --last 3d --style ndjson > ~/Desktop/unified.ndjson
+sudo omamori forensics --output "/Library/Application Support/omamori" --unified-log ~/Desktop/unified.ndjson /
+```
+
+`--output` must be outside `/Users` and `/private` on a running Mac. Without `sudo` the run still works, but
+files of other users and some of root are named as skipped. macOS can also refuse folders that need Full
+Disk Access for the terminal; they are named as skipped too.
+
+**Why did the Mac restart?** Three alerts answer it. `forensics_macos_kernel_panic` (a panic report, with the
+text that names the failing part), `forensics_macos_button_reset` (the last start came after the power button
+was held, or the reset key sequence: the system did not shut down), and `forensics_macos_unexpected_reset` (the
+watchdog or another fault reset it). The time of the alert is the start after the reset; the unified log shows
+what ran just before.
+
+Limits on a Mac: Apple's own launchd items in `/System` are not read (the sealed system volume holds them).
+Login items added through System Settings, TCC and the quarantine database are not read yet. A line of
+`log show` that goes on over several lines is read up to its first line break.
+
+### Linux
 
 | Kind (`service`) | Read from | One event for each |
 |---|---|---|

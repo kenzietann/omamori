@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	usageDetect   = "usage: omamori detect [--rules folder] [--assets file] [--indicators file] [--format syslog|web|json|suricata|zeek|wazuh|windows] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
+	usageDetect   = "usage: omamori detect [--rules folder] [--assets file] [--indicators file] [--format syslog|web|json|app|macos|suricata|zeek|wazuh|windows|pcap] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
 	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] [--host | --campaign] <new folder>"
 )
 
@@ -91,7 +91,7 @@ func runDetect(args []string, env environment) int {
 	database.bind(flags, true)
 	var rulesFolder, format string
 	flags.StringVar(&rulesFolder, "rules", "", "folder with rules, in place of the built-in rules")
-	flags.StringVar(&format, "format", "", "syslog, web, json, app, suricata, zeek, wazuh, windows or pcap")
+	flags.StringVar(&format, "format", "", "syslog, web, json, app, macos, suricata, zeek, wazuh, windows or pcap")
 	flags.IntVar(&chosen.year, "year", 0, "year of syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of syslog lines")
 	var assetsPath string
@@ -355,5 +355,5 @@ func noLogs(read intake.Result) error {
 		return errors.New("no log file was found here")
 	}
 
-	return fmt.Errorf("none of the %d files here looks like a log that Omamori reads. If some of them are logs, give the format with --format syslog, web, json, app, suricata, zeek, wazuh, windows or pcap", unknown)
+	return fmt.Errorf("none of the %d files here looks like a log that Omamori reads. If some of them are logs, give the format with --format syslog, web, json, app, macos, suricata, zeek, wazuh, windows or pcap", unknown)
 }

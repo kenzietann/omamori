@@ -50,6 +50,10 @@ func (c *collector) parse(kind, name string, data []byte, modified time.Time, st
 		c.processes(name, data, modified, stats)
 	case KindSockets:
 		c.sockets(name, data, modified, stats)
+	case KindLaunchd:
+		c.launchd(name, data, modified, stats)
+	case KindDiagnostic:
+		c.diagnostic(name, data, modified, stats)
 	}
 }
 
@@ -62,7 +66,7 @@ var (
 // cron reads a crontab. The files of the system (/etc/crontab, /etc/cron.d) name the user before the command.
 // The files of users (/var/spool/cron) do not: the name of the file is the user.
 func (c *collector) cron(name string, data []byte, modified time.Time, stats *intake.Stats) {
-	system := strings.HasPrefix(name, "etc/")
+	system := strings.HasPrefix(name, "etc/") || strings.HasPrefix(name, "private/etc/")
 	lines(data, stats, func(number int, line string) {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "#") || cronSetting.MatchString(line) {

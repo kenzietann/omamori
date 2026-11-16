@@ -1,0 +1,4 @@
+{"timezoneName":"","messageType":"Default","eventType":"logEvent","subsystem":"","category":"","processImagePath":"\/usr\/libexec\/sshd-session","timestamp":"2026-11-16 09:12:01.104512+0900","eventMessage":"Failed password for root from 203.0.113.50 port 50122 ssh2","processID":2201,"userID":0}
+{"timezoneName":"","messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xnu","category":"","processImagePath":"\/kernel","timestamp":"2026-11-16 09:15:50.000001+0900","eventMessage":"Previous shutdown cause: 5","processID":0,"userID":0}
+{"timezoneName":"","messageType":"Error","eventType":"logEvent","subsystem":"com.apple.bluetooth","category":"Server","processImagePath":"\/usr\/sbin\/bluetoothd","timestamp":"2026-11-16 09:16:00.5+0900","eventMessage":"a message of another program","processID":381,"userID":0}
+{"count":3,"finished":1}

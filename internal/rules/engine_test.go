@@ -139,7 +139,8 @@ func TestRulesThatMustBeRefused(t *testing.T) {
 		"condition with extra":            detectionRule("  s: {a: b}\n  condition: s s"),
 		"old aggregation":                 detectionRule("  s: {a: b}\n  condition: s | count() > 5"),
 		"old timeframe":                   detectionRule("  s: {a: b}\n  timeframe: 5m\n  condition: s"),
-		"logsource with a list":           "title: T\nlogsource: {product: [a, b]}\ndetection:\n  s: {a: b}\n  condition: s",
+		"logsource with a nested list":    "title: T\nlogsource: {product: [a, [b]]}\ndetection:\n  s: {a: b}\n  condition: s",
+		"logsource with an empty list":    "title: T\nlogsource: {product: []}\ndetection:\n  s: {a: b}\n  condition: s",
 		"not yaml":                        "title: [",
 		"correlation without rules":       "title: T\ncorrelation: {type: event_count, timespan: 5m, condition: {gte: 2}}",
 		"correlation unknown type":        "title: T\ncorrelation: {type: magic, rules: [a], timespan: 5m, condition: {gte: 2}}",
@@ -567,5 +568,19 @@ func TestAliasesThatMustBeRefused(t *testing.T) {
 				t.Fatalf("error is %v, want ErrInvalid", err)
 			}
 		})
+	}
+}
+
+func TestLogSourceWithChoices(t *testing.T) {
+	parsed, err := Parse([]byte("title: T\nname: choices\nlogsource: {product: [linux, macos], service: sshd}\ndetection:\n  s: {action: login}\n  condition: s"), "t.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := parsed[0]
+	for product, want := range map[string]bool{"linux": true, "macos": true, "MacOS": true, "windows": false, "linux|macos": false} {
+		got := rule.fitsSource(event.Event{Fields: map[string]string{"product": product, "service": "sshd"}})
+		if got != want {
+			t.Errorf("product %q: fits %v, want %v", product, got, want)
+		}
 	}
 }
