@@ -4,7 +4,10 @@ All notable changes to Omamori. The format follows [Keep a Changelog](https://ke
 versions follow [Semantic Versioning](https://semver.org). Before 1.0, a minor version can change commands,
 flags and file formats.
 
-## [Unreleased]
+## [0.3.1] - 2026-11-16
+
+A list for the alerts you reviewed, so that a developer's Mac shows what is new. Tested live on a Mac: 16
+alerts became 2 alerts and 14 known good.
 
 ### Added
 
@@ -18,6 +21,8 @@ flags and file formats.
   `--analyze`. Guide: [docs/known-good.md](docs/known-good.md).
 - LaunchAgents and LaunchDaemons carry the hashes of the programs and files that their command names.
 - Forensic runs read the name of the machine (`/etc/hostname`, or the settings of a Mac).
+- `.github/workflows/tap.yml` updates the Homebrew tap of a published release by hand, from its own
+  `checksums.txt`, when the tap step of the release failed.
 
 ### Fixed
 

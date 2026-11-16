@@ -18,7 +18,7 @@ you see it.
 It runs on your own computer, as a CLI with a terminal home screen and a local web dashboard. Most features
 need no AI at all.
 
-**Status: v0.3.0, a public preview.** All features below run and have tests, and the main paths have been
+**Status: v0.3.1, a public preview.** All features below run and have tests, and the main paths have been
 tested live (see [Live test results](#live-test-results)). It is not a finished product: read the limits of
 each feature. What changed in each version is in the [changelog](CHANGELOG.md).
 
@@ -102,7 +102,7 @@ sha256 against `checksums.txt`, and installs nothing if they differ:
 curl -fsSL https://raw.githubusercontent.com/kenzietann/omamori/main/install.sh | sh
 ```
 
-It puts the binary in `/usr/local/bin` (or `~/.local/bin` if that cannot be written). `OMAMORI_VERSION=v0.3.0`
+It puts the binary in `/usr/local/bin` (or `~/.local/bin` if that cannot be written). `OMAMORI_VERSION=v0.3.1`
 installs a fixed version and `OMAMORI_INSTALL_DIR=/some/folder` chooses the folder. Read the script first if you
 like; it is short.
 
@@ -117,8 +117,8 @@ go install github.com/kenzietann/omamori/cmd/omamori@latest
 
 ```sh
 shasum -a 256 -c checksums.txt --ignore-missing       # check the download
-tar xzf omamori_0.3.0_darwin_arm64.tar.gz
-sudo mv omamori_0.3.0_darwin_arm64/omamori /usr/local/bin/
+tar xzf omamori_0.3.1_darwin_arm64.tar.gz
+sudo mv omamori_0.3.1_darwin_arm64/omamori /usr/local/bin/
 omamori version
 ```
 
