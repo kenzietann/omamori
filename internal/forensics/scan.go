@@ -97,6 +97,9 @@ type scanner struct {
 	tooBig       int
 	full         bool
 	entries      map[string]int
+	// walked are the folders that were looked at. The places of a Mac overlap (/Users/Shared is in /Users),
+	// and a folder that is looked at twice would give each hit twice.
+	walked map[string]bool
 }
 
 // scan looks at the files of the scan folders with the file rules, and for the hashes of the indicator list.
@@ -105,7 +108,7 @@ func (c *collector) scan() error {
 	if c.options.FileRules == nil && c.options.Indicators.Len() == 0 {
 		return nil
 	}
-	state := &scanner{entries: map[string]int{}}
+	state := &scanner{entries: map[string]int{}, walked: map[string]bool{}}
 	for index, entry := range c.result.Manifest.Entries {
 		state.entries[entry.Path] = index
 	}
@@ -128,6 +131,10 @@ func (c *collector) scan() error {
 }
 
 func (c *collector) walk(folder string, state *scanner) error {
+	if state.walked[folder] {
+		return nil
+	}
+	state.walked[folder] = true
 	info, err := c.root.Lstat(folder)
 	if err != nil || !info.IsDir() {
 		return nil
@@ -266,7 +273,8 @@ func (c *collector) scanFile(name string, state *scanner) error {
 
 func homeOwner(name string) string {
 	parts := strings.Split(name, "/")
-	if parts[0] == "root" || parts[0] == "home" && len(parts) > 2 {
+	if parts[0] == "root" || (parts[0] == "home" || parts[0] == "Users") && len(parts) > 2 ||
+		len(parts) > 3 && parts[0] == "private" && parts[1] == "var" && parts[2] == "root" {
 		return owner(name)
 	}
 
@@ -284,7 +292,7 @@ func AlertRules(set filerules.Set) ([]*rules.Rule, error) {
 			description = "A file matches the file rule " + rule.Name + "."
 		}
 		alert, err := rules.Match(rule.Name, rule.ID, rule.Title, description, rule.Level, rule.Tags,
-			map[string]string{"product": "linux", "category": "forensics", "service": KindScanned}, FileRuleField, rule.Name)
+			map[string]string{"product": ProductLinux + "|" + ProductMacOS, "category": "forensics", "service": KindScanned}, FileRuleField, rule.Name)
 		if err != nil {
 			return nil, err
 		}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/kenzietann/omamori/internal/event"
 	"github.com/kenzietann/omamori/internal/intake"
+	"github.com/kenzietann/omamori/internal/knowngood"
 	"github.com/kenzietann/omamori/internal/rules"
 	"github.com/kenzietann/omamori/internal/sanitizer"
 )
@@ -31,6 +32,92 @@ type Outcome struct {
 	RulesFrom string
 	Made      time.Time
 	Location  *time.Location
+
+	// Hashes are the SHA-256 of the files that a forensic run read, by path, and Host is the name of the
+	// machine. They go into the fingerprints of the alerts, for the known-good list. Detection over logs
+	// has neither.
+	Hashes map[string]string
+	Host   string
+	// KnownGood is the known-good list applied to the alerts. Nil when no list was given.
+	KnownGood *knowngood.Applied
+}
+
+// ApplyKnownGood looks up the alerts in a list. It only marks alerts: none is removed.
+func (outcome *Outcome) ApplyKnownGood(list *knowngood.List, path string) {
+	outcome.KnownGood = knowngood.Apply(list, path, outcome.Result.Alerts, outcome.Hashes, outcome.Host, outcome.Made)
+}
+
+// Active gives the alerts that are not known good, the most serious first.
+func (outcome Outcome) Active() []*rules.Alert {
+	var active []*rules.Alert
+	for _, alert := range outcome.bySeverity() {
+		if !outcome.KnownGood.KnownGood(alert) {
+			active = append(active, alert)
+		}
+	}
+
+	return active
+}
+
+// Lowered gives the alerts that the known-good list covers, the most serious first.
+func (outcome Outcome) Lowered() []*rules.Alert {
+	var lowered []*rules.Alert
+	for _, alert := range outcome.bySeverity() {
+		if outcome.KnownGood.KnownGood(alert) {
+			lowered = append(lowered, alert)
+		}
+	}
+
+	return lowered
+}
+
+// LevelOf gives the level of an alert as a report shows it: "known good" for an alert of the list.
+func (outcome Outcome) LevelOf(alert *rules.Alert) string {
+	if outcome.KnownGood.KnownGood(alert) {
+		return "known good"
+	}
+
+	return alert.Rule.Level
+}
+
+// Summary gives the counts of a run for the terminal, like "15 alerts, 13 high, 2 low". Alerts of the
+// known-good list are counted apart.
+func (outcome Outcome) Summary() string {
+	active := outcome.Active()
+	counts := map[string]int{}
+	for _, alert := range active {
+		counts[alert.Rule.Level]++
+	}
+	text := fmt.Sprintf("%d alerts", len(active))
+	for _, level := range []string{"critical", "high", "medium", "low", "informational"} {
+		if counts[level] > 0 {
+			text += fmt.Sprintf(", %d %s", counts[level], level)
+		}
+	}
+	if outcome.KnownGood != nil {
+		text += fmt.Sprintf(". %d known good, from your list", outcome.KnownGood.Lowered)
+	}
+
+	return text
+}
+
+// reviewNote says what the list says about an alert that stays an alert.
+func (outcome Outcome) reviewNote(alert *rules.Alert) string {
+	if outcome.KnownGood == nil {
+		return ""
+	}
+	mark := outcome.KnownGood.Marks[alert]
+	if len(mark.Entries) == 0 {
+		return ""
+	}
+	switch mark.State {
+	case knowngood.StateChanged:
+		return "changed since you allowed it on " + mark.Entries[0].Added + ", look again"
+	case knowngood.StateExpired:
+		return "your entry expired on " + mark.Entries[0].Expires + ", look again"
+	}
+
+	return ""
 }
 
 func Run(paths []string, set rules.Set, rulesFrom string, options intake.Options, now time.Time) (Outcome, error) {
@@ -209,7 +296,7 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 		w.location = time.UTC
 	}
 	var out strings.Builder
-	alerts := outcome.bySeverity()
+	alerts := outcome.Active()
 
 	lines, events, malformed := 0, 0, 0
 	for _, file := range outcome.Intake.Files {
@@ -225,6 +312,10 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 	fmt.Fprintf(&out, "- Read: %d files, %d lines, %d events, %d lines that could not be read\n", len(outcome.Intake.Files), lines, events, malformed)
 	fmt.Fprintf(&out, "- Rules: %d (%s)\n", outcome.Rules, plain(outcome.RulesFrom, 40))
 	fmt.Fprintf(&out, "- Alerts: %d\n", len(alerts))
+	if applied := outcome.KnownGood; applied != nil {
+		fmt.Fprintf(&out, "- Known-good list: %s, %d entries, SHA-256 %s. %d alerts are known good; they are listed apart and stay in the timeline.\n",
+			plain(applied.Path, 120), len(applied.List.Entries), applied.List.SHA256, applied.Lowered)
+	}
 	for _, line := range extra.Intro {
 		out.WriteString("- " + plain(line, 400) + "\n")
 	}
@@ -235,7 +326,9 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 	}
 
 	out.WriteString("## Summary\n\n")
-	if len(alerts) == 0 {
+	if len(alerts) == 0 && len(outcome.Lowered()) > 0 {
+		out.WriteString("Every alert is on your known-good list (see \"Known good\"). This does not prove that nothing happened. See \"Limits\".\n\n")
+	} else if len(alerts) == 0 {
 		out.WriteString("No rule fired. This does not prove that nothing happened. See \"Limits\".\n\n")
 	} else {
 		type summary struct {
@@ -271,7 +364,11 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 			if index == maxRows {
 				break
 			}
-			row(&out, index+1, alert.Rule.Level, w.time(alert.Time), plain(alert.Rule.Title, maxCell), w.group(alert), alert.Count, w.refs(alert, 3))
+			title := plain(alert.Rule.Title, maxCell)
+			if note := outcome.reviewNote(alert); note != "" {
+				title += " (" + note + ")"
+			}
+			row(&out, index+1, alert.Rule.Level, w.time(alert.Time), title, w.group(alert), alert.Count, w.refs(alert, 3))
 		}
 		if len(alerts) > maxRows {
 			fmt.Fprintf(&out, "\n%d more alerts are in alerts.json.\n", len(alerts)-maxRows)
@@ -285,6 +382,9 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 			}
 			fmt.Fprintf(&out, "Alert %d (%s): %s. %s\n\n", index+1, alert.Rule.Level, plain(alert.Rule.Title, maxCell), plain(alert.Rule.Description, 400))
 			fmt.Fprintf(&out, "- Who: %s\n", w.group(alert))
+			if note := outcome.reviewNote(alert); note != "" {
+				fmt.Fprintf(&out, "- Known-good list: %s\n", note)
+			}
 			fmt.Fprintf(&out, "- Events: %d, from %s to %s\n", alert.Count, w.time(alert.First), w.time(alert.Last))
 			if len(alert.Values) > 0 {
 				shown := alert.Values
@@ -314,16 +414,17 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 			out.WriteString("\n")
 		}
 
-		if !extra.OwnTimeline {
-			out.WriteString("## Timeline\n\n| Time | Level | Rule | Who |\n|---|---|---|---|\n")
-			for index, alert := range outcome.Result.Alerts {
-				if index == maxRows {
-					break
-				}
-				row(&out, w.time(alert.Time), alert.Rule.Level, plain(alert.Rule.Title, maxCell), w.group(alert))
+	}
+	out.WriteString(outcome.knownGoodSection(w))
+	if len(outcome.Result.Alerts) > 0 && !extra.OwnTimeline {
+		out.WriteString("## Timeline\n\n| Time | Level | Rule | Who |\n|---|---|---|---|\n")
+		for index, alert := range outcome.Result.Alerts {
+			if index == maxRows {
+				break
 			}
-			out.WriteString("\n")
+			row(&out, w.time(alert.Time), outcome.LevelOf(alert), plain(alert.Rule.Title, maxCell), w.group(alert))
 		}
+		out.WriteString("\n")
 	}
 	if extra.Sections != nil {
 		out.WriteString(extra.Sections(&Formatter{w}))
@@ -358,6 +459,31 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 	return out.String()
 }
 
+// knownGoodSection lists the alerts of the known-good list, with the note of the person who allowed them.
+func (outcome Outcome) knownGoodSection(w *writer) string {
+	lowered := outcome.Lowered()
+	if len(lowered) == 0 {
+		return ""
+	}
+	var out strings.Builder
+	out.WriteString("## Known good, from your list\n\n")
+	out.WriteString("These alerts fired, and every event of each is on your known-good list. They are not counted as alerts. " +
+		"Each one comes back when what it is about changes, or when its entry expires.\n\n")
+	out.WriteString("| Level | Time | Rule | Who | Lines | Your note | Added | Expires |\n|---|---|---|---|---|---|---|---|\n")
+	for index, alert := range lowered {
+		if index == maxRows {
+			fmt.Fprintf(&out, "\n%d more are in alerts.json.\n", len(lowered)-maxRows)
+			break
+		}
+		entry := outcome.KnownGood.Marks[alert].Entries[0]
+		row(&out, alert.Rule.Level, w.time(alert.Time), plain(alert.Rule.Title, maxCell), w.group(alert), w.refs(alert, 3),
+			w.text(entry.Note, maxCell), entry.Added, entry.Expires)
+	}
+	out.WriteString("\n")
+
+	return out.String()
+}
+
 type jsonEvent struct {
 	Ref    string            `json:"ref"`
 	Time   string            `json:"time"`
@@ -381,6 +507,25 @@ type jsonAlert struct {
 	Steps       []string          `json:"steps,omitempty"`
 	Events      []jsonEvent       `json:"events"`
 	EventsShown int               `json:"events_shown"`
+	// Match is what the known-good list needs to cover the alert: the host and one item for each event.
+	// Complete is false when the alert keeps fewer events than it counts; such an alert cannot be listed.
+	Match jsonMatch `json:"match"`
+	// KnownGood is the entry that covers the alert, for an alert of the list.
+	KnownGood *jsonEntry `json:"known_good,omitempty"`
+	// Review is what the list says about an alert that stays an alert ("changed", "expired").
+	Review string `json:"review,omitempty"`
+}
+
+type jsonMatch struct {
+	Host     string           `json:"host,omitempty"`
+	Complete bool             `json:"complete"`
+	Items    []knowngood.Item `json:"items,omitempty"`
+}
+
+type jsonEntry struct {
+	Note    string `json:"note"`
+	Added   string `json:"added"`
+	Expires string `json:"expires"`
 }
 
 func JSON(outcome Outcome) (string, error) {
@@ -390,8 +535,8 @@ func JSON(outcome Outcome) (string, error) {
 	}
 	stamp := func(moment time.Time) string { return moment.In(w.location).Format(time.RFC3339) }
 
-	list := []jsonAlert{}
-	for index, alert := range outcome.bySeverity() {
+	list, lowered := []jsonAlert{}, []jsonAlert{}
+	for index, alert := range append(outcome.Active(), outcome.Lowered()...) {
 		current := jsonAlert{
 			Number: index + 1, Rule: alert.Rule.Name, RuleID: alert.Rule.ID, Title: alert.Rule.Title, Level: alert.Rule.Level, Tags: alert.Rule.Tags,
 			Time: stamp(alert.Time), First: stamp(alert.First), Last: stamp(alert.Last), Count: alert.Count, EventsShown: len(alert.Events),
@@ -424,10 +569,28 @@ func JSON(outcome Outcome) (string, error) {
 			}
 			current.Events = append(current.Events, jsonEvent{Ref: w.text(item.Ref, maxCell), Time: stamp(item.Time), Source: source, Fields: fields})
 		}
+		// The items are hashes that Omamori made, not text from the evidence, so they need no filter.
+		current.Match.Items, current.Match.Complete = knowngood.Items(alert, outcome.Hashes)
+		current.Match.Host = w.text(outcome.Host, 255)
+		if current.Match.Host == "-" {
+			current.Match.Host = ""
+		}
+		if outcome.KnownGood.KnownGood(alert) {
+			entry := outcome.KnownGood.Marks[alert].Entries[0]
+			current.KnownGood = &jsonEntry{Note: w.text(entry.Note, 300), Added: entry.Added, Expires: entry.Expires}
+			lowered = append(lowered, current)
+			continue
+		}
+		current.Review = outcome.reviewNote(alert)
 		list = append(list, current)
 	}
 
-	data, err := json.MarshalIndent(map[string]any{"made": stamp(outcome.Made), "alerts": list, "rules_cut": outcome.Result.Cut}, "", "  ")
+	document := map[string]any{"made": stamp(outcome.Made), "alerts": list, "rules_cut": outcome.Result.Cut}
+	if applied := outcome.KnownGood; applied != nil {
+		document["known_good_alerts"] = lowered
+		document["known_good_list"] = map[string]any{"sha256": applied.List.SHA256, "entries": len(applied.List.Entries), "file": w.text(applied.Path, 300)}
+	}
+	data, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		return "", err
 	}

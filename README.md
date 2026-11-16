@@ -328,7 +328,8 @@ lists), `system.log` and `install.log`, crontabs, shell histories (with `~/.zsh_
 `authorized_keys` in `/Users`. The unified log is binary, so save it with `log show` and give the file. A
 panic, a reset by the power button and a reset by the watchdog each give their own alert, which answers
 "why did my Mac restart?". On a developer's Mac, expect alerts for your own `curl … | sh` installers and the
-LaunchAgents of tools you installed: they are correct, and a list to mark reviewed items is planned for 0.3.1.
+LaunchAgents of tools you installed. They are correct; once you have looked at them, put them on your
+[known-good list](docs/known-good.md) and later runs show them apart, as "known good".
 
 ```sh
 sudo /usr/bin/log show --last 3d --style ndjson --predicate 'process == "sshd" OR process == "sshd-session" OR process == "sudo" OR process == "su" OR (process == "kernel" AND (eventMessage CONTAINS[c] "shutdown cause" OR eventMessage CONTAINS "panic("))' > ~/Desktop/unified.ndjson
@@ -529,6 +530,7 @@ completed on two real projects of mine. The details and the faults these runs fo
 | [Rules](docs/rules.md) | the detection and correlation rule format |
 | [AI analyst](docs/analyst.md) | checked reviews, schema, replay |
 | [Forensics](docs/forensics.md) | what is read, the manifest, times, limits |
+| [Known-good list](docs/known-good.md) | marking alerts you reviewed as your own, what comes back, what it does not protect against |
 | [File rules](docs/file-rules.md) | the YARA-like format and the scan |
 | [Packet captures](docs/pcap.md) | pcap and pcapng into events |
 | [Rule writing](docs/rule-writing.md) | `rule draft`, its checks and limits |

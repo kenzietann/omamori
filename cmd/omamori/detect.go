@@ -26,9 +26,17 @@ import (
 )
 
 const (
-	usageDetect   = "usage: omamori detect [--rules folder] [--assets file] [--indicators file] [--format syslog|web|json|app|macos|suricata|zeek|wazuh|windows|pcap] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
+	usageDetect   = "usage: omamori detect [--known-good file] [--rules folder] [--assets file] [--indicators file] [--format syslog|web|json|app|macos|suricata|zeek|wazuh|windows|pcap] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <log file or folder>..."
 	usageScenario = "usage: omamori scenario [--seed n] [--date 2026-11-10] [--timezone name] [--benign] [--host | --campaign] <new folder>"
 )
+
+func (env environment) input() io.Reader {
+	if env.stdin != nil {
+		return env.stdin
+	}
+
+	return strings.NewReader("")
+}
 
 func (env environment) clock() time.Time {
 	if env.now != nil {
@@ -99,6 +107,8 @@ func runDetect(args []string, env environment) int {
 	var indicatorsPath string
 	flags.StringVar(&indicatorsPath, "indicators", "", "indicator list: addresses, domains and hashes that are known to be bad")
 	flags.StringVar(&chosen.output, "output", "", "folder for the reports")
+	var knownGoodPath string
+	flags.StringVar(&knownGoodPath, "known-good", "", "your list of reviewed alerts")
 	paths, err := splitFlags(flags, args)
 	if err != nil || len(paths) == 0 {
 		fmt.Fprintln(env.stderr, usageDetect)
@@ -162,12 +172,19 @@ func runDetect(args []string, env environment) int {
 			return fail(err)
 		}
 	}
+	knownGood, err := loadKnownGood(knownGoodPath, sources, database.wanted(), false)
+	if err != nil {
+		return fail(err)
+	}
 	outcome, err := detect.Run(paths, loaded, rulesFrom, intake.Options{Year: chosen.year, Location: location, Format: format, Assets: machines, Indicators: known}, now)
 	if err != nil {
 		return fail(err)
 	}
 	if len(outcome.Intake.Files) == 0 {
 		return fail(noLogs(outcome.Intake))
+	}
+	if knownGood != nil {
+		outcome.ApplyKnownGood(knownGood, knownGoodPath)
 	}
 
 	report := detect.Markdown(outcome)
@@ -189,16 +206,7 @@ func runDetect(args []string, env environment) int {
 	for _, file := range outcome.Intake.Files {
 		events += file.Events
 	}
-	counts := map[string]int{}
-	for _, alert := range outcome.Result.Alerts {
-		counts[alert.Rule.Level]++
-	}
-	fmt.Fprintf(env.stdout, "Read %d files and %d events. %d rules. %d alerts", len(outcome.Intake.Files), events, outcome.Rules, len(outcome.Result.Alerts))
-	for _, level := range []string{"critical", "high", "medium", "low", "informational"} {
-		if counts[level] > 0 {
-			fmt.Fprintf(env.stdout, ", %d %s", counts[level], level)
-		}
-	}
+	fmt.Fprintf(env.stdout, "Read %d files and %d events. %d rules. %s", len(outcome.Intake.Files), events, outcome.Rules, outcome.Summary())
 	fmt.Fprintf(env.stdout, ".\nReport: %s\n", filepath.Join(directory, "report.html"))
 	if database.wanted() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

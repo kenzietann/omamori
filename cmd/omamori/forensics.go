@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--unified-log file] [--rules folder] [--file-rules folder | --no-file-rules] [--assets file] [--indicators file] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
+	usageForensics = "usage: omamori forensics [--processes file] [--sockets file] [--unified-log file] [--known-good file] [--rules folder] [--file-rules folder | --no-file-rules] [--assets file] [--indicators file] [--year n] [--timezone name] [--output folder] [--store] [--db SQLite-file] <evidence folder>\n" +
 		"       omamori forensics --analyze [--yes | --dry-run | --replay recording.json] [--provider id] [--model name] [--reasoning level] ... <evidence folder>\n" +
 		"       omamori forensics verify <manifest.json> <evidence folder>"
 	maxManifestBytes = forensics.MaxManifestBytes
@@ -49,6 +49,8 @@ func runForensics(args []string, env environment) int {
 	flags.StringVar(&processes, "processes", "", "file with the output of ps aux or ps -ef")
 	flags.StringVar(&sockets, "sockets", "", "file with the output of ss -tulpn or netstat -tulpn")
 	flags.StringVar(&unifiedLog, "unified-log", "", "file with the output of log show (macOS)")
+	var knownGoodPath string
+	flags.StringVar(&knownGoodPath, "known-good", "", "your list of reviewed alerts")
 	flags.IntVar(&chosen.year, "year", 0, "year of syslog lines")
 	flags.StringVar(&chosen.zone, "timezone", "", "time zone of syslog lines")
 	flags.StringVar(&chosen.output, "output", "", "folder for the reports")
@@ -154,6 +156,10 @@ func runForensics(args []string, env environment) int {
 			return fail(outputRefused)
 		}
 	}
+	knownGood, err := loadKnownGood(knownGoodPath, sources, database.wanted(), analyze)
+	if err != nil {
+		return fail(err)
+	}
 	if live {
 		fmt.Fprintln(env.stderr, "Looking at a running system. Files are only read, but a system that was broken into can show files that are not what is on the disk; prefer a mounted image when you can.")
 	}
@@ -161,6 +167,9 @@ func runForensics(args []string, env environment) int {
 	result, err := forensics.Run(evidence, loaded, rulesFrom, forensics.Options{Year: chosen.year, Location: location, Processes: processes, Sockets: sockets, UnifiedLog: unifiedLog, Assets: machines, Indicators: known, FileRules: fileRules}, now)
 	if err != nil {
 		return fail(err)
+	}
+	if knownGood != nil {
+		result.Outcome.ApplyKnownGood(knownGood, knownGoodPath)
 	}
 	if len(result.Manifest.Entries) == 0 {
 		return fail(errors.New("no artifact was found. The folder must be the top of a Linux system, with folders like etc, var and home in it, or of a Mac, with Library, Users and private in it"))
@@ -177,8 +186,8 @@ func runForensics(args []string, env environment) int {
 			artifacts++
 		}
 	}
-	read := fmt.Sprintf("Read and hashed %d files: %d log events and %d artifacts. %d rules. %d alerts",
-		len(result.Manifest.Entries), len(result.Outcome.Intake.Events)-artifacts, artifacts, result.Outcome.Rules, len(result.Outcome.Result.Alerts))
+	read := fmt.Sprintf("Read and hashed %d files: %d log events and %d artifacts. %d rules. %s",
+		len(result.Manifest.Entries), len(result.Outcome.Intake.Events)-artifacts, artifacts, result.Outcome.Rules, result.Outcome.Summary())
 	if analyze {
 		base := analysisrun.Base{Report: report, Prefix: "forensics", Files: map[string]string{
 			"manifest.json": result.ManifestText, "manifest.sha256": result.ManifestSHA256 + "  manifest.json\n",
@@ -206,16 +215,7 @@ func runForensics(args []string, env environment) int {
 		}
 	}
 
-	counts := map[string]int{}
-	for _, alert := range result.Outcome.Result.Alerts {
-		counts[alert.Rule.Level]++
-	}
 	fmt.Fprint(env.stdout, read)
-	for _, level := range []string{"critical", "high", "medium", "low", "informational"} {
-		if counts[level] > 0 {
-			fmt.Fprintf(env.stdout, ", %d %s", counts[level], level)
-		}
-	}
 	fmt.Fprintf(env.stdout, ".\nManifest SHA-256: %s\nReport: %s\n", result.ManifestSHA256, filepath.Join(directory, "report.html"))
 
 	if database.wanted() {

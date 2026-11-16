@@ -83,6 +83,10 @@ of the shell.
 files of other users and some of root are named as skipped. macOS can also refuse folders that need Full
 Disk Access for the terminal; they are named as skipped too.
 
+**Your own tools.** On a developer's Mac, your `curl … | sh` installers and the LaunchAgents of tools you
+installed give alerts. Once you have looked at them, put them on a [known-good list](known-good.md):
+`--known-good file` then shows them apart, and brings each one back when its program changes.
+
 **Why did the Mac restart?** Three alerts answer it. `forensics_macos_kernel_panic` (a panic report, with the
 text that names the failing part), `forensics_macos_button_reset` (the last start came after the power button
 was held, or the reset key sequence: the system did not shut down), and `forensics_macos_unexpected_reset` (the

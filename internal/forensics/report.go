@@ -54,8 +54,14 @@ func Run(folder string, set rules.Set, rulesFrom string, options Options, now ti
 		return Result{}, fmt.Errorf("%w: the manifest would be larger than %d MB", ErrTooBig, MaxManifestBytes>>20)
 	}
 
+	hashes := make(map[string]string, len(collected.Manifest.Entries))
+	for _, entry := range collected.Manifest.Entries {
+		hashes[entry.Path] = entry.SHA256
+	}
+
 	return Result{
 		Outcome: detect.Outcome{
+			Hashes: hashes, Host: collected.Host,
 			Intake: intake.Result{Events: collected.Events, Files: collected.Files, Skipped: collected.Manifest.Skipped},
 			Result: set.Evaluate(collected.Events), Rules: len(set.Rules()), RulesFrom: rulesFrom, Made: now, Location: options.Location,
 		},
@@ -128,7 +134,7 @@ func sections(result Result, format *detect.Formatter) string {
 			if len(alert.Events) > 0 {
 				where = format.Text(alert.Events[0].Ref, 80)
 			}
-			format.Row(&out, format.Time(alert.Time), timeNote(alert), alert.Rule.Level, format.Text(alert.Rule.Title, 160), format.Group(alert), where)
+			format.Row(&out, format.Time(alert.Time), timeNote(alert), result.Outcome.LevelOf(alert), format.Text(alert.Rule.Title, 160), format.Group(alert), where)
 		}
 		out.WriteString("\n")
 	}

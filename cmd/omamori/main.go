@@ -22,6 +22,7 @@ func main() {
 		keys:         keys,
 		settingsPath: appconfig.Path,
 		stdout:       os.Stdout,
+		stdin:        os.Stdin,
 		stderr:       os.Stderr,
 		lookupEnv:    os.Getenv,
 		home:         os.UserHomeDir,

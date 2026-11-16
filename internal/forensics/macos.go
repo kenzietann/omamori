@@ -105,6 +105,8 @@ func (c *collector) launchd(name string, data []byte, modified time.Time, stats 
 	fields := map[string]string{
 		event.Action: "launchd_item", "file": name, "label": label, event.Command: strings.Join(arguments, " "), event.User: runAs,
 		"agent": strconv.FormatBool(strings.Contains(name, "LaunchAgents/")),
+		// The hashes of the programs it starts. A known-good entry for the item stops fitting when one changes.
+		"programs": c.programs(strings.Join(arguments, " ")),
 	}
 	if run, isBool := values["RunAtLoad"].(bool); isBool {
 		fields["run_at_load"] = strconv.FormatBool(run)

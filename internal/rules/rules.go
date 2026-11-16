@@ -407,7 +407,16 @@ func Match(name, id, title, description, level string, tags []string, logSource 
 	hit := map[string]any{field: value}
 	other := map[string]any{field: value + "_other"}
 	for key, text := range logSource {
-		source[key], hit[key], other[key] = text, text, text
+		// A value with choices ("linux|macos") is a list for the rule, and its first choice for the tests.
+		choices := strings.Split(text, "|")
+		list := make([]any, len(choices))
+		for index, choice := range choices {
+			list[index] = choice
+		}
+		source[key], hit[key], other[key] = list, choices[0], choices[0]
+		if len(choices) == 1 {
+			source[key] = text
+		}
 	}
 	one, none := 1, 0
 	doc := document{

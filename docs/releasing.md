@@ -22,6 +22,18 @@ The `release` workflow then runs the tests, builds the four archives and `checks
 `Formula/omamori.rb` into the tap ([`scripts/formula.sh`](../scripts/formula.sh)). The formula takes its
 sha256 values from the same `checksums.txt` that is uploaded, so they cannot differ.
 
+## If the tap step fails
+
+The release is published before the tap is updated, so a failure there (most often a token that can read
+the tap but not write to it: `403 Permission … denied`) leaves a good release and an old formula.
+
+1. Give the token **Contents: Read and write** on `homebrew-tap`, and update the secret.
+2. Run `gh workflow run tap.yml -f tag=vX.Y.Z`. It downloads the `checksums.txt` of the published release
+   and updates the tap; it builds and publishes nothing.
+
+Do not re-run the release workflow for this: a re-run runs the whole job again, and the publish step stops
+because the release exists.
+
 ## What users run
 
 | Way | Command | Where it comes from |

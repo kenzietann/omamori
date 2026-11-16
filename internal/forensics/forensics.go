@@ -114,8 +114,9 @@ type Manifest struct {
 }
 
 type Collection struct {
-	// Product is linux or macos, as the folder shows.
+	// Product is linux or macos, as the folder shows, and Host is the name of the machine, when it says one.
 	Product  string
+	Host     string
 	Events   []event.Event
 	Files    []intake.Stats
 	Manifest Manifest
@@ -229,6 +230,7 @@ func Collect(folder string, options Options) (Collection, error) {
 	event.Sort(c.result.Events)
 	sort.Strings(c.result.Manifest.Skipped)
 	c.result.Product = c.product
+	c.result.Host = c.hostName()
 
 	return c.result, nil
 }

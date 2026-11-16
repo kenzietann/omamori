@@ -4,6 +4,28 @@ All notable changes to Omamori. The format follows [Keep a Changelog](https://ke
 versions follow [Semantic Versioning](https://semver.org). Before 1.0, a minor version can change commands,
 flags and file formats.
 
+## [Unreleased]
+
+### Added
+
+- **Known-good list.** `omamori known-good add` puts alerts of a report that you reviewed on a list, after
+  asking for each one; `detect` and `forensics` take it with `--known-good file`. An alert on the list is
+  lowered to "known good": it is listed apart in the report and in `alerts.json`, stays in the timeline, and
+  its events stay in every rule. Entries hold no text from the system, only SHA-256 fingerprints of the
+  events (and of the file, and of the programs that a LaunchAgent starts). An alert comes back when what it is
+  about changes ("changed since you allowed it"), when its entry expires (90 days by default), or on another
+  machine. The list must be outside the evidence, and the report prints its hash. Not yet with `--store` or
+  `--analyze`. Guide: [docs/known-good.md](docs/known-good.md).
+- LaunchAgents and LaunchDaemons carry the hashes of the programs and files that their command names.
+- Forensic runs read the name of the machine (`/etc/hostname`, or the settings of a Mac).
+
+### Fixed
+
+- On a Mac, a hit of a file rule never became an alert: the alert rules of the file rules only fitted Linux.
+- On a Mac, a file in `/Users/Shared` was looked at twice by the file rules, and each hit was counted twice.
+- A list or a path that does not exist yet under a link (on a Mac, `/var` is a link to `/private/var`) is now
+  checked against the evidence by its real place.
+
 ## [0.3.0] - 2026-11-16
 
 Omamori reads a Mac: `forensics` on a mounted Mac disk or on `/` of a running Mac, and `detect` on the
