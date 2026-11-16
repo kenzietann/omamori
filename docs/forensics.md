@@ -33,6 +33,23 @@ lists the alerts that must fire and what is known to give no alert.
 The folder is the top of the system that is looked at: a mounted disk image (mount it read-only), an
 unpacked copy, or `/` of a running system. Paths in the report and in the manifest are relative to it.
 
+### A running system
+
+```sh
+sudo omamori forensics --output /var/lib/omamori /
+```
+
+Everything is inside `/`, so the rule "the report folder is not inside the evidence" is asked of the places
+that the run reads instead: `/etc`, `/var/log`, `/var/spool/cron`, `/tmp`, `/var/tmp`, `/dev/shm`, `/var/www`,
+`/srv`, `/opt`, `/usr/local`, `/root` and `/home`. A report in one of them would change what is looked at, and
+the next run would read the report as if it were part of the system. So `--output` is needed (the default
+folder is in your home, which is one of the places), and a folder like `/var/lib/omamori` or a mounted disk
+works. Run it as root, or the logs and other users' files cannot be read; what cannot be read is named in the
+manifest as skipped. `forensics verify manifest.json /` checks the files later.
+
+The same limits hold as for an image, and one more: a system with a rootkit can show files that are not what
+is on the disk. Prefer an image when you think the system is not honest.
+
 | Kind (`service`) | Read from | One event for each |
 |---|---|---|
 | logs | `var/log/auth.log`, `secure`, `syslog`, `messages`, `cron` (and `.1`), nginx and Apache access logs | log line, as in `detect` |

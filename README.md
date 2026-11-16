@@ -126,6 +126,12 @@ The binaries are not signed. Homebrew and the install script download the file t
 block them. If macOS refuses a file that a browser downloaded, run
 `xattr -d com.apple.quarantine /usr/local/bin/omamori` once. In a clone, `go install ./cmd/omamori` builds it.
 
+**Use one way, and update with the same way.** Each way puts the binary in its own folder (Homebrew in
+`/opt/homebrew/bin`, the script in `/usr/local/bin` or `~/.local/bin`, Go in `~/go/bin`), so they do not
+overwrite each other. If you have several, the one earliest on your `PATH` runs, and `brew upgrade omamori`
+updates only the Homebrew copy. `which -a omamori` lists every copy; delete the ones you do not want.
+To update: `brew upgrade omamori`, the install script again, or `go install …@latest`.
+
 Optional:
 
 - an **API key** of an AI provider, for the AI features (see [AI providers](#ai-providers-and-api-keys))
@@ -297,7 +303,7 @@ report holds the rule alerts, the checked review, the rejected claims and what w
 ### 5. Forensic triage of a Linux system
 
 **What it does.** `forensics` reads a Linux system from a folder (a mounted image, an unpacked copy, or `/` of
-a running system): login, system and web logs, crontabs, systemd units, `authorized_keys`, shell histories,
+a running system, with `--output` outside the places it reads): login, system and web logs, crontabs, systemd units, `authorized_keys`, shell histories,
 `/etc/passwd`, and saved `ps` and `ss` output if you give it. The same rules run over the logs and the
 artifacts, and everything stands in one attack timeline. The [file rules](#6-file-rules-yara-like) look at
 the content of the files where attackers leave tools.

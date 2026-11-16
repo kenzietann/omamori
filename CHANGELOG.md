@@ -6,6 +6,13 @@ flags and file formats.
 
 ## [Unreleased]
 
+### Fixed
+
+- `omamori forensics /` was refused on every system, although the README said it works. The check that keeps
+  the report out of the evidence took the whole tree for the evidence. It now keeps the report out of the
+  places that the run reads (`/etc`, `/var/log`, `/tmp`, `/home` and the others), and the run needs `--output`.
+  Tested on a real Linux system in Docker.
+
 ### Added
 
 - **Easier installation.** `install.sh` (finds the latest release, checks its sha256, installs to

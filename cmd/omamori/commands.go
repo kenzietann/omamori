@@ -118,6 +118,7 @@ Flags for forensics (also --rules, --year, --timezone, --output, --store and --d
   --analyze           let the AI analyst review the alerts; takes --yes, --dry-run, --replay, --provider and
                       --model as analyze does. Without --yes it only shows the guarded request
 The evidence folder is the top of the system: a mounted image, an unpacked copy, or / itself.
+On / the report must go outside the places that are read: use --output /var/lib/omamori (run as root).
 Nothing in it is changed or run. Password hashes, private keys and credential files are never read.
 
 SQL storage defaults to SQLite. For PostgreSQL or MariaDB, set OMAMORI_DB_DRIVER

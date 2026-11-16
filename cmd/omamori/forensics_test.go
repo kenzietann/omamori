@@ -154,6 +154,11 @@ func TestForensicsRefusals(t *testing.T) {
 		{"folder that is no system", []string{"forensics", empty, "--output", output}, exitFailed, "no artifact was found"},
 		{"report folder inside the evidence", []string{"forensics", root, "--output", filepath.Join(root, "tmp")}, exitFailed, "must not be inside the evidence"},
 		{"report folder around the evidence", []string{"forensics", filepath.Join(root, "etc"), "--output", filepath.Join(root, "etc", "..", "etc", "x")}, exitFailed, "must not be inside the evidence"},
+		// The top of a running system: nothing is read, because the report folder is refused first.
+		{"running system, report in a place that is read", []string{"forensics", "/", "--output", "/tmp/omamori-test"}, exitFailed, "outside the places that are read"},
+		{"running system, report in the logs", []string{"forensics", "/", "--output", "/var/log/omamori"}, exitFailed, "outside the places that are read"},
+		{"running system, report in the settings", []string{"forensics", "/", "--output", "/etc/omamori"}, exitFailed, "outside the places that are read"},
+		{"running system, report in a home", []string{"forensics", "/", "--output", "/home/someone/reports"}, exitFailed, "outside the places that are read"},
 		{"missing snapshot", []string{"forensics", root, "--processes", filepath.Join(base, "ps.txt"), "--output", output}, exitFailed, "snapshot file"},
 		{"unknown time zone", []string{"forensics", root, "--timezone", "Mars/Olympus", "--output", output}, exitFailed, "time zone"},
 		{"verify without arguments", []string{"forensics", "verify"}, exitUsage, "omamori forensics verify"},

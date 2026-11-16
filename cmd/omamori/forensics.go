@@ -127,7 +127,16 @@ func runForensics(args []string, env environment) int {
 	if err != nil {
 		return fail(errors.New("the evidence folder is not usable"))
 	}
+	// The top of a running system holds everything, so a report cannot be "outside" it. The folders that
+	// the run reads are what the report, a database or a recording must stay out of.
+	live := forensics.IsSystemRoot(evidence)
 	sources := []string{evidence}
+	outputRefused := errors.New("the report folder must be new, and it must not be inside the evidence folder or around it")
+	if live {
+		sources = forensics.LivePlaces(evidence)
+		outputRefused = errors.New("on a running system the report folder must be outside the places that are read (/etc, /var/log, /tmp, /home, /root, /opt, /srv and others). " +
+			"Use --output with a folder like /var/lib/omamori or a mounted disk")
+	}
 	for _, snapshot := range []string{processes, sockets} {
 		if snapshot != "" {
 			absolute, err := filepath.Abs(snapshot)
@@ -141,8 +150,11 @@ func runForensics(args []string, env environment) int {
 
 	for _, source := range sources {
 		if err := pathguard.CheckOutputFolder(source, directory); err != nil {
-			return fail(errors.New("the report folder must be new, and it must not be inside the evidence folder or around it"))
+			return fail(outputRefused)
 		}
+	}
+	if live {
+		fmt.Fprintln(env.stderr, "Looking at a running system. Files are only read, but a system that was broken into can show files that are not what is on the disk; prefer a mounted image when you can.")
 	}
 
 	result, err := forensics.Run(evidence, loaded, rulesFrom, forensics.Options{Year: chosen.year, Location: location, Processes: processes, Sockets: sockets, Assets: machines, Indicators: known, FileRules: fileRules}, now)
@@ -182,7 +194,7 @@ func runForensics(args []string, env environment) int {
 			return fail(errors.New("the report folder of this second exists already. Run again"))
 		}
 
-		return fail(errors.New("the report folder must be new, and it must not be inside the evidence folder or around it"))
+		return fail(outputRefused)
 	}
 	for _, file := range []struct{ name, content string }{
 		{"report.md", report}, {"report.html", htmlreport.Render(report)}, {"alerts.json", alerts},
