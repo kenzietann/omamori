@@ -1,4 +1,4 @@
-# Builds and publishes a release when a tag like v0.1.0 is pushed. The tag is pushed by hand.
+# Builds and publishes a release when a tag like v0.2.0 is pushed, then updates the Homebrew tap. The tag is pushed by hand.
 name: release
 
 on:
@@ -26,3 +26,21 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt \
             --title "Omamori $GITHUB_REF_NAME" --notes-file dist/notes.md --verify-tag
+      - name: Update the Homebrew tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "HOMEBREW_TAP_TOKEN is not set, so the Homebrew tap is not updated."
+            exit 0
+          fi
+          scripts/formula.sh "$GITHUB_REF_NAME" > omamori.rb
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/kenzietann/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          cp omamori.rb tap/Formula/omamori.rb
+          cd tap
+          git config user.name "omamori release"
+          git config user.email "actions@users.noreply.github.com"
+          git add Formula/omamori.rb
+          git commit -m "omamori $GITHUB_REF_NAME"
+          git push

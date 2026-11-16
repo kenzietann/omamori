@@ -6,6 +6,12 @@ flags and file formats.
 
 ## [Unreleased]
 
+### Added
+
+- **Easier installation.** `install.sh` (finds the latest release, checks its sha256, installs to
+  `/usr/local/bin` or `~/.local/bin`) and a Homebrew formula that the release workflow writes to the tap
+  `kenzietann/homebrew-tap` (`brew install kenzietann/tap/omamori`). CI tests the script on every push.
+
 ## [0.2.0] - 2026-11-14
 
 Omamori reads the logs of web applications: fifteen framework setups, Docker and the systemd journal, with

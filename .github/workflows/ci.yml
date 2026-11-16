@@ -32,3 +32,13 @@ jobs:
           node-version: 22
       - name: Dashboard tests
         run: npm ci --prefix tests && npm test --prefix tests
+      - name: Install script and Homebrew formula
+        run: |
+          sh -n install.sh
+          sh -n scripts/formula.sh
+          tag="v$(sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)"
+          scripts/release.sh "$tag" > /dev/null
+          scripts/formula.sh "$tag" > "$RUNNER_TEMP/omamori.rb"
+          OMAMORI_VERSION="$tag" OMAMORI_BASE_URL="file://$PWD/dist" \
+            OMAMORI_INSTALL_DIR="$RUNNER_TEMP/bin" ./install.sh
+          "$RUNNER_TEMP/bin/omamori" version

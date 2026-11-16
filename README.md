@@ -87,8 +87,33 @@ The [platform plan](docs/platform-plan.md) has the details and the tests behind 
 
 ## Install
 
-**Download a release** (macOS and Linux, Apple silicon and Intel/AMD). Pick the archive of your system from
-the [latest release](https://github.com/kenzietann/omamori/releases/latest), then:
+Omamori is one binary for macOS and Linux (Apple silicon and Intel/AMD). Pick one way.
+
+**Homebrew** (macOS and Linux):
+
+```sh
+brew install kenzietann/tap/omamori
+```
+
+**Install script**, for servers and anything without Homebrew. It finds the latest release, checks its
+sha256 against `checksums.txt`, and installs nothing if they differ:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kenzietann/omamori/main/install.sh | sh
+```
+
+It puts the binary in `/usr/local/bin` (or `~/.local/bin` if that cannot be written). `OMAMORI_VERSION=v0.2.0`
+installs a fixed version and `OMAMORI_INSTALL_DIR=/some/folder` chooses the folder. Read the script first if you
+like; it is short.
+
+**Go** 1.26.5 or newer:
+
+```sh
+go install github.com/kenzietann/omamori/cmd/omamori@latest
+```
+
+**Download by hand.** Pick the archive of your system from the
+[latest release](https://github.com/kenzietann/omamori/releases/latest), then:
 
 ```sh
 shasum -a 256 -c checksums.txt --ignore-missing       # check the download
@@ -97,15 +122,9 @@ sudo mv omamori_0.2.0_darwin_arm64/omamori /usr/local/bin/
 omamori version
 ```
 
-The binaries are not signed. If macOS refuses to open a file that a browser downloaded, run
-`xattr -d com.apple.quarantine /usr/local/bin/omamori` once.
-
-**Or build it from source** with Go 1.26.5 or newer:
-
-```sh
-go install github.com/kenzietann/omamori/cmd/omamori@v0.2.0
-# or, in a clone: go install ./cmd/omamori
-```
+The binaries are not signed. Homebrew and the install script download the file themselves, so macOS does not
+block them. If macOS refuses a file that a browser downloaded, run
+`xattr -d com.apple.quarantine /usr/local/bin/omamori` once. In a clone, `go install ./cmd/omamori` builds it.
 
 Optional:
 
@@ -498,6 +517,7 @@ completed on two real projects of mine. The details and the faults these runs fo
 | [Attack lab](docs/lab.md) | the lab, its safety and its results |
 | [Demo campaign](docs/demo.md) | one attack through three hosts |
 | [Roadmap](ROADMAP.md) | the plan for v1 |
+| [Releasing](docs/releasing.md) | how a version is tagged, built and reaches Homebrew, the install script and Go |
 
 ## About the project
 
@@ -507,8 +527,10 @@ my startup, Millelith.
 **How I use AI.** I built the first parts by hand to learn Go. Later parts, the tests and the docs were
 written with an AI coding tool; I review, run and commit them. The product's own AI is limited by the guard.
 
-**Releases.** Pushing a tag like `v0.1.0` runs the tests and builds the archives with
-[`scripts/release.sh`](scripts/release.sh); every push to `main` runs the test gate in GitHub Actions.
+**Releases.** Pushing a tag like `v0.2.0` runs the tests, builds the archives with
+[`scripts/release.sh`](scripts/release.sh), publishes the release and updates the Homebrew tap; every push to
+`main` runs the test gate, and the install script, in GitHub Actions. The steps are in
+[docs/releasing.md](docs/releasing.md).
 
 **Tech.** Go, one binary. Tests with `go test`, including fuzz tests and mutation checks; the dashboard has
 browser tests (`npm test --prefix tests`). Terminal screen with Bubble Tea. Commit messages follow
