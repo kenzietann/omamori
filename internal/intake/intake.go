@@ -74,6 +74,27 @@ type Stats struct {
 	Events    int
 	Blank     int
 	Malformed int
+	// AppEvents counts the events of an application log, Requests the events that are a web request
+	// (category webserver), and PartialRequests the events that name a method and a path but have no status,
+	// so the web rules cannot read them. They feed Warnings: a log that is read but says nothing about requests
+	// must not look the same as a log of a quiet day.
+	AppEvents       int
+	Requests        int
+	PartialRequests int
+}
+
+// Warnings says, in fixed words, why the web rules may be blind on this file. Empty when nothing is wrong.
+func (stats Stats) Warnings() []string {
+	var warnings []string
+	if stats.AppEvents > 0 && stats.Requests == 0 && stats.PartialRequests == 0 {
+		warnings = append(warnings, "an application log with no request lines: its logger probably does not log requests, "+
+			"so attacks on its routes cannot be seen. Turn on request logging (see docs/apps.md)")
+	}
+	if stats.PartialRequests > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d requests have no status code, so the web rules could not read them", stats.PartialRequests))
+	}
+
+	return warnings
 }
 
 type Result struct {
@@ -364,6 +385,20 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 		}
 		if errors.Is(err, io.EOF) {
 			break
+		}
+	}
+	if sources[FormatJSON] {
+		joinSplitRequests(events)
+	}
+	for _, current := range events {
+		switch {
+		case current.Fields[event.Category] == "webserver":
+			stats.Requests++
+		case current.Fields[event.Method] != "" && current.Fields[event.URL] != "":
+			stats.PartialRequests++
+		}
+		if current.Fields[event.Product] == "app" {
+			stats.AppEvents++
 		}
 	}
 	stats.Events = len(events)

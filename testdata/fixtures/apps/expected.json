@@ -111,6 +111,16 @@
    "web_sensitive_scan"
   ]
  },
+ "fastify": {
+  "stdout.log": [
+   "app_credential_stuffing",
+   "app_login_after_bruteforce",
+   "app_login_bruteforce",
+   "app_sql_error",
+   "web_injection_attempt",
+   "web_sensitive_scan"
+  ]
+ },
  "flask": {
   "docker-json.log": [
    "app_credential_stuffing",
