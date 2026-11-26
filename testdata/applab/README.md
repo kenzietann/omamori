@@ -16,3 +16,8 @@ build it) on an `--internal` Docker network, runs [`attack.sh`](attack.sh), and 
 Docker (through `colima ssh`; on Docker Desktop or Engine, read `/var/lib/docker/containers/<id>/<id>-json.log`
 directly), `docker logs --timestamps`, and the log files of Spring Boot (Tomcat) and Laravel. All addresses are
 private lab addresses, and the attack reaches only the app.
+
+`fastify` was run without Docker (2026-11-26): `node server.js > stdout.log` with Fastify 5.9.0, then
+`./attack.sh 127.0.0.1`, so its fixture is standard output as a process manager keeps it and the client is
+127.0.0.1. In the fixture, `hostname` and `pid` were set to `fastify` and `1` like a container's, and the
+"Server listening" lines for the machine's own network addresses were removed. Nothing else was changed.

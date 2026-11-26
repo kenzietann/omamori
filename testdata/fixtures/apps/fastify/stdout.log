@@ -1,0 +1,68 @@
+{"level":30,"time":1795699687255,"pid":1,"hostname":"fastify","msg":"Server listening at http://127.0.0.1:8080"}
+{"level":30,"time":1795699687684,"pid":1,"hostname":"fastify","reqId":"req-1","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47884},"msg":"incoming request"}
+{"level":40,"time":1795699687686,"pid":1,"hostname":"fastify","reqId":"req-1","msg":"Failed login for user1@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687689,"pid":1,"hostname":"fastify","reqId":"req-1","res":{"statusCode":401},"responseTime":4.582935000769794,"msg":"request completed"}
+{"level":30,"time":1795699687694,"pid":1,"hostname":"fastify","reqId":"req-2","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47888},"msg":"incoming request"}
+{"level":40,"time":1795699687694,"pid":1,"hostname":"fastify","reqId":"req-2","msg":"Failed login for user2@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687695,"pid":1,"hostname":"fastify","reqId":"req-2","res":{"statusCode":401},"responseTime":0.5544050000607967,"msg":"request completed"}
+{"level":30,"time":1795699687700,"pid":1,"hostname":"fastify","reqId":"req-3","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47896},"msg":"incoming request"}
+{"level":40,"time":1795699687700,"pid":1,"hostname":"fastify","reqId":"req-3","msg":"Failed login for user3@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687701,"pid":1,"hostname":"fastify","reqId":"req-3","res":{"statusCode":401},"responseTime":0.34521100018173456,"msg":"request completed"}
+{"level":30,"time":1795699687706,"pid":1,"hostname":"fastify","reqId":"req-4","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47900},"msg":"incoming request"}
+{"level":40,"time":1795699687706,"pid":1,"hostname":"fastify","reqId":"req-4","msg":"Failed login for user4@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687706,"pid":1,"hostname":"fastify","reqId":"req-4","res":{"statusCode":401},"responseTime":0.34378799982368946,"msg":"request completed"}
+{"level":30,"time":1795699687712,"pid":1,"hostname":"fastify","reqId":"req-5","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47912},"msg":"incoming request"}
+{"level":40,"time":1795699687712,"pid":1,"hostname":"fastify","reqId":"req-5","msg":"Failed login for user5@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687712,"pid":1,"hostname":"fastify","reqId":"req-5","res":{"statusCode":401},"responseTime":0.3906760001555085,"msg":"request completed"}
+{"level":30,"time":1795699687717,"pid":1,"hostname":"fastify","reqId":"req-6","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47918},"msg":"incoming request"}
+{"level":40,"time":1795699687718,"pid":1,"hostname":"fastify","reqId":"req-6","msg":"Failed login for user6@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687718,"pid":1,"hostname":"fastify","reqId":"req-6","res":{"statusCode":401},"responseTime":0.3526950003579259,"msg":"request completed"}
+{"level":30,"time":1795699687723,"pid":1,"hostname":"fastify","reqId":"req-7","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47928},"msg":"incoming request"}
+{"level":40,"time":1795699687723,"pid":1,"hostname":"fastify","reqId":"req-7","msg":"Failed login for user7@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687723,"pid":1,"hostname":"fastify","reqId":"req-7","res":{"statusCode":401},"responseTime":0.2850069999694824,"msg":"request completed"}
+{"level":30,"time":1795699687729,"pid":1,"hostname":"fastify","reqId":"req-8","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47934},"msg":"incoming request"}
+{"level":40,"time":1795699687729,"pid":1,"hostname":"fastify","reqId":"req-8","msg":"Failed login for user8@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687729,"pid":1,"hostname":"fastify","reqId":"req-8","res":{"statusCode":401},"responseTime":0.3415040001273155,"msg":"request completed"}
+{"level":30,"time":1795699687734,"pid":1,"hostname":"fastify","reqId":"req-9","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47938},"msg":"incoming request"}
+{"level":40,"time":1795699687735,"pid":1,"hostname":"fastify","reqId":"req-9","msg":"Failed login for user9@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687735,"pid":1,"hostname":"fastify","reqId":"req-9","res":{"statusCode":401},"responseTime":0.4263230003416538,"msg":"request completed"}
+{"level":30,"time":1795699687741,"pid":1,"hostname":"fastify","reqId":"req-a","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47954},"msg":"incoming request"}
+{"level":40,"time":1795699687741,"pid":1,"hostname":"fastify","reqId":"req-a","msg":"Failed login for user10@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687741,"pid":1,"hostname":"fastify","reqId":"req-a","res":{"statusCode":401},"responseTime":0.45595999993383884,"msg":"request completed"}
+{"level":30,"time":1795699687747,"pid":1,"hostname":"fastify","reqId":"req-b","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47966},"msg":"incoming request"}
+{"level":40,"time":1795699687747,"pid":1,"hostname":"fastify","reqId":"req-b","msg":"Failed login for user11@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687747,"pid":1,"hostname":"fastify","reqId":"req-b","res":{"statusCode":401},"responseTime":0.23826900031417608,"msg":"request completed"}
+{"level":30,"time":1795699687752,"pid":1,"hostname":"fastify","reqId":"req-c","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47968},"msg":"incoming request"}
+{"level":40,"time":1795699687752,"pid":1,"hostname":"fastify","reqId":"req-c","msg":"Failed login for user12@example.test from 127.0.0.1"}
+{"level":30,"time":1795699687752,"pid":1,"hostname":"fastify","reqId":"req-c","res":{"statusCode":401},"responseTime":0.21377199981361628,"msg":"request completed"}
+{"level":30,"time":1795699687757,"pid":1,"hostname":"fastify","reqId":"req-d","req":{"method":"POST","url":"/auth/login","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47970},"msg":"incoming request"}
+{"level":30,"time":1795699687757,"pid":1,"hostname":"fastify","reqId":"req-d","res":{"statusCode":200},"responseTime":0.27785299997776747,"msg":"request completed"}
+{"level":30,"time":1795699687763,"pid":1,"hostname":"fastify","reqId":"req-e","req":{"method":"GET","url":"/.env","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47984},"msg":"incoming request"}
+{"level":30,"time":1795699687763,"pid":1,"hostname":"fastify","reqId":"req-e","msg":"Route GET:/.env not found"}
+{"level":30,"time":1795699687763,"pid":1,"hostname":"fastify","reqId":"req-e","res":{"statusCode":404},"responseTime":0.36285299994051456,"msg":"request completed"}
+{"level":30,"time":1795699687768,"pid":1,"hostname":"fastify","reqId":"req-f","req":{"method":"GET","url":"/.git/config","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47996},"msg":"incoming request"}
+{"level":30,"time":1795699687768,"pid":1,"hostname":"fastify","reqId":"req-f","msg":"Route GET:/.git/config not found"}
+{"level":30,"time":1795699687768,"pid":1,"hostname":"fastify","reqId":"req-f","res":{"statusCode":404},"responseTime":0.16217599995434284,"msg":"request completed"}
+{"level":30,"time":1795699687774,"pid":1,"hostname":"fastify","reqId":"req-g","req":{"method":"GET","url":"/actuator/env","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":47998},"msg":"incoming request"}
+{"level":30,"time":1795699687774,"pid":1,"hostname":"fastify","reqId":"req-g","msg":"Route GET:/actuator/env not found"}
+{"level":30,"time":1795699687774,"pid":1,"hostname":"fastify","reqId":"req-g","res":{"statusCode":404},"responseTime":0.19085999950766563,"msg":"request completed"}
+{"level":30,"time":1795699687779,"pid":1,"hostname":"fastify","reqId":"req-h","req":{"method":"GET","url":"/wp-login.php","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":48010},"msg":"incoming request"}
+{"level":30,"time":1795699687779,"pid":1,"hostname":"fastify","reqId":"req-h","msg":"Route GET:/wp-login.php not found"}
+{"level":30,"time":1795699687780,"pid":1,"hostname":"fastify","reqId":"req-h","res":{"statusCode":404},"responseTime":0.19787299912422895,"msg":"request completed"}
+{"level":30,"time":1795699687785,"pid":1,"hostname":"fastify","reqId":"req-i","req":{"method":"GET","url":"/phpmyadmin/","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":48014},"msg":"incoming request"}
+{"level":30,"time":1795699687785,"pid":1,"hostname":"fastify","reqId":"req-i","msg":"Route GET:/phpmyadmin/ not found"}
+{"level":30,"time":1795699687785,"pid":1,"hostname":"fastify","reqId":"req-i","res":{"statusCode":404},"responseTime":0.15383999980986118,"msg":"request completed"}
+{"level":30,"time":1795699687790,"pid":1,"hostname":"fastify","reqId":"req-j","req":{"method":"GET","url":"/backup.sql","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":48030},"msg":"incoming request"}
+{"level":30,"time":1795699687790,"pid":1,"hostname":"fastify","reqId":"req-j","msg":"Route GET:/backup.sql not found"}
+{"level":30,"time":1795699687790,"pid":1,"hostname":"fastify","reqId":"req-j","res":{"statusCode":404},"responseTime":0.1507540000602603,"msg":"request completed"}
+{"level":30,"time":1795699687796,"pid":1,"hostname":"fastify","reqId":"req-k","req":{"method":"GET","url":"/api/items?id=1%27%20OR%20%271%27=%271","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":48042},"msg":"incoming request"}
+{"level":50,"time":1795699687796,"pid":1,"hostname":"fastify","reqId":"req-k","msg":"QueryFailedError: syntax error at or near \"1' OR '1'='1\""}
+{"level":30,"time":1795699687796,"pid":1,"hostname":"fastify","reqId":"req-k","res":{"statusCode":500},"responseTime":0.2085429998114705,"msg":"request completed"}
+{"level":30,"time":1795699687801,"pid":1,"hostname":"fastify","reqId":"req-l","req":{"method":"GET","url":"/api/items?id=1%27%20OR%20%271%27=%271","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":48056},"msg":"incoming request"}
+{"level":50,"time":1795699687801,"pid":1,"hostname":"fastify","reqId":"req-l","msg":"QueryFailedError: syntax error at or near \"1' OR '1'='1\""}
+{"level":30,"time":1795699687801,"pid":1,"hostname":"fastify","reqId":"req-l","res":{"statusCode":500},"responseTime":0.15550300013273954,"msg":"request completed"}
+{"level":30,"time":1795699687806,"pid":1,"hostname":"fastify","reqId":"req-m","req":{"method":"GET","url":"/api/items?id=1%27%20OR%20%271%27=%271","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":48060},"msg":"incoming request"}
+{"level":50,"time":1795699687806,"pid":1,"hostname":"fastify","reqId":"req-m","msg":"QueryFailedError: syntax error at or near \"1' OR '1'='1\""}
+{"level":30,"time":1795699687807,"pid":1,"hostname":"fastify","reqId":"req-m","res":{"statusCode":500},"responseTime":0.22412300016731024,"msg":"request completed"}
+{"level":30,"time":1795699687812,"pid":1,"hostname":"fastify","reqId":"req-n","req":{"method":"GET","url":"/api/items?id=1","host":"127.0.0.1:8080","remoteAddress":"127.0.0.1","remotePort":48068},"msg":"incoming request"}
+{"level":30,"time":1795699687812,"pid":1,"hostname":"fastify","reqId":"req-n","res":{"statusCode":200},"responseTime":0.17617199942469597,"msg":"request completed"}

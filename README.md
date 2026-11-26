@@ -273,8 +273,8 @@ omamori detect ./logs --assets assets.yml --indicators bad.yml
 Boot, ASP.NET Core, Laravel, Rails, Go (Gin, Echo, chi and the usual JSON loggers) and Rust (actix-web, Axum),
 in files, in Docker (`docker logs --timestamps` or the json-file log) and in the systemd journal. A request
 that a framework logs is read like a line of nginx, so the same rules work everywhere; behind a proxy, the
-client is taken from `X-Forwarded-For`. This was measured on real applications of fifteen setups attacked in
-Docker; the [web applications guide](docs/apps.md) says what each setup shows and how to log more.
+client is taken from `X-Forwarded-For`. This was measured on real applications of sixteen setups (fifteen attacked in
+Docker, Fastify on its own); the [web applications guide](docs/apps.md) says what each setup shows and how to log more.
 
 ```sh
 docker logs --timestamps api > api.log
@@ -526,7 +526,7 @@ completed on two real projects of mine. The details and the faults these runs fo
 | [Platform plan](docs/platform-plan.md) | design, decisions, verification results, what was fixed and why |
 | [Toolkit map](docs/toolkit.md) | which blue-team tools Omamori stands in for, and what is missing |
 | [Log intake](docs/intake.md) | formats, field maps and limits |
-| [Web applications](docs/apps.md) | framework, Docker and journald logs, the app rules, measured on fifteen setups |
+| [Web applications](docs/apps.md) | framework, Docker and journald logs, the app rules, measured on sixteen setups |
 | [Rules](docs/rules.md) | the detection and correlation rule format |
 | [AI analyst](docs/analyst.md) | checked reviews, schema, replay |
 | [Forensics](docs/forensics.md) | what is read, the manifest, times, limits |

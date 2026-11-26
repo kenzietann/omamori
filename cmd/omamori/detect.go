@@ -22,6 +22,7 @@ import (
 	"github.com/kenzietann/omamori/internal/reportwriter"
 	"github.com/kenzietann/omamori/internal/rules"
 	"github.com/kenzietann/omamori/internal/runstore"
+	"github.com/kenzietann/omamori/internal/sanitizer"
 	"github.com/kenzietann/omamori/internal/scenario"
 )
 
@@ -208,6 +209,11 @@ func runDetect(args []string, env environment) int {
 	}
 	fmt.Fprintf(env.stdout, "Read %d files and %d events. %d rules. %s", len(outcome.Intake.Files), events, outcome.Rules, outcome.Summary())
 	fmt.Fprintf(env.stdout, ".\nReport: %s\n", filepath.Join(directory, "report.html"))
+	var clean sanitizer.Sanitizer
+	for _, warning := range detect.FileWarnings(outcome.Intake) {
+		text, _ := clean.Sanitize(warning)
+		fmt.Fprintln(env.stdout, "Warning:", text)
+	}
 	if database.wanted() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()

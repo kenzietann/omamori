@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -134,6 +135,18 @@ func RunContext(ctx context.Context, paths []string, set rules.Set, rulesFrom st
 		Intake: read, Result: set.Evaluate(read.Events), Rules: len(set.Rules()), RulesFrom: rulesFrom,
 		Made: now, Location: options.Location,
 	}, nil
+}
+
+// FileWarnings gives the warnings of every file that was read, each starting with the name of its file.
+func FileWarnings(read intake.Result) []string {
+	var warnings []string
+	for _, file := range read.Files {
+		for _, warning := range file.Warnings() {
+			warnings = append(warnings, filepath.Base(file.File)+": "+warning)
+		}
+	}
+
+	return warnings
 }
 
 var levelRank = map[string]int{"critical": 4, "high": 3, "medium": 2, "low": 1, "informational": 0}
@@ -442,6 +455,13 @@ func MarkdownWith(outcome Outcome, extra Extra) string {
 		out.WriteString("\nFiles that were not read:\n\n")
 		for _, skipped := range outcome.Intake.Skipped {
 			fmt.Fprintf(&out, "- %s\n", w.text(skipped, maxCell))
+		}
+	}
+
+	if warnings := FileWarnings(outcome.Intake); len(warnings) > 0 {
+		out.WriteString("\n## Warnings\n\nThe rules may be blind on these files. No alert from them does not mean no attack.\n\n")
+		for _, warning := range warnings {
+			out.WriteString("- " + w.text(warning, 400) + "\n")
 		}
 	}
 

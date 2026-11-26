@@ -58,9 +58,15 @@ must be read, and exactly the same rules must fire.
 | Go, chi | `middleware.Logger` | yes | yes | yes | yes | yes | no | yes |
 | Rust, actix-web | `Logger::default()` with env_logger | yes | yes | yes | yes | yes | yes | yes |
 | Rust, Axum | tower-http `TraceLayer` with tracing-subscriber | yes | yes | no | no | no | no | yes |
+| Fastify | `Fastify({ logger: true })`, standard output (2026-11-26, without Docker) | yes | yes | yes | yes | yes | no | yes |
 
-Spring Boot also gave the alert for its Actuator `env` endpoint, which answered from outside. All 31 log
-files were read with no unread line. The "no" cells are not faults of a reader: the information is not in
+Spring Boot also gave the alert for its Actuator `env` endpoint, which answered from outside. All 32 log
+files were read with no unread line.
+
+Fastify writes one request as two lines, `incoming request` (method, path, address) and `request completed`
+(status), with the same `reqId`. They are joined into one request when they come from the same process (pid
+and host) within ten minutes; both lines stay events. Without the join, Fastify's requests were read as plain
+JSON and no web rule could fire. This was found by attacking a real Fastify app. The "no" cells are not faults of a reader: the information is not in
 that log, and the next section says how to add it.
 
 Where "many accounts" and "guessing" come from the messages of the application, a request and the line about
@@ -74,7 +80,7 @@ it are both counted; ten failures can then be five attempts.
 | Requests of Laravel | Laravel logs no requests | Read the access log of nginx or Apache in front of PHP-FPM, as in production |
 | The client of Axum | `TraceLayer` does not record it | Add the address to the span (`ConnectInfo<SocketAddr>` in `make_span_with`, as `client_ip`) |
 | The query of ASP.NET Core | Serilog's request log has the path without the query | Add `QueryString` in `EnrichDiagnosticContext`, or read the access log of the proxy |
-| The user agent (scanner tools) | Flask, uvicorn, Gin, chi, Rails, Serilog and the Tomcat `common` pattern do not log it | Use a combined format (Tomcat pattern `combined`), or read the access log of the proxy |
+| The user agent (scanner tools) | Flask, uvicorn, Gin, chi, Rails, Serilog, Fastify's default serializers and the Tomcat `common` pattern do not log it | Use a combined format (Tomcat pattern `combined`), or read the access log of the proxy |
 | The time of uvicorn lines | uvicorn writes no time | Read them through Docker or journald, or set a log config with `%(asctime)s` |
 | The Tomcat access log, right away | Tomcat buffers it | `server.tomcat.accesslog.buffered=false`, or read it after a flush |
 
@@ -100,11 +106,14 @@ A refused login is a `POST` to a path like `/login`, `/auth/token` or `/users/si
   like a success to the status rules; the message rules still see it if the application logs it.
 - The address in a message is taken only when the message names exactly one IPv4 address. The account is
   taken from the usual wording ("failed ... for X from Y"); other wordings keep only the message.
-- Formats that a project changed (its own log pattern, another JSON logger) may not be read. They show up as
-  unread lines in the report, never as a quiet clean result. Give such logs as JSON when you can: the usual
+- Formats that a project changed (its own log pattern, another JSON logger) may not be read. A line that no
+  reader takes shows up as an unread line. A JSON line is always read, though, and a JSON request in a shape
+  that is not known stays a plain event that no web rule reads. The report then says so under "Warnings":
+  an application log with no request at all (Nest's default logger), or requests without a status. Without
+  such a warning, read a quiet result with care. Give such logs as JSON when you can: the usual
   field names of pino, winston, slog, zap, zerolog, logrus, Echo, Serilog, ASP.NET Core, Spring Boot (ECS and
   Logstash), lograge and Google Cloud are read.
 - ASP.NET Core's default console output (several lines for one entry, no time) is not read; use its JSON
   console formatter or Serilog.
-- These measurements are fifteen setups, one attack each, made by me. They show that the readers and rules
+- These measurements are sixteen setups, one attack each, made by me. They show that the readers and rules
   work on real output of these versions; another version or setup can write differently.

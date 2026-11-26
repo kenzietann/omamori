@@ -13,8 +13,9 @@ import (
 	"github.com/kenzietann/omamori/internal/rules"
 )
 
-// The logs in testdata/fixtures/apps were written by real applications of fifteen setups of the most used backend
-// frameworks, in Docker, during the same attack (testdata/applab). Each file must be read whole, and exactly the
+// The logs in testdata/fixtures/apps were written by real applications of sixteen setups of the most used backend
+// frameworks during the same attack (testdata/applab): fifteen in Docker, and Fastify's standard output as a
+// process manager keeps it. Each file must be read whole, and exactly the
 // rules in expected.json must fire: a rule that stops firing is a missed attack, and a new one a false alarm.
 func TestRealLogsOfTheFrameworks(t *testing.T) {
 	folder := filepath.Join("..", "..", "testdata", "fixtures", "apps")
@@ -30,8 +31,8 @@ func TestRealLogsOfTheFrameworks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(expected) != 15 {
-		t.Fatalf("%d setups in expected.json, want 15", len(expected))
+	if len(expected) != 16 {
+		t.Fatalf("%d setups in expected.json, want 16", len(expected))
 	}
 	for app, files := range expected {
 		for file, want := range files {
