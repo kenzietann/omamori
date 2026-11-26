@@ -83,12 +83,21 @@ type Stats struct {
 	PartialRequests int
 }
 
+// WarningNoRequests is the warning for an application log without any request. watch holds it back until the
+// application has logged something after it started, because a freshly started app has had no request yet.
+const WarningNoRequests = "an application log with no request lines: its logger probably does not log requests, " +
+	"so attacks on its routes cannot be seen. Turn on request logging (see docs/apps.md)"
+
+// NoRequests says whether this is an application log that holds no request at all.
+func (stats Stats) NoRequests() bool {
+	return stats.AppEvents > 0 && stats.Requests == 0 && stats.PartialRequests == 0
+}
+
 // Warnings says, in fixed words, why the web rules may be blind on this file. Empty when nothing is wrong.
 func (stats Stats) Warnings() []string {
 	var warnings []string
-	if stats.AppEvents > 0 && stats.Requests == 0 && stats.PartialRequests == 0 {
-		warnings = append(warnings, "an application log with no request lines: its logger probably does not log requests, "+
-			"so attacks on its routes cannot be seen. Turn on request logging (see docs/apps.md)")
+	if stats.NoRequests() {
+		warnings = append(warnings, WarningNoRequests)
 	}
 	if stats.PartialRequests > 0 {
 		warnings = append(warnings, fmt.Sprintf("%d requests have no status code, so the web rules could not read them", stats.PartialRequests))
@@ -337,7 +346,7 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 	case FormatWeb:
 		parse = parseWebLine
 	case FormatApp:
-		parse = newAppParser(options)
+		parse = newAppFileParser(options)
 	case FormatMacOS:
 		parse = newMacOSParser(options)
 	default:
@@ -391,6 +400,8 @@ func Parse(reader io.Reader, name string, options Options) ([]event.Event, Stats
 		joinSplitRequests(events)
 	}
 	for _, current := range events {
+		addDecoded(current.Fields)
+		addWindow(current)
 		switch {
 		case current.Fields[event.Category] == "webserver":
 			stats.Requests++

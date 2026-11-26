@@ -144,8 +144,46 @@ detection:
     url|re|i: "(%27|')(\\s|%20|\\+|/\\*\\*/)+(or|and)(\\s|%20|\\+|/\\*\\*/)+(%27|'|\\d)"
   traversal:
     url|contains: ['../..', '..%2f..', '%2e%2e%2f', '%2e%2e/', '..%5c..', '....//']
-  condition: sqli or sqli_mixed or union or traversal
+  # The same patterns on the URL and the Referer as the server reads them: decoded up to three times, with SQL
+  # comments as spaces (url_decoded, referrer_decoded), and with comments and spaces removed (url_compact,
+  # referrer_compact), so double encoding (%2527) and keywords split by comments (UN/**/ION) are read too.
+  # A quote, any closing brackets ("') AND 1=2"), then OR or AND as a word, then a quote or a digit. The Referer
+  # is read as written too: a log that writes it raw gives it no decoded copy.
+  decoded_sqli:
+    - url_decoded|re|i: "'\\)*\\s*(or|and)\\s+\\(*('|\\d)|information_schema|(^|[^a-z])(sleep|benchmark)\\s*\\(|waitfor\\s+delay"
+    - referrer|re|i: "'\\)*\\s*(or|and)\\s+\\(*('|\\d)|information_schema|(^|[^a-z])(sleep|benchmark)\\s*\\(|waitfor\\s+delay"
+    - referrer_decoded|re|i: "'\\)*\\s*(or|and)\\s+\\(*('|\\d)|information_schema|(^|[^a-z])(sleep|benchmark)\\s*\\(|waitfor\\s+delay"
+  decoded_union:
+    - url_decoded|re|i: '(^|[^a-z])union\s+(all\s+)?select([^a-z]|$)'
+    - referrer|re|i: '(^|[^a-z])union\s+(all\s+)?select([^a-z]|$)'
+    - referrer_decoded|re|i: '(^|[^a-z])union\s+(all\s+)?select([^a-z]|$)'
+    - url_compact|re|i: '(^|[^a-z])union(all)?select([^a-z]|$)'
+    - referrer_compact|re|i: '(^|[^a-z])union(all)?select([^a-z]|$)'
+  decoded_traversal:
+    - url_decoded|contains: ['../..', '..\..']
+    - referrer|contains: ['../..', '..\..']
+    - referrer_decoded|contains: ['../..', '..\..']
+  condition: sqli or sqli_mixed or union or traversal or decoded_sqli or decoded_union or decoded_traversal
 tests:
+  - name: double encoding, keywords split by comments, and the Referer are read after decoding
+    events:
+      - {category: webserver, url: "/v?tag=%2527%2520OR%25201%253D1--", url_decoded: "/v?tag=' OR 1=1--", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/v?id=1/**/UN/**/ION/**/SEL/**/ECT/**/1,2", url_decoded: "/v?id=1 UN ION SEL ECT 1,2", url_compact: "/v?id=1UNIONSELECT1,2", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/?q=1%2F%2A%2A%2FUnIoN%2F%2A%2A%2FsElEcT%2F%2A%2A%2F1", url_decoded: "/?q=1 UnIoN sElEcT 1", url_compact: "/?q=1UnIoNsElEcT1", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/?path=%252e%252e%252f%252e%252e%252fetc%252fpasswd", url_decoded: "/?path=../../etc/passwd", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/", referrer: "http://x/?id=1%2527%2520OR%2520%25271", referrer_decoded: "http://x/?id=1' OR '1", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/", referrer: "https://example.com/?id=1' OR '1'='1", src_ip: 203.0.113.77}
+      - {category: webserver, url: "/history?sort=%2527%2529%2520AND%25201%253D2--", url_decoded: "/history?sort=') AND 1=2--", src_ip: 203.0.113.77}
+    expect: {alerts: 7}
+  - name: decoded ordinary text is not an injection
+    events:
+      - {category: webserver, url: "/search?q=children%27s%20or%20adults", url_decoded: "/search?q=children's or adults", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/search?q=student+union+selection", url_decoded: "/search?q=student union selection", url_compact: "/search?q=studentunionselection", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/blog/sleep%20better", url_decoded: "/blog/sleep better", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/a", referrer: "https://www.google.com/search?q=reunion%20select", referrer_decoded: "https://www.google.com/search?q=reunion select", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/a", referrer: "https://blog.example/children's-books-or-adults", src_ip: 198.51.100.4}
+      - {category: webserver, url: "/a?q=(it's)%20or%20(1)", url_decoded: "/a?q=(it's) or (1)", src_ip: 198.51.100.4}
+    expect: {alerts: 0}
   - name: injection and traversal match
     events:
       - {category: webserver, url: "/item?id=1+UNION+SELECT+user,pass+FROM+users", src_ip: 203.0.113.77}

@@ -3,6 +3,7 @@ package watch
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/kenzietann/omamori/internal/alertsink"
@@ -70,10 +71,10 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
-	warned := map[string]bool{}
+	seen := &memory{warned: map[string]bool{}, firstApp: map[string]int{}}
 
 	for {
-		if err := tick(ctx, config, state, warned); err != nil {
+		if err := tick(ctx, config, state, seen); err != nil {
 			return err
 		}
 		if config.Once {
@@ -88,8 +89,37 @@ func Run(ctx context.Context, config Config) error {
 	}
 }
 
-// tick runs one check. warned holds the warnings already shown, so a blind log is named once, not every tick.
-func tick(ctx context.Context, config Config, state *State, warned map[string]bool) error {
+// memory is what one run of watch remembers between ticks: the warnings already shown, so a blind log is named
+// once and not every tick, and how many application events each file had when watch first saw it.
+type memory struct {
+	warned   map[string]bool
+	firstApp map[string]int
+}
+
+// warnings gives the warnings of this tick. The one for an application log with no request at all waits until
+// the file has new application lines since watch first saw it: a freshly started app has had no request yet, and
+// warning then is a false alarm. A single check (Once) has no "later", so it warns as detect does.
+func (seen *memory) warnings(read intake.Result, once bool) []string {
+	var out []string
+	for _, file := range read.Files {
+		first, known := seen.firstApp[file.File]
+		if !known {
+			seen.firstApp[file.File] = file.AppEvents
+			first = file.AppEvents
+		}
+		for _, warning := range file.Warnings() {
+			if warning == intake.WarningNoRequests && !once && file.AppEvents <= first {
+				continue
+			}
+			out = append(out, filepath.Base(file.File)+": "+warning)
+		}
+	}
+
+	return out
+}
+
+// tick runs one check.
+func tick(ctx context.Context, config Config, state *State, seen *memory) error {
 	now := config.now()
 
 	outcome, err := detect.RunContext(ctx, config.Paths, config.Rules, config.RulesFrom, config.Options, now)
@@ -98,9 +128,9 @@ func tick(ctx context.Context, config Config, state *State, warned map[string]bo
 		return nil
 	}
 	clean := alertsink.Sanitizer()
-	for _, warning := range detect.FileWarnings(outcome.Intake) {
-		if !warned[warning] {
-			warned[warning] = true
+	for _, warning := range seen.warnings(outcome.Intake, config.Once) {
+		if !seen.warned[warning] {
+			seen.warned[warning] = true
 			config.report("warning: " + clean(warning))
 		}
 	}

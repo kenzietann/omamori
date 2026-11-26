@@ -95,6 +95,15 @@ it are both counted; ten failures can then be five attempts.
 | `app_server_error_burst` | medium | twenty or more server errors caused by one address in five minutes |
 | `app_debug_endpoint_exposed` | high | a debug endpoint answered with success: Spring Boot Actuator `env` and `heapdump`, Django and Symfony debug tools, Laravel Telescope, the Rails info page, the H2 console, Go pprof, ELMAH |
 | `app_sql_error` | medium | the application wrote a database syntax error (MySQL, PostgreSQL, SQLite, SQL Server, Oracle) |
+| `app_denied_probe` | medium | eight or more refused requests (401 or 403) on one page from one address in ten minutes, whatever the query: guessing a key or a token, like the key of an API documentation page. Login pages are left to the login rules |
+| `app_login_slow_guessing` | medium | refused logins from one address in four or more different ten-minute windows within an hour: guessing that waits between tries to stay under `app_login_bruteforce`. A burst falls in one or two windows and does not give it |
+
+**Decoded requests.** The web rules also read each URL and Referer as the server reads them. Omamori adds
+`url_decoded` (percent-decoded up to three times, SQL comments as spaces) and `url_compact` (comments and
+spaces removed), and the same for the Referer, so `%2527%2520OR` and `UN/**/ION/**/SEL/**/ECT` are seen as
+injection. It also adds `url_path` (the URL without its query) and `ten_minutes` (the ten-minute window of the
+event), which rules group and count by. These were added after a test attack on three real apps
+(2026-11-26): before them, 3 of 8 quieter injection attempts were seen, and after them 8 of 8.
 
 A refused login is a `POST` to a path like `/login`, `/auth/token` or `/users/sign_in` answered with 400, 401,
 403, 422 or 429, or a message of the application like "login failed", "invalid credentials" or

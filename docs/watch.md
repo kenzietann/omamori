@@ -53,9 +53,15 @@ same sanitizer. `watch` only adds a loop and a delivery step around `detect.Run`
 
 - Reuses the fingerprinting already built for the known-good list (SHA-256 of the event content that
   made the alert fire, per `internal/knowngood`), rather than inventing a second alert-identity scheme.
-- The state file keeps a bounded set (e.g. last 10,000) of fingerprints already sent, with an
-  expiry so the set doesn't grow forever. An alert whose fingerprint was already sent is written to
-  the local report/store (if `--store` is given) but not sent to a sink again.
+- The state file keeps a bounded set (the last 10,000) of fingerprints already sent, with an
+  expiry (30 days) so the set doesn't grow forever. An alert whose fingerprint was already sent is not
+  sent to a sink again. `watch` writes no report and has no `--store` yet.
+- A correlation that keeps fewer events than it counts (a long guessing burst) cannot be pinned by its
+  events, which change as it grows. It is keyed as one burst instead: the rule, what it is grouped by
+  (an address) and when it began. The first version sent such an alert on every check, 22 times in one
+  test attack; now a growing burst is sent once, and a new burst later is sent again.
+- The warning for an application log with no request waits until the app logged something new after
+  `watch` started, so a freshly started app with no traffic yet does not set it off.
 
 ### Delivery (`internal/alertsink`, new package)
 

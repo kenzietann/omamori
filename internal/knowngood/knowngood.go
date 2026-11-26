@@ -55,10 +55,11 @@ var (
 	ruleName = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,200}$`)
 )
 
-// volatile are fields that differ between two runs over the same thing: the number of a process, and what
-// Omamori writes about where an event came from.
+// volatile are fields that differ between two runs over the same thing: the number of a process, what Omamori
+// writes about where an event came from, and the ten-minute window that intake adds (intake.TenMinutes), which
+// is the time again: an event that was allowed must still be allowed when it happens an hour later.
 var volatile = map[string]bool{
-	"pid": true, event.Collector: true, "time_source": true, "log_level": true,
+	"pid": true, event.Collector: true, "time_source": true, "log_level": true, "ten_minutes": true,
 }
 
 // Item is one event of an alert, as two hashes. Fingerprint is the event itself. Subject names the thing the

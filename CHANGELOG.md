@@ -16,11 +16,21 @@ flags and file formats.
   requests no longer looks like a quiet day.
 - Fastify's request logs: the two lines of one request (`incoming request`, `request completed`) are joined by
   `reqId`, so the web rules read them. A real Fastify app was added to the measured setups (16).
+- **Decoded requests.** The web rules also read each URL and Referer decoded up to three times and with SQL
+  comments removed (`url_decoded`, `url_compact`, `referrer_decoded`, `referrer_compact`), so double encoding
+  and keywords split by comments are seen. The Referer is read in JSON logs too.
+- Rules `app_denied_probe` (a key or token guessed on one page) and `app_login_slow_guessing` (refused logins
+  spread over an hour). 52 built-in rules.
 
 ### Fixed
 
 - Requests of Fastify were read as plain JSON events, and no web rule fired on them. Found by attacking a real
   Fastify app with `watch` running: 0 alerts before, 3 after, on the same log.
+- In an app log, a bare access-log line next to the framework's own lines (an app whose output goes to a file,
+  as under pm2 or systemd) was not read.
+- `watch` sent a correlation alert that keeps fewer events than it counts (a long guessing burst) again on every
+  check: 22 times in one test. Such an alert is now one burst, sent once.
+- `watch` warned that a freshly started app logs no requests before the app had had any request.
 
 ## [0.3.1] - 2026-11-16
 

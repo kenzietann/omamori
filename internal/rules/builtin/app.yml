@@ -482,3 +482,92 @@ tests:
       - {product: "app", message: "Connection to the database restored", src_ip: "203.0.113.77"}
       - {product: "app", message: "SQLSTATE[23000]: Integrity constraint violation", src_ip: "203.0.113.77"}
     expect: {alerts: 0}
+---
+title: Refused request to a page other than a login
+name: app_page_denied
+id: 6f3a2c10-0613-4a6e-9d7b-0a1b2c3d4e13
+description: A request that the application refused (401 or 403) on a page that is not a login. It is counted by another rule and gives no alert alone; refused logins have rules of their own.
+level: informational
+logsource: {category: webserver}
+detection:
+  refused:
+    status: ['401', '403']
+  login:
+    url|re|i: '(^|[/_-])(login|log-in|signin|sign-in|sign_in|session|sessions|token|authenticate|auth)(/?$|[/?.])'
+  condition: refused and not login
+tests:
+  - name: a refused page, not a login
+    events:
+      - {category: "webserver", method: "GET", url: "/docs?key=guess", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "POST", url: "/api/auth/login", url_path: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+    expect: {alerts: 1}
+---
+title: Keys or tokens guessed on one page
+name: app_denied_probe
+id: 6f3a2c10-0614-4a6e-9d7b-0a1b2c3d4e14
+description: One address had eight or more requests refused (401 or 403) on one page, whatever the query, in ten minutes. Someone guesses a key, a token or a password that the page takes, like the key of an API documentation page. A browser with an expired session is refused a few times, not eight times on one page; app_denied_burst counts refusals over many pages.
+level: medium
+tags: [attack.credential_access, attack.t1110]
+correlation:
+  type: event_count
+  rules: [app_page_denied]
+  group-by: [src_ip, url_path]
+  timespan: 10m
+  condition: {gte: 8}
+tests:
+  - name: eight guesses of a key on one page are one alert
+    events:
+      - {category: "webserver", method: "GET", url: "/docs?key=docs", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/docs?key=admin", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/docs?key=changeme", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/docs?key=123456", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/docs?key=test", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/docs", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/docs?key[]=x", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+      - {category: "webserver", method: "GET", url: "/docs?key=expenss", url_path: "/docs", status: 401, src_ip: "203.0.113.77"}
+    expect: {alerts: 1}
+  - name: an expired session refused on several pages is not a guess
+    events:
+      - {category: "webserver", method: "GET", url: "/api/me", url_path: "/api/me", status: 401, src_ip: "198.51.100.4"}
+      - {category: "webserver", method: "GET", url: "/api/expenses?month=11", url_path: "/api/expenses", status: 401, src_ip: "198.51.100.4"}
+      - {category: "webserver", method: "GET", url: "/api/savings", url_path: "/api/savings", status: 401, src_ip: "198.51.100.4"}
+      - {category: "webserver", method: "GET", url: "/api/budgets", url_path: "/api/budgets", status: 401, src_ip: "198.51.100.4"}
+      - {category: "webserver", method: "GET", url: "/api/me", url_path: "/api/me", status: 401, src_ip: "198.51.100.4"}
+      - {category: "webserver", method: "GET", url: "/api/expenses?month=10", url_path: "/api/expenses", status: 401, src_ip: "198.51.100.4"}
+    expect: {alerts: 0}
+---
+title: Refused logins from one address spread over an hour
+name: app_login_slow_guessing
+id: 6f3a2c10-0615-4a6e-9d7b-0a1b2c3d4e15
+description: One address had refused logins in four or more different ten-minute windows within an hour. Slow guessing stays under app_login_bruteforce (ten in ten minutes) by waiting between tries; a burst falls in one or two windows and gives only that rule. A client with a wrong saved password that retries every few minutes gives this alert too, and is worth fixing.
+level: medium
+tags: [attack.credential_access, attack.t1110.001]
+correlation:
+  type: value_count
+  rules: [app_login_failure, app_login_failure_message]
+  group-by: [src_ip]
+  timespan: 60m
+  condition: {gte: 4, field: ten_minutes}
+tests:
+  - name: a try every twelve minutes for an hour is one alert
+    events:
+      - {time: "2026-11-26T09:00:00Z", ten_minutes: "2026-11-26T09:00Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {time: "2026-11-26T09:12:00Z", ten_minutes: "2026-11-26T09:10Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {time: "2026-11-26T09:24:00Z", ten_minutes: "2026-11-26T09:20Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {time: "2026-11-26T09:36:00Z", ten_minutes: "2026-11-26T09:30Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+      - {time: "2026-11-26T09:48:00Z", ten_minutes: "2026-11-26T09:40Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.77"}
+    expect: {alerts: 1}
+  - name: a fast burst is not slow guessing
+    events:
+      - {time: "2026-11-26T09:01:00Z", ten_minutes: "2026-11-26T09:00Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.9"}
+      - {time: "2026-11-26T09:02:00Z", ten_minutes: "2026-11-26T09:00Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.9"}
+      - {time: "2026-11-26T09:08:00Z", ten_minutes: "2026-11-26T09:00Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.9"}
+      - {time: "2026-11-26T09:11:00Z", ten_minutes: "2026-11-26T09:10Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.9"}
+      - {time: "2026-11-26T09:12:00Z", ten_minutes: "2026-11-26T09:10Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "203.0.113.9"}
+    expect: {alerts: 0}
+  - name: a person who mistypes now and then is not slow guessing
+    events:
+      - {time: "2026-11-26T09:00:00Z", ten_minutes: "2026-11-26T09:00Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "198.51.100.4"}
+      - {time: "2026-11-26T09:31:00Z", ten_minutes: "2026-11-26T09:30Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "198.51.100.4"}
+      - {time: "2026-11-26T09:55:00Z", ten_minutes: "2026-11-26T09:50Z", category: "webserver", method: "POST", url: "/api/auth/login", status: 401, src_ip: "198.51.100.4"}
+    expect: {alerts: 0}

@@ -64,17 +64,41 @@ func TestNewReportsADifferentAlertAsFresh(t *testing.T) {
 	}
 }
 
-func TestNewTreatsIncompleteFingerprintsAsAlwaysFresh(t *testing.T) {
-	state := newState()
-	// Count > len(Events) makes knowngood.Items report incomplete: a correlation over more events than
-	// were kept. Such an alert can never be pinned down exactly, so it must never be silently dropped.
-	alert := sampleAlert(t, "many", "203.0.113.5", baseTime)
-	alert.Count = 5
+// burst is a correlation alert over more events than it keeps (Count > len(Events)), so knowngood.Items cannot
+// pin it: like app_login_bruteforce after many failures from one address.
+func burst(t *testing.T, srcIP string, first time.Time, count int) *rules.Alert {
+	t.Helper()
+	alert := sampleAlert(t, "many", srcIP, first.Add(time.Minute))
+	alert.First, alert.Count = first, count
+	alert.Group = []rules.Pair{{Field: "src_ip", Value: srcIP}}
 
-	first := state.New([]*rules.Alert{alert}, nil, baseTime)
-	second := state.New([]*rules.Alert{alert}, nil, baseTime.Add(time.Minute))
-	if len(first) != 1 || len(second) != 1 {
-		t.Fatalf("an alert that cannot be fingerprinted must always be reported fresh, got %d then %d", len(first), len(second))
+	return alert
+}
+
+func TestNewSendsAGrowingBurstOnce(t *testing.T) {
+	// Found by attacking a real app: such a burst was sent again on every check, 22 times for one attack.
+	state := newState()
+	if got := state.New([]*rules.Alert{burst(t, "203.0.113.5", baseTime, 12)}, nil, baseTime); len(got) != 1 {
+		t.Fatalf("first check: %d fresh, want 1", len(got))
+	}
+	for i, count := range []int{12, 15, 30} {
+		later := baseTime.Add(time.Duration(i+1) * 5 * time.Second)
+		if got := state.New([]*rules.Alert{burst(t, "203.0.113.5", baseTime, count)}, nil, later); len(got) != 0 {
+			t.Fatalf("check %d: the same burst was sent again (%d events)", i+2, count)
+		}
+	}
+}
+
+func TestNewSendsANewBurstAndAnotherAddress(t *testing.T) {
+	state := newState()
+	state.New([]*rules.Alert{burst(t, "203.0.113.5", baseTime, 12)}, nil, baseTime)
+
+	if got := state.New([]*rules.Alert{burst(t, "203.0.113.9", baseTime, 12)}, nil, baseTime); len(got) != 1 {
+		t.Errorf("a burst from another address must be sent, got %d", len(got))
+	}
+	later := baseTime.Add(2 * time.Hour)
+	if got := state.New([]*rules.Alert{burst(t, "203.0.113.5", later, 12)}, nil, later); len(got) != 1 {
+		t.Errorf("a new burst later from the same address must be sent, got %d", len(got))
 	}
 }
 
