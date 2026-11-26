@@ -16,7 +16,8 @@ computer, the AI can only use read-only tools, and every claim the AI makes is c
 you see it.
 
 It runs on your own computer, as a CLI with a terminal home screen and a local web dashboard. Most features
-need no AI at all.
+need no AI at all. On a server, `omamori watch` keeps checking your app's logs and sends each new attack to
+Slack, a webhook or email (see [Watch your own web app](#watch-your-own-web-app)).
 
 **Status: v0.3.1, a public preview.** All features below run and have tests, and the main paths have been
 tested live (see [Live test results](#live-test-results)). It is not a finished product: read the limits of
@@ -29,6 +30,7 @@ each feature. What changed in each version is in the [changelog](CHANGELOG.md).
 - [Install](#install)
 - [A five-minute tour, no API key needed](#a-five-minute-tour-no-api-key-needed)
 - [Two ways to use it: home screen or commands](#two-ways-to-use-it-home-screen-or-commands)
+- [Watch your own web app](#watch-your-own-web-app)
 - [Features](#features)
   1. [Exposure check (Task A)](#1-exposure-check-task-a)
   2. [Log triage (Task B)](#2-log-triage-task-b)
@@ -189,6 +191,95 @@ gives way to the normal terminal, so you can scroll and select the report.
 
 **Commands.** Every feature is also a command, for scripts and for options the forms do not have (the year
 and time zone of syslog, `--db`, `--dry-run`, `--timeout`). `omamori help` lists them all.
+
+## Watch your own web app
+
+`omamori watch` checks your app's logs again and again and tells you, within seconds, when someone attacks
+it: password guessing, credential stuffing, scans for secret files, injection, scanner tools. It sends each
+attack once, to Slack, Discord, any webhook or email. No AI is used. This is the setup that three test attacks
+on real apps used (see [Live test results](#live-test-results)).
+
+**1. Make your app log what Omamori needs.** Omamori can only see what the log says. Check three things:
+
+- **One line per request**, with the method, the path with its query, the status, the client address and the
+  user agent. Most frameworks do this; some do not by default: NestJS's own logger and Laravel log no requests
+  (add nestjs-pino or an access log), Fastify's default leaves out the user agent, and so do Flask, uvicorn,
+  Gin and chi. The [web applications guide](docs/apps.md) has the setting for each framework.
+- **One line per refused login**, naming the account and the client, like
+  `Failed login for alice@example.com from 203.0.113.5`. This is how credential stuffing (one address, many
+  accounts) is seen. Never log the password.
+- **No secrets in the URL.** If a query parameter carries a token or a key (`/verify?token=...`), write it
+  as `REDACTED` in the log, or it ends up in every copy of the log.
+
+**2. Check once.** Run `detect` on a real log of your app:
+
+```sh
+omamori detect /var/log/myapp/app.log
+```
+
+The report lists each file with its format and how many lines were read. If a line starts with `Warning:`,
+fix that first: "an application log with no request lines" means the rules cannot see attacks on your
+routes, and a quiet result would mean nothing.
+
+**3. Watch it.** Give the same files to `watch`. Without a webhook it prints each alert:
+
+```sh
+omamori watch /var/log/myapp/app.log /var/log/nginx/access.log
+# ALERT [high] Password guessing at a web application (app_login_bruteforce): 12 events, last at ...
+```
+
+To be told elsewhere, add a Slack or Discord incoming webhook, or email:
+
+```sh
+omamori watch --webhook https://hooks.slack.com/services/... /var/log/myapp/app.log
+
+export OMAMORI_SMTP_USER=alerts@example.com OMAMORI_SMTP_PASSWORD=...   # never as flags
+omamori watch --smtp-host smtp.example.com --smtp-from alerts@example.com --smtp-to you@example.com \
+  /var/log/myapp/app.log
+```
+
+| Flag | What it does |
+|---|---|
+| `--interval 15s` | how often the logs are checked |
+| `--severity low` | the lowest level that is sent: `informational`, `low`, `medium`, `high` or `critical` |
+| `--state file` | where the alerts already sent are kept (default: `.omamori-watch-state.json` next to the first log) |
+| `--once` | one check, then exit: for cron, or to try it |
+| `--rules`, `--assets`, `--indicators`, `--format`, `--timezone` | as for `detect` |
+
+How it sends: an attack that goes on (guessing, an injection burst) is one alert, sent once, even as it
+grows; the same address attacking again an hour later is a new alert. The same event again apart from its
+time (one cron line that runs every 30 minutes) is not sent again. Keep the state file: it is how a restart
+knows what was already sent.
+
+**4. Keep it running.** Run it as a service of the machine that has the logs, for example with systemd:
+
+```ini
+# /etc/systemd/system/omamori-watch.service
+[Unit]
+Description=Omamori watch for myapp
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/omamori watch --webhook https://hooks.slack.com/services/... /var/log/myapp/app.log
+Restart=on-failure
+User=omamori
+StateDirectory=omamori
+WorkingDirectory=/var/lib/omamori
+
+[Install]
+WantedBy=multi-user.target
+```
+
+The user it runs as must be able to read the logs. Logs in Docker: point it at the container's json-file log
+(`/var/lib/docker/containers/<id>/<id>-json.log`) or at a file that your process manager writes (pm2:
+`~/.pm2/logs/<app>-out.log`). Try it first on demo data: `omamori scenario ./demo-logs` and then
+`omamori watch --once ./demo-logs`.
+
+**What it does not do.** It re-reads each whole file on every check, so rotate large logs. It only tells
+you: it blocks nothing. It cannot see what the log does not say: request bodies (injection in a JSON field),
+a forged token that is refused a few times, or a login refused by a rate limiter before the account is known.
+A webhook URL given as a flag can be seen by other users of the machine in its process list. The design is in
+[docs/watch.md](docs/watch.md).
 
 ## Features
 
@@ -492,8 +583,11 @@ folder may not be inside the evidence. Typical files:
 - A valid マイナンバー check digit only means "possible identifier": about 1 in 10 random 12-digit numbers
   pass by luck.
 - It reduces what the AI company sees. It cannot control what the company does with it.
-- Detection is batch: it reads files, it does not watch live traffic or logs. There is no agent on hosts, no
-  blocking and no active response.
+- It reads log files, not live traffic. `watch` checks files again every few seconds and re-reads each whole
+  file, so it is near real time, not instant, and large logs must be rotated. There is no agent that collects
+  logs from other machines, no blocking and no active response.
+- It sees only what a log says: not request bodies, and not an attack that the log does not name. A forged token
+  or a guessed key that is refused only a few times stays under the rules.
 - The rules and the synthetic tests were written by me together. Numbers from them show that the code works
   as designed, not how many real attacks would be found. The attack lab is the check against a real server.
 - It is for defense only. The attack lab attacks only its own container.
@@ -514,6 +608,19 @@ wording. Latest run (2026-11-11, `gpt-6-luna`, 3 runs per case, 43,220 tokens): 
 The one failure: the AI did not claim a finding that was in the log, so the checker listed it as "found by
 Omamori, not claimed by the AI". Nothing false was accepted. Three runs per case is a small sample.
 
+**Test attacks on real apps (2026-11-26 and 27).** Three apps of mine (NestJS, Fastify and a Rust hyper
+server) were attacked three times by a red team that did not know the rules, with `omamori watch` running.
+
+| Run | What it showed | What was changed |
+|---|---|---|
+| 1 | 0 alerts: the NestJS app logged no requests, and Fastify's two-line requests were not read | Fastify lines joined; warnings for blind logs; logging added to the apps |
+| 2 | Every loud attack caught; 3 of 8 quieter injections; `watch` sent one alert 22 times | decoded URLs and Referers; key guessing and slow guessing rules; burst dedup |
+| 3 | Every loud attack and every query and Referer injection caught, but one comment-split form; one attack sent up to 13 times | that form caught; one alert per attack (6 sends where there were 40) |
+
+Not seen in any run, because the logs do not say it: injection in JSON bodies, and forged tokens or other
+users' ids tried only a few times. No attack got into the apps; the runs found one real hole in an app (an
+open admin route), which was fixed.
+
 Other live checks (2026-11-13): the attack lab found 24 of 24 detections in four runs in a row; a forensic
 run with the AI review on an attacked lab server had 24 claims verified and 0 rejected; the exposure check
 completed on two real projects of mine. The details and the faults these runs found are in the
@@ -527,6 +634,7 @@ completed on two real projects of mine. The details and the faults these runs fo
 | [Toolkit map](docs/toolkit.md) | which blue-team tools Omamori stands in for, and what is missing |
 | [Log intake](docs/intake.md) | formats, field maps and limits |
 | [Web applications](docs/apps.md) | framework, Docker and journald logs, the app rules, measured on sixteen setups |
+| [Watch](docs/watch.md) | `omamori watch`: the loop, what is sent once, the state file, limits |
 | [Rules](docs/rules.md) | the detection and correlation rule format |
 | [AI analyst](docs/analyst.md) | checked reviews, schema, replay |
 | [Forensics](docs/forensics.md) | what is read, the manifest, times, limits |

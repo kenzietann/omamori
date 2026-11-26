@@ -1,7 +1,9 @@
 # Continuous watch and alerts
 
-**Status: design, not yet built.** This is the plan for `omamori watch`, the first piece of turning
+**Status: built (unreleased), tested in three attacks on real apps.** How to use it is in the README,
+[Watch your own web app](../README.md#watch-your-own-web-app). This page is the design: how `watch` turns
 Omamori's batch detection into something that runs continuously and tells you when something happens.
+Where the build differs from the first plan, the sections below say so.
 
 ## Goal
 
@@ -84,19 +86,15 @@ same sanitizer. `watch` only adds a loop and a delivery step around `detect.Run`
   ones still land in the store/report if present. Keeps a noisy new rule set from spamming Slack
   during tuning.
 
-## Open questions before building
+## Questions from the plan, and what was decided
 
-1. Poll interval vs. real filesystem notify (`fsnotify`): polling is simpler, has no extra
-   dependency beyond what's already in `go.mod`, and is good enough at a 15s default for log
-   triage (not a low-latency IDS). Proposal: start with polling; revisit `fsnotify` only if the
-   interval is a real complaint.
-2. What counts as "the same source" across a restart of `watch` itself, vs. log rotation vs. a
-   totally different file reused at the same path — covered above by inode+offset, but worth a
-   dedicated test matrix.
-3. Should `watch` also accept Docker/journald as live subprocess streams (`docker logs -f`,
-   `journalctl -f`) piped to stdin, rather than only polling files? Proposal: yes, via `--` to pass a
-   command whose stdout is treated as one growing virtual file with no offset tracking needed
-   (it's already a live stream) — same dedup and sink logic applies.
+1. Poll interval vs. filesystem notify (`fsnotify`): **polling was built**, every 15 seconds by default.
+   It needs no new dependency and is fast enough for log triage, which is not a low-latency IDS.
+2. What counts as "the same source" across a restart, a rotation or a new file at the same path:
+   **not needed yet**, because each check re-reads whole files and no offset is kept. Dedup is by the
+   alert, not by the file, so a rotated or restarted log does not resend what was already sent.
+3. Live streams (`docker logs -f`, `journalctl -f`) through `--`: **not built.** Point `watch` at the
+   json-file log of Docker or at a file your process manager writes; streams are a follow-up.
 
 ## Testing plan
 
