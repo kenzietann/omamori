@@ -59,6 +59,20 @@ func TestFastifyLinesAreJoinedIntoOneRequest(t *testing.T) {
 	}
 }
 
+func TestFastifyUserAgentAndReferrerAreRead(t *testing.T) {
+	// The request serializer of matchingg-backend adds the user agent and the Referer under req.headers.
+	withHeaders := strings.Replace(incoming, `"remotePort":5}`,
+		`"remotePort":5,"headers":{"user-agent":"sqlmap/1.8","referer":"http://x/?id=1%2527%2520OR%2520%25271"}}`, 1)
+	got := requests(readLines(t, withHeaders, completed))
+	if len(got) != 1 {
+		t.Fatalf("got %d requests", len(got))
+	}
+	fields := got[0].Fields
+	if fields[event.UserAgent] != "sqlmap/1.8" || fields[ReferrerDecoded] != "http://x/?id=1' OR '1" {
+		t.Errorf("fields: %v", fields)
+	}
+}
+
 func TestFastifyLinesOfAnotherProcessAreNotJoined(t *testing.T) {
 	// After a restart, Fastify counts request ids from req-1 again. Another pid is another request.
 	other := strings.Replace(completed, `"pid":7`, `"pid":8`, 1)
@@ -97,6 +111,26 @@ func TestAppLogWithoutRequestsWarns(t *testing.T) {
 	warnings := read.Files[0].Warnings()
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "no request lines") {
 		t.Errorf("warnings: %v", warnings)
+	}
+}
+
+func TestAppLogWithBareAccessLines(t *testing.T) {
+	// Nest's own lines and a combined access log in one standard output, as under pm2 or systemd.
+	read := readLines(t,
+		"[Nest] 41241  - 11/26/2026, 10:17:27 PM     LOG [NestApplication] Nest application successfully started",
+		"[Nest] 41241  - 11/26/2026, 10:17:28 PM    WARN [AuthService] Failed login for admin from 203.0.113.5",
+		`203.0.113.5 - - [26/Nov/2026:13:17:28 +0000] "POST /auth/login HTTP/1.1" 401 73 "-" "sqlmap/1.8"`,
+	)
+	file := read.Files[0]
+	if file.Format != FormatApp || file.Malformed != 0 || file.Requests != 1 {
+		t.Fatalf("stats %+v", file)
+	}
+	if warnings := file.Warnings(); len(warnings) != 0 {
+		t.Errorf("a log with requests must not warn: %v", warnings)
+	}
+	got := requests(read)
+	if fields := got[0].Fields; fields[event.Status] != "401" || fields[event.UserAgent] != "sqlmap/1.8" || fields[event.SourceIP] != "203.0.113.5" {
+		t.Errorf("request: %v", fields)
 	}
 }
 

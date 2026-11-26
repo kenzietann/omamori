@@ -146,7 +146,7 @@ Everything here uses made-up data and runs offline.
 # 1. Make a day of synthetic logs with planted attacks, and find them with the rules.
 omamori scenario --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-logs
 omamori detect ./demo-logs --year 2026 --timezone Asia/Tokyo
-#    -> Read 2 files and 1254 events. 49 rules. 15 alerts, 1 critical, 6 high, 8 medium.
+#    -> Read 2 files and 1254 events. 52 rules. 15 alerts, 1 critical, 6 high, 8 medium.
 
 # 2. Watch the AI analyst work, with recorded answers instead of a live AI.
 omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo \
@@ -157,7 +157,7 @@ omamori analyze ./demo-logs --year 2026 --timezone Asia/Tokyo \
 omamori scenario --host --seed 3 --date 2026-11-10 --timezone Asia/Tokyo ./demo-host
 omamori forensics --year 2026 --timezone Asia/Tokyo \
   --processes ./demo-host/snapshots/ps.txt --sockets ./demo-host/snapshots/ss.txt ./demo-host/root
-#    -> Read and hashed 31 files ... 73 rules. 34 alerts, 3 critical, 20 high, 11 medium.
+#    -> Read and hashed 31 files ... 76 rules. 34 alerts, 3 critical, 20 high, 11 medium.
 
 # 4. Open the home screen and try the other tasks.
 omamori ui ./demo-logs
@@ -249,7 +249,7 @@ Wazuh alerts, Windows and Sysmon events (Winlogbeat or NXLog JSON), and packet c
 [7](#7-packet-captures)). Give files or folders; the format of each file is found from its first bytes and
 lines, or set it with `--format`. Dependency folders like `node_modules` are skipped and listed.
 
-**The rules.** 49 built-in rules for SSH (guessing, spraying, a login after guessing, sshd penalties), Linux
+**The rules.** 52 built-in rules for SSH (guessing, spraying, a login after guessing, sshd penalties), Linux
 hosts (sudo refused, new users, admin groups, cron jobs that download a script), web servers (scans for
 sensitive files, path enumeration, injection, scanner tools, commands sent to a web shell), web applications
 and APIs (login guessing, many accounts tried, a login after guessing, bursts of refused requests and server

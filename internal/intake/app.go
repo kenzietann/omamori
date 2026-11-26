@@ -424,6 +424,7 @@ var appKeys = []struct {
 	{event.Status, []string{"res.statusCode", "response.statusCode", "response.status", "http.response.status_code", "http.status_code", "httpRequest.status", "StatusCode", "status_code", "statusCode", "status"}},
 	{event.SourceIP, []string{"req.remoteAddress", "req.ip", "request.remote_ip", "client.ip", "source.ip", "http.client_ip", "httpRequest.remoteIp", "RemoteIpAddress", "remote_ip", "remoteAddress", "remoteAddr", "remote_addr", "client_ip", "clientIp", "peer.address", "ip"}},
 	{event.UserAgent, []string{"req.headers.user-agent", "request.headers.user-agent", "http.request.headers.user_agent", "user_agent.original", "http.user_agent", "httpRequest.userAgent", "headers.user-agent", "userAgent", "user_agent"}},
+	{event.Referrer, []string{"req.headers.referer", "request.headers.referer", "http.request.referrer", "http.request.headers.referer", "httpRequest.referer", "headers.referer", "referer", "referrer"}},
 	{event.User, []string{"user.name", "user.email", "user.id", "userName", "userId", "user_id", "username", "email", "user"}},
 	{event.Message, []string{"msg", "message", "@m", "@mt", "Message", "MessageTemplate"}},
 	{"level", []string{"level", "severity", "@l", "LogLevel", "log.level", "levelname"}},

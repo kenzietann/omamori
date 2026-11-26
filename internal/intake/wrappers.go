@@ -206,6 +206,21 @@ func (parser *innerParser) joinRails(fields map[string]string) {
 	}
 }
 
+// newAppFileParser reads a file that is already known to be an app log. It reads what newAppParser reads, and
+// also a bare access-log line (Apache/nginx combined, as morgan or a small middleware writes it): an application
+// whose standard output goes to a file (pm2, a systemd unit) mixes its framework lines with them, and without
+// this the requests were left unread while the framework lines made the file an app log. It is not used to find
+// the format of a file, where an access log must stay "web".
+func newAppFileParser(options Options) lineParser {
+	app := newAppParser(options)
+	return func(line string) (map[string]string, time.Time, bool) {
+		if fields, moment, ok := app(line); ok {
+			return fields, moment, true
+		}
+		return parseWebLine(line)
+	}
+}
+
 // newAppParser reads a file of framework lines, or of lines of docker logs --timestamps. A line without a time
 // of its own and outside of a wrapper cannot be placed in time, and is counted as not read.
 func newAppParser(options Options) lineParser {
