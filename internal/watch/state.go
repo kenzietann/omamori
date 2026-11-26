@@ -7,12 +7,15 @@
 package watch
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/kenzietann/omamori/internal/knowngood"
@@ -105,25 +108,36 @@ func (state *State) Save(path string) error {
 
 // fingerprintsOf gives every fingerprint of an alert's events, in a fixed order, so the same alert
 // always produces the same key set regardless of map iteration order elsewhere.
-func fingerprintsOf(alert *rules.Alert, hashes map[string]string) ([]string, bool) {
-	items, complete := knowngood.Items(alert, hashes)
-	if !complete {
-		return nil, false
+// keysOf gives the keys that stand for an alert. An alert whose events can all be fingerprinted (knowngood.Items)
+// is its events: it is new when one of them is new. A correlation over more events than it keeps cannot be
+// pinned that way, and its kept events change as it grows; it is one burst instead: the rule, what it is grouped
+// by (an address, an account) and when the burst began. A burst that grows is then sent once, and a new burst
+// later (another start) is sent again. Sending it on every check, as before, flooded the sink.
+func keysOf(alert *rules.Alert, hashes map[string]string) []string {
+	if items, complete := knowngood.Items(alert, hashes); complete {
+		keys := make([]string, 0, len(items))
+		for _, item := range items {
+			keys = append(keys, item.Fingerprint)
+		}
+		sort.Strings(keys)
+
+		return keys
 	}
 
-	keys := make([]string, 0, len(items))
-	for _, item := range items {
-		keys = append(keys, item.Fingerprint)
+	group := make([]string, 0, len(alert.Group))
+	for _, pair := range alert.Group {
+		group = append(group, fmt.Sprintf("%q=%q", pair.Field, pair.Value))
 	}
-	sort.Strings(keys)
+	sort.Strings(group)
+	text := fmt.Sprintf("omamori watch burst v1\nrule=%q\ngroup=%s\nfirst=%s\n",
+		alert.Rule.Name, strings.Join(group, ","), alert.First.UTC().Format(time.RFC3339Nano))
+	sum := sha256.Sum256([]byte(text))
 
-	return keys, true
+	return []string{hex.EncodeToString(sum[:])}
 }
 
-// New reports which of the given alerts have at least one event never seen before, marks all of their
-// fingerprints as seen now, and prunes entries older than SeenTTL or past MaxSeen. An alert whose
-// events cannot be fingerprinted exactly (knowngood.Items reports incomplete) is always treated as new:
-// it is safer to alert again on something that cannot be pinned down than to silently drop it.
+// New reports which of the given alerts are new: an alert whose keys (keysOf) include one not seen before. It
+// marks all of their keys as seen now, and prunes entries older than SeenTTL or past MaxSeen.
 func (state *State) New(alerts []*rules.Alert, hashes map[string]string, now time.Time) []*rules.Alert {
 	// Drop anything past its TTL before checking what is new, so an entry that aged out is treated
 	// as unseen rather than silently refreshed by this same call.
@@ -132,11 +146,7 @@ func (state *State) New(alerts []*rules.Alert, hashes map[string]string, now tim
 	var fresh []*rules.Alert
 
 	for _, alert := range alerts {
-		keys, complete := fingerprintsOf(alert, hashes)
-		if !complete {
-			fresh = append(fresh, alert)
-			continue
-		}
+		keys := keysOf(alert, hashes)
 
 		isNew := false
 		for _, key := range keys {

@@ -168,6 +168,29 @@ func TestRunContinuesWhenASinkFails(t *testing.T) {
 	}
 }
 
+func TestNoRequestsWarningWaitsForNewAppLines(t *testing.T) {
+	seen := &memory{warned: map[string]bool{}, firstApp: map[string]int{}}
+	startup := intake.Result{Files: []intake.Stats{{File: "/logs/api.log", AppEvents: 59}}}
+
+	// Right after the app started: startup lines only, which is not yet a sign of a blind log.
+	if got := seen.warnings(startup, false); len(got) != 0 {
+		t.Fatalf("warned at startup: %v", got)
+	}
+	if got := seen.warnings(startup, false); len(got) != 0 {
+		t.Fatalf("warned without new lines: %v", got)
+	}
+	// The app logs more (it is in use), and still no request: now the log is blind.
+	later := intake.Result{Files: []intake.Stats{{File: "/logs/api.log", AppEvents: 70}}}
+	if got := seen.warnings(later, false); len(got) != 1 || got[0] != "api.log: "+intake.WarningNoRequests {
+		t.Fatalf("no warning once the app logged more: %v", got)
+	}
+	// A single check warns at once, as detect does.
+	fresh := &memory{warned: map[string]bool{}, firstApp: map[string]int{}}
+	if got := fresh.warnings(startup, true); len(got) != 1 {
+		t.Fatalf("a single check must warn: %v", got)
+	}
+}
+
 func TestRunCancelledContextStopsBeforeInterval(t *testing.T) {
 	directory := t.TempDir()
 	logPath := writeLog(t, directory, "auth.log", "")
