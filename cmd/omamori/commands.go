@@ -74,6 +74,8 @@ Commands:
                       point at, and Omamori accepts it only if it passes fixed checks (see below)
   known-good add|show mark alerts of a report that you reviewed as your own (asks for each one), and show
                       the list. detect and forensics take it with --known-good file
+  watch <logs>...     check the logs again and again (default every 15s), and send new alerts to a
+                      webhook or by email. Writes no report; see "Flags for watch" below
   dashboard [folder]  local web dashboard: investigations and confirmed runs
   store <command>    stored runs, event/alert search, cases and timelines (run "omamori store" for usage)
   ui <folder>         open the home screen, where you choose a task
@@ -116,6 +118,19 @@ Flags for detect:
   --known-good file   your list of reviewed alerts (see known-good add). The alerts on it are shown apart
                       as "known good" and are not counted; they come back when what they are about changes.
                       Not yet with --store or --analyze. The list must be outside the logs or the evidence
+
+Flags for watch (also --rules, --assets, --indicators, --format, --year, --timezone, as for detect):
+  --interval duration  how often to re-check the logs (default 15s)
+  --severity level     minimum level sent to a sink (default low); lower alerts are still shown here
+  --webhook url        POST new alerts as JSON to this URL (a Slack or Discord incoming webhook works)
+  --smtp-host, --smtp-port, --smtp-from, --smtp-to, --smtp-tls  send new alerts by email; the SMTP
+                      username and password come from OMAMORI_SMTP_USER and OMAMORI_SMTP_PASSWORD,
+                      never from a flag
+  --state file        where the record of alerts already sent is kept (default: next to the first log)
+  --once              run a single check and exit, instead of looping (for cron or tests)
+This re-reads the whole log on every check; it does not yet avoid re-reading unchanged bytes (see
+docs/watch.md). An alert is sent to a sink only the first time its events are seen; it is never
+re-sent for the same events, even across a restart, as long as the state file is kept.
 
 Flags for forensics (also --rules, --year, --timezone, --output, --store and --db, as for detect):
   --processes file    saved output of "ps aux" or "ps -ef" from the system
@@ -226,6 +241,8 @@ func run(args []string, env environment) int {
 		return runPeek(rest, env)
 	case "detect":
 		return runDetect(rest, env)
+	case "watch":
+		return runWatch(rest, env)
 	case "forensics":
 		return runForensics(rest, env)
 	case "analyze":

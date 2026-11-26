@@ -4,6 +4,24 @@ All notable changes to Omamori. The format follows [Keep a Changelog](https://ke
 versions follow [Semantic Versioning](https://semver.org). Before 1.0, a minor version can change commands,
 flags and file formats.
 
+## [Unreleased]
+
+### Added
+
+- **`omamori watch`.** Checks logs again and again (default every 15 seconds) with the rules of `detect`, and
+  sends each new alert once to a webhook (Slack and Discord work) or by email. A state file remembers what was
+  sent, also across a restart. It re-reads whole files on every check for now. Design: [docs/watch.md](docs/watch.md).
+- **Warnings for blind logs.** `detect`, its report and `watch` warn when an application log has no request
+  line at all (Nest's default logger) or has requests without a status, so a log that says nothing about
+  requests no longer looks like a quiet day.
+- Fastify's request logs: the two lines of one request (`incoming request`, `request completed`) are joined by
+  `reqId`, so the web rules read them. A real Fastify app was added to the measured setups (16).
+
+### Fixed
+
+- Requests of Fastify were read as plain JSON events, and no web rule fired on them. Found by attacking a real
+  Fastify app with `watch` running: 0 alerts before, 3 after, on the same log.
+
 ## [0.3.1] - 2026-11-16
 
 A list for the alerts you reviewed, so that a developer's Mac shows what is new. Tested live on a Mac: 16
