@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -120,6 +121,7 @@ func runWatch(args []string, env environment) int {
 	}
 	if len(sinks) == 0 {
 		fmt.Fprintln(env.stdout, "omamori: no --webhook or --smtp-* given. Alerts will only be printed here, not delivered anywhere.")
+		sinks = append(sinks, printSink{out: env.stdout})
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -139,13 +141,29 @@ func runWatch(args []string, env environment) int {
 		OnTick:    func(line string) { fmt.Fprintln(env.stdout, "omamori watch:", line) },
 	}
 
-	fmt.Fprintf(env.stdout, "omamori watch: %d rule(s), checking every %s, severity %s or above. Ctrl-C to stop.\n", len(loaded.Rules()), interval, severity)
+	if once {
+		fmt.Fprintf(env.stdout, "omamori watch: %d rule(s), one check, severity %s or above.\n", len(loaded.Rules()), severity)
+	} else {
+		fmt.Fprintf(env.stdout, "omamori watch: %d rule(s), checking every %s, severity %s or above. Ctrl-C to stop.\n", len(loaded.Rules()), interval, severity)
+	}
 
 	if err := watch.Run(ctx, config); err != nil {
 		return fail(err)
 	}
 
 	return exitOK
+}
+
+// printSink writes each new alert to the terminal, for a watch with no webhook and no email. The alerts are
+// already sanitized by alertsink.FromAlerts.
+type printSink struct{ out io.Writer }
+
+func (sink printSink) Send(_ context.Context, alerts []alertsink.Alert) error {
+	for _, alert := range alerts {
+		fmt.Fprintf(sink.out, "ALERT [%s] %s (%s): %s\n", alert.Level, alert.Title, alert.Rule, alert.Summary)
+	}
+
+	return nil
 }
 
 func buildSinks(webhookURL, smtpHost string, smtpPort int, smtpFrom, smtpTo string, smtpTLS bool, env environment) ([]alertsink.Sink, error) {

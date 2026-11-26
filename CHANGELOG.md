@@ -32,6 +32,8 @@ flags and file formats.
   correlation alert is now one burst (its rule, group and time range), sent once; replaying a test attack check
   by check gives 6 alerts, one per attack, where 40 were sent before.
 - An injection split by comments and followed by a word (`UN/**/ION SEL/**/ECT NULL`) was not seen.
+- `watch` without `--webhook` or `--smtp-*` said that alerts are printed, but printed only how many there were.
+  It now prints each alert.
 - `watch` warned that a freshly started app logs no requests before the app had had any request.
 
 ## [0.3.1] - 2026-11-16
