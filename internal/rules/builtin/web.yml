@@ -157,8 +157,9 @@ detection:
     - url_decoded|re|i: '(^|[^a-z])union\s+(all\s+)?select([^a-z]|$)'
     - referrer|re|i: '(^|[^a-z])union\s+(all\s+)?select([^a-z]|$)'
     - referrer_decoded|re|i: '(^|[^a-z])union\s+(all\s+)?select([^a-z]|$)'
-    - url_compact|re|i: '(^|[^a-z])union(all)?select([^a-z]|$)'
-    - referrer_compact|re|i: '(^|[^a-z])union(all)?select([^a-z]|$)'
+    # Compact text has no spaces, so the word after SELECT runs on (UNIONSELECTNULL): only the start is bounded.
+    - url_compact|re|i: '(^|[^a-z])union(all)?select'
+    - referrer_compact|re|i: '(^|[^a-z])union(all)?select'
   decoded_traversal:
     - url_decoded|contains: ['../..', '..\..']
     - referrer|contains: ['../..', '..\..']
@@ -174,7 +175,8 @@ tests:
       - {category: webserver, url: "/", referrer: "http://x/?id=1%2527%2520OR%2520%25271", referrer_decoded: "http://x/?id=1' OR '1", src_ip: 203.0.113.77}
       - {category: webserver, url: "/", referrer: "https://example.com/?id=1' OR '1'='1", src_ip: 203.0.113.77}
       - {category: webserver, url: "/history?sort=%2527%2529%2520AND%25201%253D2--", url_decoded: "/history?sort=') AND 1=2--", src_ip: 203.0.113.77}
-    expect: {alerts: 7}
+      - {category: webserver, url: "/x?id=1%20UN/**/ION%20SEL/**/ECT%20NULL,NULL--", url_decoded: "/x?id=1 UN ION SEL ECT NULL,NULL--", url_compact: "/x?id=1UNIONSELECTNULL,NULL--", src_ip: 203.0.113.77}
+    expect: {alerts: 8}
   - name: decoded ordinary text is not an injection
     events:
       - {category: webserver, url: "/search?q=children%27s%20or%20adults", url_decoded: "/search?q=children's or adults", src_ip: 198.51.100.4}
