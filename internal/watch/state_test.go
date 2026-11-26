@@ -89,6 +89,63 @@ func TestNewSendsAGrowingBurstOnce(t *testing.T) {
 	}
 }
 
+func TestNewSendsAGrowingCorrelationOnce(t *testing.T) {
+	// Found by the third test attack: an injection burst whose events were all kept was keyed by its events, so
+	// each new payload made it new again, and it was sent 13 times.
+	parsed, err := rules.Parse([]byte("title: One\nname: one\nlogsource: {}\ndetection:\n  s: {action: x}\n  condition: s\n---\n"+
+		"title: Burst\nname: burst\ncorrelation:\n  type: event_count\n  rules: [one]\n  group-by: [src_ip]\n  timespan: 5m\n  condition: {gte: 1}\n"), "t.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	correlation := parsed[1]
+	if !correlation.IsCorrelation() {
+		t.Fatal("the test rule is not a correlation")
+	}
+	state := newState()
+	growing := func(events int) *rules.Alert {
+		alert := &rules.Alert{Rule: correlation, First: baseTime, Last: baseTime.Add(time.Duration(events) * time.Second), Count: events,
+			Group: []rules.Pair{{Field: "src_ip", Value: "203.0.113.5"}}}
+		for i := range events {
+			alert.Events = append(alert.Events, sampleAlert(t, "one", addressFor(i), baseTime).Events[0])
+		}
+		return alert
+	}
+	if got := state.New([]*rules.Alert{growing(1)}, nil, baseTime); len(got) != 1 {
+		t.Fatalf("first payload: %d fresh, want 1", len(got))
+	}
+	for events := 2; events <= 15; events++ {
+		if got := state.New([]*rules.Alert{growing(events)}, nil, baseTime.Add(time.Duration(events)*5*time.Second)); len(got) != 0 {
+			t.Fatalf("payload %d: the same burst was sent again", events)
+		}
+	}
+}
+
+func TestNewKeepsABurstWhoseStartMovesEarlier(t *testing.T) {
+	// Lines of another log can arrive late, so the first event of a running burst can move earlier.
+	state := newState()
+	state.New([]*rules.Alert{burst(t, "203.0.113.5", baseTime, 12)}, nil, baseTime)
+	earlier := burst(t, "203.0.113.5", baseTime.Add(-3*time.Second), 20)
+	if got := state.New([]*rules.Alert{earlier}, nil, baseTime.Add(5*time.Second)); len(got) != 0 {
+		t.Fatal("a burst whose start moved a few seconds earlier was sent again")
+	}
+}
+
+func TestBurstsSurviveARestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+	state := newState()
+	state.New([]*rules.Alert{burst(t, "203.0.113.5", baseTime, 12)}, nil, baseTime)
+	if err := state.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := loaded.New([]*rules.Alert{burst(t, "203.0.113.5", baseTime, 30)}, nil, baseTime.Add(time.Minute)); len(got) != 0 {
+		t.Fatal("after a restart, the same burst was sent again")
+	}
+}
+
 func TestNewSendsANewBurstAndAnotherAddress(t *testing.T) {
 	state := newState()
 	state.New([]*rules.Alert{burst(t, "203.0.113.5", baseTime, 12)}, nil, baseTime)

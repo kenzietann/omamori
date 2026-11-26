@@ -28,8 +28,10 @@ flags and file formats.
   Fastify app with `watch` running: 0 alerts before, 3 after, on the same log.
 - In an app log, a bare access-log line next to the framework's own lines (an app whose output goes to a file,
   as under pm2 or systemd) was not read.
-- `watch` sent a correlation alert that keeps fewer events than it counts (a long guessing burst) again on every
-  check: 22 times in one test. Such an alert is now one burst, sent once.
+- `watch` sent a running attack again and again as it grew: up to 22 times for one attack in a test. A
+  correlation alert is now one burst (its rule, group and time range), sent once; replaying a test attack check
+  by check gives 6 alerts, one per attack, where 40 were sent before.
+- An injection split by comments and followed by a word (`UN/**/ION SEL/**/ECT NULL`) was not seen.
 - `watch` warned that a freshly started app logs no requests before the app had had any request.
 
 ## [0.3.1] - 2026-11-16

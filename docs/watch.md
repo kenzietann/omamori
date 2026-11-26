@@ -56,10 +56,13 @@ same sanitizer. `watch` only adds a loop and a delivery step around `detect.Run`
 - The state file keeps a bounded set (the last 10,000) of fingerprints already sent, with an
   expiry (30 days) so the set doesn't grow forever. An alert whose fingerprint was already sent is not
   sent to a sink again. `watch` writes no report and has no `--store` yet.
-- A correlation that keeps fewer events than it counts (a long guessing burst) cannot be pinned by its
-  events, which change as it grows. It is keyed as one burst instead: the rule, what it is grouped by
-  (an address) and when it began. The first version sent such an alert on every check, 22 times in one
-  test attack; now a growing burst is sent once, and a new burst later is sent again.
+- A correlation (a count over a time window, like guessing or an injection burst) is keyed as one
+  burst: its rule and what it is grouped by (an address), with the time range it covers. A burst that
+  overlaps one already sent is the same burst, and its range grows; one that touches none (the same
+  address an hour later) is sent again. Keying it by its events or its exact start failed in test
+  attacks: each new request, or a first line arriving late from another log, made it new again, and one
+  attack was sent up to 22 times. Replaying the third test attack check by check now sends 6 alerts,
+  one per attack, where the first version sent 40.
 - The warning for an application log with no request waits until the app logged something new after
   `watch` started, so a freshly started app with no traffic yet does not set it off.
 
